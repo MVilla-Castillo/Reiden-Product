@@ -91,8 +91,8 @@
 * **RNF-36 (Tipado Estricto de Producción):** El pipeline CI/CD rechazará cualquier commit que no pase una validación estática completa de **MyPy**, obligando al uso de genéricos, esquemas Pydantic o typed dictionaries para los objetos anidados como en `fsm_answers`.
 * **RNF-37 (Auth Stateless):** El backend operará bajo un modelo de autenticación sin estado (stateless), validando la firma del JWT en cada request sin requerir sesiones persistentes en servidor.
 * **RNF-38 (JWT Handshake):** Validación obligatoria de claims `iss` (Issuer), `aud` (Audience) y `exp` (Expiration) en todos los middlewares de autenticación del backend.
-* **RNF-39 (Tenant ID Linkage):** El sistema debe extraer el claim `tid` del JWT para vincular la sesión del usuario con el aislamiento lógico de datos (`tenant_id`) de forma inequívoca en Azure AD.
+* **RNF-39 (Tenant ID / Domain Linkage):** El sistema debe extraer reclamos específicos del JWT (como `tid` para Microsoft o el dominio alojado `hd` para Google) para vincular la sesión del usuario con el aislamiento lógico de datos (`tenant_id`) de forma inequívoca.
 * **RNF-40 (Refresh Token Rotation):** Implementación de rotación de Refresh Tokens para mitigar el riesgo de robo de tokens de larga duración.
 * **RNF-41 (ID Token Integrity):** El sistema tratará el ID Token como recurso inmutable y autoportante para evitar consultas redundantes a base de datos de usuarios durante la fase de autorización.
-* **RNF-42 (Scoped Access):** El acceso a la Graph API de Microsoft o recursos internos debe limitarse a los "Scopes" mínimos necesarios (`openid`, `profile`, `email`).
-* **RNF-43 (Autenticación OIDC Nativa):** El backend debe implementar el protocolo OIDC utilizando librerías validadas (ej. `msal-python`) para garantizar el cumplimiento de los estándares de seguridad de Microsoft Entra ID.
+* **RNF-42 (Scoped Access):** El acceso a los recursos del Identity Provider debe limitarse a los "Scopes" mínimos necesarios (`openid`, `profile`, `email`).
+* **RNF-43 (Autenticación OIDC Nativa & Multi-Issuer):** El backend debe implementar validación OIDC compatible nativamente con **múltiples emisores (Microsoft Entra ID y Google Identity)** mediante la extracción segura del claim `iss` antes de la validación criptográfica contra el JWKS correspondiente.

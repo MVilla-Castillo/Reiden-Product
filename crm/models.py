@@ -1,0 +1,232 @@
+import uuid
+from typing import Any, Dict
+
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.db import models
+from django.db.models import JSONField
+from django.contrib.postgres.indexes import GinIndex
+
+
+class ActiveManager(models.Manager):
+    """
+    Manager Customizado para excluir registros eliminados por Soft-Delete.
+    Haciendo cumplir la regla Clean Architecture.
+    """
+    def get_queryset(self) -> models.QuerySet:
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class TenantManager(models.Manager):
+    """
+    Manager base para enforzar el aislamiento (RLS Lógico).
+    Requiere pasar el tenant_id actual explícitamente.
+    Ej: Lead.tenant_objects.for_tenant(tenant)
+    """
+    def for_tenant(self, tenant_id: uuid.UUID) -> models.QuerySet:
+        return self.get_queryset().filter(tenant_id=tenant_id)
+
+
+class ActiveTenantManager(TenantManager):
+    """
+    Combina el aislamiento de Tenant con el Soft-Delete.
+    """
+    def get_queryset(self) -> models.QuerySet:
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class AppUserManager(BaseUserManager):
+    """Manager requerido por Django para usuarios customizados."""
+    def create_user(self, email: str, password: str = None, **extra_fields: Any) -> "AppUser":
+        if not email:
+            raise ValueError('El email debe estar configurado')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        if password:
+            user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email: str, password: str = None, **extra_fields: Any) -> "AppUser":
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        
+        return self.create_user(email, password, **extra_fields)
+
+
+class Tenant(models.Model):
+    """La raíz de aislamiento de datos y configuración del negocio."""
+    
+    class RoutingMode(models.TextChoices):
+        MANUAL = 'MANUAL', 'Manual'
+        AUTO = 'AUTO', 'Auto'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nombre_legal = models.CharField(max_length=255)
+    rut_empresa = models.CharField(max_length=50, unique=True)
+    phone_number_id = models.CharField(max_length=100, unique=True)
+    waba_id = models.CharField(max_length=100, unique=True, db_index=True)
+    routing_mode = models.CharField(
+        max_length=10, 
+        choices=RoutingMode.choices, 
+        default=RoutingMode.MANUAL
+    )
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return str(self.nombre_legal)
+
+
+class AppUser(AbstractBaseUser, PermissionsMixin):
+    """Implementación del RBAC y Gamificación vía Microsoft Entra ID (OIDC Stateless)."""
+    
+    class Role(models.TextChoices):
+        ADMIN = 'ADMIN', 'Admin'
+        MANAGER = 'MANAGER', 'Manager'
+        SALESPERSON = 'SALESPERSON', 'Salesperson'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Aceptamos null=True temoporalmente si usamos createsuperuser, pero en OIDC no será nulo.
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='users', null=True, blank=True)
+    # azure_oid opcional en supersusers locales, pero obligatorio en usuarios de negocio
+    oidc_sub = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text="Subject ID agnóstico (Entra ID Object ID o Google ID)")
+    oidc_issuer = models.CharField(max_length=100, db_index=True, null=True, blank=True, help_text="Origen del Subject (ej. sts.windows.net o accounts.google.com)")
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.SALESPERSON)
+    email = models.EmailField(unique=True)
+    
+    # Flags required by Django Admin
+    is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    
+    objects = AppUserManager()
+    tenant_objects = TenantManager() # Para listar usuarios del mismo Tenant
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    def __str__(self) -> str:
+        return str(self.email)
+
+
+class Lead(models.Model):
+    """Identidad del prospecto con privacidad garantizada."""
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='leads')
+    wa_id_hash = models.CharField(max_length=64, unique=True, db_index=True, help_text="Hash SHA-256 para búsqueda O(1) en webhooks")
+    wa_id = models.CharField(max_length=50, unique=True, help_text="ID de WhatsApp en texto plano (KISS)")
+    first_name = models.CharField(max_length=255, blank=True, null=True)
+    last_interaction = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+    objects = models.Manager() # Default manager (retorna todo, util para Admin)
+    active_objects = ActiveManager() # Custom soft-delete manager general
+    tenant_objects = ActiveTenantManager() # Manager para Vistas Seguras Multi-Tenant (RLS)
+
+    def __str__(self) -> str:
+        return str(self.wa_id)
+
+
+class ChatSession(models.Model):
+    """Entidad de alta concurrencia. Contiene la FSM y base para métricas."""
+    
+    class Status(models.TextChoices):
+        BOT = 'BOT', 'Bot'
+        PENDING_ASSIGNMENT = 'PENDING_ASSIGNMENT', 'Pending Assignment'
+        CON_VENDEDOR = 'CON_VENDEDOR', 'Con Vendedor'
+        GANADO = 'GANADO', 'Ganado'
+        PERDIDO = 'PERDIDO', 'Perdido'
+        ABANDONO_BOT = 'ABANDONO_BOT', 'Abandono Bot'
+        PERDIDO_SISTEMA = 'PERDIDO_SISTEMA', 'Perdido Sistema'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='chat_sessions')
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='chat_sessions')
+    salesperson = models.ForeignKey(
+        AppUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_sessions'
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.BOT)
+    fsm_answers = JSONField(default=dict, help_text="Ficha del Cliente (respuestas)")
+    urgency_score = models.IntegerField(default=0, db_index=True)
+    last_fsm_step = models.CharField(max_length=100, blank=True, null=True)
+    last_client_message_at = models.DateTimeField(blank=True, null=True)
+    lost_reason = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+    objects = models.Manager()
+    active_objects = ActiveManager()
+    tenant_objects = ActiveTenantManager()
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['fsm_answers']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'lead'],
+                condition=~models.Q(
+                    status__in=[
+                        'GANADO', 
+                        'PERDIDO', 
+                        'PERDIDO_SISTEMA', 
+                        'ABANDONO_BOT'
+                    ]
+                ) & models.Q(is_deleted=False),
+                name='unique_active_session_per_lead'
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.lead.wa_id} - {self.status}"
+
+
+class Message(models.Model):
+    """Registro inmutable de la conversación. (Idempotencia y Trazabilidad)"""
+    
+    class Direction(models.TextChoices):
+        INBOUND = 'INBOUND', 'Inbound'
+        OUTBOUND = 'OUTBOUND', 'Outbound'
+
+    class Type(models.TextChoices):
+        TEXT = 'TEXT', 'Text'
+        IMAGE = 'IMAGE', 'Image'
+        AUDIO = 'AUDIO', 'Audio'
+        DOCUMENTO = 'DOCUMENTO', 'Documento'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='messages')
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages')
+    provider_message_id = models.CharField(max_length=255, unique=True, help_text="Idempotencia (RNF-03)")
+    direction = models.CharField(max_length=10, choices=Direction.choices)
+    message_type = models.CharField(max_length=10, choices=Type.choices, default=Type.TEXT)
+    body = models.TextField(help_text="Texto literal o URL firmada")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    tenant_objects = TenantManager()
+
+    def __str__(self) -> str:
+        return str(self.provider_message_id)
+
+
+class AuditLog(models.Model):
+    """Telemetría y Anti-Fraude (Event Sourcing parcial)."""
+    
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='audit_logs')
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='audit_logs')
+    actor = models.ForeignKey(AppUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='actions')
+    action = models.CharField(max_length=50, help_text="Ej: SESSION_START, FSM_TRANSITION, STATUS_CHANGED")
+    old_value = JSONField(default=dict)
+    new_value = JSONField(default=dict)
+    owner_at_time_of_close = models.ForeignKey(
+        AppUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='closed_sessions_audit'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    tenant_objects = TenantManager()
+
+    def __str__(self) -> str:
+        return f"{self.action} on {self.session_id}"

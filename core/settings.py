@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Local Apps
+    'crm',
 ]
 
 MIDDLEWARE = [
@@ -55,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.auth.oidc.OIDCStatelessMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -114,6 +118,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Custom User Model
+AUTH_USER_MODEL = 'crm.AppUser'
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -131,6 +138,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# OIDC Multi-Issuer Configuration (Stateless Auth)
+OIDC_MICROSOFT_ISSUER = env('OIDC_MICROSOFT_ISSUER', default='https://sts.windows.net/COMMON_OR_TENANT_ID/')
+OIDC_MICROSOFT_JWKS_URL = env('OIDC_MICROSOFT_JWKS_URL', default='https://login.microsoftonline.com/common/discovery/v2.0/keys')
+OIDC_MICROSOFT_AUDIENCE = env('OIDC_MICROSOFT_AUDIENCE', default='CLIENT_ID_AZURE')
+
+OIDC_GOOGLE_ISSUER = env('OIDC_GOOGLE_ISSUER', default='https://accounts.google.com')
+OIDC_GOOGLE_JWKS_URL = env('OIDC_GOOGLE_JWKS_URL', default='https://www.googleapis.com/oauth2/v3/certs')
+OIDC_GOOGLE_AUDIENCE = env('OIDC_GOOGLE_AUDIENCE', default='CLIENT_ID_GOOGLE')
 
 # Observability (SRE): JSON Structured Logging
 LOGGING = {

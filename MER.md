@@ -14,11 +14,11 @@
 - **created_at**: Timestamp
 
 ### User (Operadores de la Plataforma)
-*Implementación del RBAC y Gamificación vía Microsoft Entra ID.*
+*Implementación del RBAC y Gamificación vía Proveedor de Identidad (IdP).*
 - **id**: UUID (PK)
 - **tenant_id**: FK (-> Tenant.id, Indexed)
-- **azure_oid**: UUID (Unique) - Object ID de Microsoft Azure
-- **microsoft_tenant_id**: UUID (Indexed)
+- **oidc_sub**: String (Unique) - Subject ID agnóstico (Entra ID Object ID o Google ID)
+- **oidc_issuer**: String (Indexed) - Origen del Subject (ej. `sts.windows.net` o `accounts.google.com`)
 - **role**: Enum (ADMIN, MANAGER, SALESPERSON)
 - **email**: String (Unique)
 - **is_active**: Boolean (Consistencia histórica para rankings)

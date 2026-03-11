@@ -2,7 +2,7 @@
 
 * **Backend:** `Django 5.1` (Asincronía nativa).
 * **Frontend:** `Angular 18+` (TypeScript estricto), `RxJS` para "Polling" eficiente.
-* **Auth:** **Microsoft Entra ID (Azure AD)** mediante MSAL (Frontend) y validación OIDC nativa en Django (Backend). Prohibido el uso de Firebase Auth como intermediario.
+* **Auth:** **OIDC Multi-Issuer (Stateless)**. Soporte simultáneo para **Microsoft Entra ID (Azure AD)** y **Google Workspace (Google Identity)** mediante validación nativa JWT en Django. Prohibido el uso de intermediarios como Firebase Auth.
 * **Base de Datos:** `PostgreSQL 15+` (GCP Cloud SQL) con soporte avanzado `JSONB` y RLS.
 * **Broker & Caché:** Eliminados (KISS). La asincronía se delega a la capa serverless de GCP.
 * **Worker Engine:** `GCP Cloud Tasks` (Encolamiento push) + `GCP Cloud Scheduler` (Cron).
@@ -95,6 +95,7 @@ sequenceDiagram
 ## 🤖 4. Máquina de Estados Finita (FSM - Fricción Cero)
 
 > **Regla de Oro:** El sistema obliga la recolección determinista. Prohibido pedir texto libre para avanzar.
+> **Defensa contra Inyección (FSM Edge Case 3):** La FSM solo responde a selecciones de botones o listas interactivas. Si el lead responde con texto libre, audio u otro formato no soportado en ese instante del flujo, el Worker enviará un recordatorio (hasta 3 veces por estado) insistiendo en usar los botones. Esto neutraliza la posibilidad de inyecciones maliciosas y asegura un JSON estructurado para el cálculo de urgencia.
 
 * 📍 **Estado 1: `VEHICLE_TYPE_QUERY`**
   * **Payload a Twilio:** `LIST` message. (Max 10 opciones de carrocería/modelo).
@@ -126,7 +127,9 @@ sequenceDiagram
 
 ## 🚧 7. Reglas de Arquitectura Anti-Junior (Rules of Engagement)
 
-1. **Transaccionalidad (ACID):** Prohibido usar `get_or_create` en el Webhook. Usa Upsert Atómico (`INSERT ... ON CONFLICT DO NOTHING`) apoyado en el `provider_message_id`. Todo avance de la FSM debe estar dentro de `transaction.atomic()`.
+1. **Transaccionalidad (ACID) y Prevención de Deadlocks:** 
+   * Prohibido usar `get_or_create` en el Webhook. Usa Upsert Atómico (`INSERT ... ON CONFLICT DO NOTHING`) apoyado en el `provider_message_id`. 
+   * **Row-Level Locks:** Todo avance de la FSM debe estar dentro de `transaction.atomic()` y ejecutar obligatoriamente `ChatSession.objects.select_for_update().get(id=...)` para bloquear la fila de la sesión en PostgreSQL. Esto previene condiciones de carrera si llegan mensajes del mismo lead en el mismo milisegundo.
 2. **Defensa de Payload:** La ausencia del objeto `referral` o la carencia de `text.body` no deben generar excepciones `KeyError` o `NullPointerException`.
 3. **Seguridad RLS y Multi-Tenancy:** Todo QuerySet en Django que consuma información de Leads o Mensajes DEBE utilizar un Custom Manager que inyecte `WHERE tenant_id = X` automáticamente.
 4. **Inmutabilidad y Auditoría:** Prohibidos los comandos `DELETE` físicos en `Lead` o `ChatSession`. Uso estricto de Soft-Delete (`is_deleted=True`). Prohibido mantener plantillas HSM hardcodeadas; deben sincronizarse vía tarea periódica (Cloud Scheduler).
@@ -141,6 +144,10 @@ sequenceDiagram
 > 💸 **Trade-off de Costos vs Latencia:** Para el servicio de Ingesta (Webhook) en GCP Cloud Run, operaremos en modo Escalado a Cero (`--min-instances 0`) (Principio YAGNI) limitando la facturación base. Asumimos una mínima penalización de "Cold Start" (aprox 2 seg con Uvicorn) en la recepción del primer mensaje tras un periodo largo de inactividad, que es tolerado nativamente por la política de reintentos de Twilio.
 
 > 🧩 **Edge Case de Estructura Dinámica:** Si Twilio cambia el payload de los mensajes interactivos y el Webhook recibe una llave inesperada, el sistema la atrapará sin fallar (Evitar Error 500) devolviendo un error de API estándar (`{"error": "internal_error"}`) y guardará el error estructurado asíncronamente en Sentry/GCP Logging.
+
+> 🔐 **Edge Case 1: Rotación Silenciosa de Llaves JWKS (Multi-Issuer):** Elegimos validación de identidad OIDC stateless por escalabilidad absoluta. El trade-off es que proveedores como Microsoft y Google rotan sus llaves JWKS periódicamente sin previo aviso. Si la firma del JWT falla por `kid` no encontrado, el middleware de Django **debe identificar el emisor (`iss`), invalidar su caché interna en memoria correspondiente, hacer un re-fetch silencioso de las llaves al emisor específico y reintentar la validación 1 vez** antes de generar el error 401 Unauthorized.
+
+> ⛈️ **Edge Case 2: The "Thundering Herd" en Webhooks:** Si un prospecto envía 4 mensajes muy rápidos hacia una infraestructura Cloud Run escalada a 0, Twilio disparará 4 instancias paralelas intentando crear la misma `ChatSession`. Para resolver esto sin Redis, nos apoyaremos nativamente en la base de datos PostgreSQL mediante un `UniqueConstraint` parcial en `ChatSession`: un `lead_id` solo puede tener garantizada UNA sesión si el estado no es terminal. Los contenedores perdedores de la carrera atraparán el `IntegrityError` y buscarán la sesión recién creada.
 
 ---
 
@@ -163,8 +170,8 @@ sequenceDiagram
 *Implementación del RBAC y Auth corporativa.*
 * `id` (UUID, Primary Key)
 * `tenant_id` (Foreign Key -> Tenant.id, Indexed)
-* `azure_oid` (String, Unique, MaxLength 128) - Mapeo con Microsoft Azure AD (Entra ID).
-* `microsoft_tenant_id` (UUID, Indexed) - ID del directorio de Microsoft.
+* `oidc_sub` (String, Unique, MaxLength 128) - Mapeo agnóstico OIDC (Subject/Object ID) con Azure AD o Google.
+* `oidc_issuer` (String, Indexed, MaxLength 100) - Identifica el origen corporativo (`sts.windows.net` o `accounts.google.com`).
 * `role` (Enum: ADMIN, MANAGER, SALESPERSON)
 * `email` (String, Unique, MaxLength 255)
 * `is_active` (Boolean) - Default: `True`.
@@ -260,7 +267,7 @@ El desarrollo utilizará un flujo de promoción simplificado apoyado **estrictam
    * **Frontend Stack:** Construido en **Angular 18+**.
    * **Despliegue del Frontend:** Alojamiento estático en **Firebase Hosting** (Solo como file server). Esto garantiza extrema velocidad de despliegue, aprovisionamiento gratuito de SSL y CDN Global inmediato, evadiendo la complejidad de balanceadores de carga TCP/HTTPS en V1.
    * Backend: **GCP Cloud Run**.
-   * Autenticación: **Microsoft Entra ID corporativo**.
+   * Autenticación: **OIDC Corporativo (Microsoft Entra ID / Google Workspace)**.
    * Base de Datos: Cloud SQL con backups automatizados.
    * Conexión: WABA ID real y número certificado.
 
@@ -291,18 +298,18 @@ Para una arquitectura de identidad impecable, el sistema implementa los siguient
 
 1.  **Diferenciación entre Autenticación y Autorización:**
     *   **Autenticación (OIDC):** Identifica al usuario ("quién es").
-    *   **Autorización (OAuth 2.0):** Determina permisos sobre recursos ("qué puede hacer").
-2.  **El Token de Identidad (ID Token):** Al completar el login, el sistema recibe un JWT autoportante firmado digitalmente por Microsoft Entra ID. La identidad básica se valida sin consultar la base de datos en cada petición.
-3.  **Autenticación Stateless (Sin Estado):** El backend no guarda sesiones en memoria/disco. Valida la firma del JWT en cada solicitud, permitiendo escalado horizontal infinito.
+    *   **Autorización (RBAC Interno):** Determina permisos sobre recursos ("qué puede hacer").
+2.  **El Token de Identidad (ID Token/Access Token):** Al completar el login, el sistema recibe un JWT autoportante firmado digitalmente por Google o Microsoft. La identidad se valida estrictamente sin consultar la base de datos en cada petición.
+3.  **Autenticación Stateless (Multi-Issuer):** El backend extrae el claim `iss` (Issuer) del header del JWT sin verificarlo aún. En base al `iss`, el middleware decide contra qué JWKS oficial (Microsoft o Google) validará la criptografía de la firma `kid`.
 4.  **Anatomía del JWT (Header, Payload, Signature):**
-    *   **Header:** Algoritmo de encriptación.
-    *   **Payload:** Claims del usuario (email, nombre, `tid` - Tenant ID).
-    *   **Signature:** Garantía de no manipulación.
+    *   **Header:** Algoritmo de encriptación y `kid` (Key ID).
+    *   **Payload:** Claims del usuario (email, sub/oid, iss).
+    *   **Signature:** Garantía de no manipulación vericada contra JWKS externos.
 5.  **Ciclo de Vida (Access vs. Refresh Tokens):**
     *   **Access Token:** Corta duración (~60 min) para autorizar llamadas a la API.
     *   **Refresh Token:** Larga duración, almacenado de forma segura para renovar Access Tokens sin re-login.
 6.  **Claims y Scopes:** Solicitud de scopes `openid`, `profile` y `email`. El claim crítico `tid` vincula al usuario inequívocamente con su organización (`Tenant`).
 7.  **Validación en Backend (Handshake Obligatorio):** Cada token debe verificarse contra:
-    *   **Issuer (iss):** Origen comprobado de Microsoft.
-    *   **Audience (aud):** Emitido específicamente para el Client ID de esta App.
-    *   **Expiration (exp):** Validez temporal vigente.
+    *   **Issuer (iss):** Origen comprobado (Google o Microsoft).
+    *   **Audience (aud):** Emitido específicamente para el Client ID de tu App corporativa en Google o Azure.
+    *   **Expiration (exp):** Validez temporal vigente en Unix time.
