@@ -23,3 +23,14 @@ Esta skill obliga al agente a aplicar principios de Clean Architecture y evitar 
 ## 4. Estilos y Formatting
 *   Uso mandatorio de `black` y `isort` mental para la estructura de imports (estándar de la librería, django, terceros, locales).
 *   Docs string en cada función pública explicando el parámetro, el retorno y los *Side Effects* (ej. "Encola tarea HTTP", "Inserta registro").
+
+## 5. ORM Anti-Patterns (Prevención N+1)
+*   **Prohibido N+1 en Listas:** Todo endpoint que retorne una lista de objetos relacionados (ej. ChatSessions con su Lead y Vendedor) DEBE usar `select_related()` para Foreign Keys simples o `prefetch_related()` para relaciones Many-to-Many/inversas. El dashboard de vendedores cargando 50 chats debe generar máximo 2 queries SQL.
+*   **Anotaciones en vez de Python loops:** Para calcular métricas (ej. count de mensajes por sesión, urgency_score promedio), usa `queryset.annotate()` y `aggregate()` del ORM. Prohibido iterar en Python y contar con lógica de aplicación lo que PostgreSQL puede hacer en una sola query.
+*   **`only()` y `defer()` para proyecciones:** Cuando necesites sólo 2-3 campos de un modelo pesado (ej. solo `id` y `status` de ChatSession en un listado), usa `ChatSession.objects.only('id', 'status', 'lead_id')` para evitar transferir columnas JSONB pesadas innecesariamente.
+
+## 6. Testing Patterns (pytest-django)
+*   **Estructura AAA obligatoria:** Todo test debe seguir el patrón Arrange-Act-Assert. Prohibido mezclar configuración, ejecución y verificación en el mismo bloque.
+*   **Factories sobre Fixtures:** Usa `factory_boy` para crear datos de prueba en vez de fixtures de Django (JSON/YAML). Las factories son más legibles, componibles y mantenibles.
+*   **Un comportamiento por test:** Cada función de test valida un único comportamiento o caso de borde. Si un test tiene más de 2-3 `assert`, probablemente debe dividirse.
+*   **Prohibido HTTP real a Twilio:** Todo código que llame a la API de Twilio debe ser interceptado con `unittest.mock.patch` o la librería `responses`. Los tests deben ser deterministas y no depender de red externa.

@@ -23,3 +23,19 @@ Esta skill está enfocada a programar de forma defensiva para que el sistema sop
 ## 4. Programación Defensiva (Fallas Externas)
 *   Asume que la API de Twilio (o Microsoft Entra ID) se va a caer o demorar.
 *   Siempre, sin excepción, aplica un argumento de `timeout=5.0` (o menor) a cualquier petición externa HTTP. Si falla, delega a GCP Cloud Tasks para reintento automático (Dead Letter Queue).
+
+## 5. Connection Management (PostgreSQL)
+*   **`CONN_MAX_AGE`:** Configura `CONN_MAX_AGE` en `settings.py` (recomendado: `60` segundos) para reutilizar conexiones de BD entre requests y evitar el overhead de establecer nueva conexión TCP en cada petición en Cloud Run.
+*   **Sin conexiones dentro de loops:** Prohibido ejecutar queries dentro de bucles Python. Si necesitas procesar N registros, usa `queryset.iterator()` para streaming eficiente o una sola query con `IN`.
+*   **Cloud SQL Auth Proxy:** En producción (Cloud Run), la conexión a PostgreSQL pasa obligatoriamente por Cloud SQL Auth Proxy. Prohibido exponer el puerto de PostgreSQL directamente. Esto gestiona TLS y autenticación IAM sin credenciales en código.
+
+## 6. Row-Level Locking para FSM (select_for_update)
+*   **Patrón obligatorio para transiciones FSM:** Toda actualización al campo `status` o `fsm_answers` de `ChatSession` DEBE seguir este patrón exacto dentro de `transaction.atomic()`:
+    ```python
+    with transaction.atomic():
+        session = ChatSession.objects.select_for_update().get(id=session_id)
+        # ... lógica de transición ...
+        session.save()
+    ```
+*   **`select_for_update(nowait=False)`:** El parámetro por defecto `nowait=False` hace que la transacción espere a que se libere el lock. Esto es correcto para nuestro caso porque el volumen de mensajes concurrentes del mismo Lead es bajo. Si en el futuro se detecta contención, evaluar `skip_locked=True` para procesamiento en paralelo.
+*   **`UniqueConstraint` como última línea de defensa:** El constraint parcial en `ChatSession` garantiza a nivel de base de datos (no solo aplicación) que un Lead sólo tenga una sesión activa. Es el seguro para el Thundering Herd en Cloud Run escalado a cero.
