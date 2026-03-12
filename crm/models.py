@@ -212,8 +212,9 @@ class Message(models.Model):
 
 
 class AuditLog(models.Model):
-    """Telemetría y Anti-Fraude (Event Sourcing parcial)."""
+    """Telemetría y Anti-Fraude (Event Sourcing parcial). Inmutable: prohibido UPDATE/DELETE."""
     
+    id = models.BigAutoField(primary_key=True)  # MASTER_SPEC §9.3: BigInt Auto-incremental
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='audit_logs')
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='audit_logs')
     actor = models.ForeignKey(AppUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='actions')

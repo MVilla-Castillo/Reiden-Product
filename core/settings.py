@@ -87,7 +87,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': env.db(
         'DATABASE_URL',
-        default=f'sqlite:///{BASE_DIR}/db.sqlite3'
+        default='postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db'
     )
 }
 

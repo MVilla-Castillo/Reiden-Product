@@ -63,7 +63,7 @@
 *Objetivo: Estabilidad total, escalado a cero y monitoreo de nivel Big Tech.*
 - [ ] Configuración de GCP Secret Manager e inyección (Cloud Run / Django).
 - [ ] Configuración de **GCP Cloud Scheduler** para cierre automático de sesiones inactivas (>48h).
-- [ ] Setup de despliegues canarios en GCP Cloud Run y Firebase Hosting.
+- [ ] Setup de deploy directo en GCP Cloud Run y Firebase Hosting (canario diferido a multi-tenant).
 - [ ] Configuración de alertas en Sentry y GCP Logging (1% error threshold).
 - [ ] **Hito:** Despliegue en dominio de producción con tráfico real operando a `--min-instances 0`.
 
