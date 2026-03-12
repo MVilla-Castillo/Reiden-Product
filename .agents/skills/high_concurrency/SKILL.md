@@ -25,9 +25,9 @@ Esta skill está enfocada a programar de forma defensiva para que el sistema sop
 *   Siempre, sin excepción, aplica un argumento de `timeout=5.0` (o menor) a cualquier petición externa HTTP. Si falla, delega a GCP Cloud Tasks para reintento automático (Dead Letter Queue).
 
 ## 5. Connection Management (PostgreSQL)
-*   **`CONN_MAX_AGE`:** Configura `CONN_MAX_AGE` en `settings.py` (recomendado: `60` segundos) para reutilizar conexiones de BD entre requests y evitar el overhead de establecer nueva conexión TCP en cada petición en Cloud Run.
-*   **Sin conexiones dentro de loops:** Prohibido ejecutar queries dentro de bucles Python. Si necesitas procesar N registros, usa `queryset.iterator()` para streaming eficiente o una sola query con `IN`.
-*   **Cloud SQL Auth Proxy:** En producción (Cloud Run), la conexión a PostgreSQL pasa obligatoriamente por Cloud SQL Auth Proxy. Prohibido exponer el puerto de PostgreSQL directamente. Esto gestiona TLS y autenticación IAM sin credenciales en código.
+*   **Cloud SQL Auth Proxy (obligatorio):** En producción (Cloud Run), la conexión a PostgreSQL pasa obligatoriamente por Cloud SQL Auth Proxy. Prohibido exponer el puerto de PostgreSQL directamente. Gestiona TLS e IAM sin credenciales en código.
+*   **Sin queries dentro de loops:** Prohibido ejecutar queries dentro de bucles Python. Usar una sola query con `IN` o `annotate()`. Al escalar a múltiples tenants, evaluar `queryset.iterator()` para procesar conjuntos grandes.
+*   **`CONN_MAX_AGE`:** Con 600 leads/mes el pool por defecto es suficiente. Configurar `CONN_MAX_AGE=60` en `settings.py` cuando el tráfico escale a múltiples tenants activos simultáneamente.
 
 ## 6. Row-Level Locking para FSM (select_for_update)
 *   **Patrón obligatorio para transiciones FSM:** Toda actualización al campo `status` o `fsm_answers` de `ChatSession` DEBE seguir este patrón exacto dentro de `transaction.atomic()`:

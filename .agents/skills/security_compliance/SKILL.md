@@ -25,7 +25,7 @@ Aplica el rigor de una empresa Fintech/Salud a la autenticación y almacenamient
 *   El único momento donde se ve el campo completo es en la respuesta de red autorizada o ejecutando queries directas en Cloud SQL (donde aplica el Data-at-Rest Encryption).
 
 ## 5. Ciclo de Vida de Secretos (GCP Secret Manager)
-*   **Versionado:** Todos los secretos en GCP Secret Manager se almacenan con versiones. Al rotar un secreto (ej. Twilio Auth Token), crear una nueva versión y deshabilitar la anterior. **Nunca eliminar versiones antiguas inmediatamente**, esperar el tiempo de propagación (~15 min) antes de destruirlas.
-*   **Least-Privilege IAM:** La Service Account de Cloud Run solo debe tener el rol `roles/secretmanager.secretAccessor` para los secretos específicos que necesita. Prohibido usar roles amplios como `roles/editor` o `roles/owner`.
-*   **Sin credenciales de larga duración:** Prohibido crear API Keys de Google con duración indefinida. Preferir credenciales de corta duración (Application Default Credentials en Cloud Run) o secretos rotados trimestralmente via Cloud Scheduler.
-*   **Escaneo Pre-Commit (TruffleHog):** Configurar un hook de Git o pipeline de CI que ejecute `trufflehog filesystem .` antes de cada merge a `main`. Si detecta un secreto expuesto, el pipeline falla y bloquea el merge automáticamente.
+*   **Versionado:** Al actualizar un secreto (ej. Twilio Auth Token comprometido), crear una nueva versión en GCP Secret Manager y deshabilitar la anterior. Esperar ~15 min de propagación antes de destruir la versión vieja.
+*   **Least-Privilege IAM (configuración única):** La Service Account de Cloud Run solo debe tener el rol `roles/secretmanager.secretAccessor`. Prohibido usar `roles/editor` o `roles/owner`.
+*   **Rotación:** Rotar secretos ante cualquier brecha de seguridad o salida de un miembro del equipo. No es necesario automatizar rotación periódica en V1.
+*   **Opcional (cuando el equipo crezca):** Agregar `trufflehog filesystem .` como paso de CI para escanear secretos accidentalmente commiteados.

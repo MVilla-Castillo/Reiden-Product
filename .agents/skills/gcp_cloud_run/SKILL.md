@@ -38,11 +38,13 @@ USER appuser
 CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8080", "--workers", "2"]
 ```
 
-## 2. cloudbuild.yaml (CI/CD Canario)
+## 2. cloudbuild.yaml (CI/CD Directo)
+
+Deploy automático al 100% del tráfico al hacer push a `main`. Con 5 usuarios activos, el rollback se hace con `gcloud run deploy` apuntando al commit anterior si algo falla.
 
 ```yaml
 steps:
-  # 1. Build de imagen inmutable
+  # 1. Build de imagen inmutable (tag = commit SHA para trazabilidad)
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/ccrm-backend:$COMMIT_SHA', '.']
 
@@ -50,7 +52,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/ccrm-backend:$COMMIT_SHA']
 
-  # 3. Deploy con 0% de tráfico inicial (Canario)
+  # 3. Deploy directo al 100% del tráfico
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -59,14 +61,15 @@ steps:
       - ccrm-backend
       - --image=gcr.io/$PROJECT_ID/ccrm-backend:$COMMIT_SHA
       - --region=us-central1
-      - --no-traffic           # No recibe tráfico hasta validación manual
-      - --tag=canary-$COMMIT_SHA
       - --min-instances=0      # OBLIGATORIO: Escalado a cero
       - --max-instances=10
       - --memory=512Mi
+      - --cpu-boost             # Reduce cold start durante arranque
       - --set-secrets=TWILIO_AUTH_TOKEN=TWILIO_AUTH_TOKEN:latest
       - --set-secrets=DB_PASSWORD=DB_PASSWORD:latest
 ```
+
+> **Futuro:** Cuando el sistema tenga múltiples tenants activos, evaluar deploy canario con `--no-traffic` y validación manual antes de migrar el 100% del tráfico.
 
 ## 3. Healthchecks Obligatorios
 

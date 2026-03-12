@@ -57,12 +57,11 @@ vehicle_type = payload['referral']['headline']
     CORS_ALLOW_CREDENTIALS = True
     ```
 
-## 4. Rate Limiting sin Redis (Cloud Run Nativo)
+## 4. Rate Limiting (Cloud Tasks como Buffer Natural)
 
-Como no usamos Redis, el rate limiting se implementa a nivel de infraestructura:
-*   **Google Cloud Armor:** Para el Webhook de Twilio, configurar una regla de Cloud Armor que límite a 50 req/seg por IP de origen (IPs de Twilio conocidas).
-*   **Cloud Tasks como buffer:** El Webhook no procesa nada pesado; delega inmediatamente a Cloud Tasks. Esto es el mayor protector natural contra sobrecarga.
-*   **Timeout de Vista:** Todo `view` de Django que no sea el Webhook debe tener lógica de timeout implícita via `CONN_MAX_AGE` y timeouts de Red externos.
+No se necesita Redis ni Cloud Armor a este volumen de tráfico:
+*   **Cloud Tasks es el rate limiter:** El Webhook recibe el payload de Twilio, lo encola en Cloud Tasks y responde `200 OK` en < 100ms. Si Twilio envía en ráfaga, las tareas se procesan en orden sin saturar la BD.
+*   **Timeout obligatorio en vistas:** Todo `view` debe completar su lógica en < 10s. Las llamadas externas (Twilio API, JWKS) deben tener `timeout=5.0` explícito.
 
 ## 5. Headers de Seguridad HTTP
 

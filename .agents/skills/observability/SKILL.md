@@ -23,15 +23,12 @@ Esta skill obliga al agente a generar un rastro auditable (Audit Trail) perfecto
 *   **Toda vez** que la entidad `ChatSession` cambia de `.status` (ej. de `BOT` a `CON_VENDEDOR` o a `GANADO`), un registro paralelo debe insertarse en la tabla `AuditLog`.
 *   Captura el `old_value` (JSON previo) y el `new_value` (JSON post-estado) + el `actor_id` (quién lo cambió: Bot o Vendedor). Esto es el motor matemático irrefutable para la facturación de comisiones y gamificación (Win-Rate).
 
-## 5. SLI/SLO & Error Budget (CCRM-SAAS)
-*   **SLOs definidos para producción:**
-    *   Webhook Ingestion: 99.5% de disponibilidad mensual (max ~3.6h downtime/mes). Métrica: `HTTP 200` en `/webhook/`.
-    *   FSM Worker: 99% de tareas procesadas exitosamente por Cloud Tasks sin llegar a DLQ.
-    *   Dashboard API: p95 latencia < 500ms para listado de sesiones activas.
-*   **Error Budget:** Si el error budget del Webhook se consume más del 50% en una semana, se activa congelación de despliegues hasta identificar la causa raíz.
-*   **Healthchecks obligatorios:** Implementar `/health/liveness` (responde 200 si Django arrancó) y `/health/readiness` (verifica conexión real a PostgreSQL). Cloud Run los usa para enrutar tráfico y escalar.
+## 5. Healthchecks (Obligatorio para Cloud Run)
+*   Implementar dos endpoints que Cloud Run usa para gestionar el ciclo de vida del contenedor:
+    *   `GET /health/liveness` → responde `200 OK` si Django arrancó correctamente.
+    *   `GET /health/readiness` → verifica conexión real a PostgreSQL (`SELECT 1`). Responde `503` si la BD no está disponible. Sin este endpoint, Cloud Run puede enrutar tráfico a una instancia sin BD.
+*   Estos endpoints no requieren autenticación OIDC.
 
-## 6. Alert Routing (GCP Cloud Logging + Sentry)
-*   **P1 – Alerta Crítica (respuesta inmediata):** Disparar cuando tasa de errores HTTP 5xx en el Webhook supere el 1% en ventana de 5 minutos, o cuando Cloud Tasks reporte más de 10 tareas en DLQ en 15 minutos.
-*   **P2 – Alerta de Degradación:** Disparar cuando latencia p95 del Dashboard API supere 800ms sostenido por 10 minutos.
-*   **Prohibido "Log Noise":** No loguear eventos de bajo nivel (ej. cada request HTTP exitoso) en producción. Solo loguear Warnings, Errors y eventos de negocio importantes (transiciones FSM, asignaciones de vendedor). Costo de GCP Logging es proporcional al volumen.
+## 6. Alertas Simples (Sentry)
+*   Configurar **una sola alerta de Sentry** que notifique por email cuando ocurran 3+ errores HTTP 5xx en menos de 5 minutos. Es suficiente para un equipo pequeño con 1 tenant.
+*   **Prohibido "Log Noise":** No loguear cada request HTTP exitoso en producción. Solo loguear: Warnings, Errors y eventos de negocio importantes (transiciones FSM, asignación de vendedor). El costo de GCP Logging es proporcional al volumen.
