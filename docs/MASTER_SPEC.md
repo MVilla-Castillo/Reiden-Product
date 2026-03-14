@@ -1,4 +1,4 @@
-## 🛠️ 1. Stack Tecnológico de Élite y Tooling
+##  1. Stack Tecnológico de Élite y Tooling
 
 * **Backend:** `Django 5.1` (Asincronía nativa).
 * **Frontend:** `Angular 18+` (TypeScript estricto), `RxJS` para "Polling" eficiente.
@@ -14,54 +14,54 @@
     * **Storage:** GCP Cloud Storage (Persistencia de Audios/Imágenes).
 * **Observabilidad y APM:** Sentry (Performance Tracing) y GCP Cloud Logging (Logs estructurados en formato JSON).
 
-### 🧠 Skills y MCPs del Agente
+###  Skills y MCPs del Agente
 
 > **Skills Activas (Obligatorias):** `Clean Architecture`, `High Concurrency`, `Security & Compliance`, `Observability & Monitoring`.
 > **MCPs Activos (Permanentes):** `postgresql_mcp` (Validación DDL), `filesystem_mcp` (Escritura de código).
 
 **Skills Contextuales (Activar según la sesión de código):**
-* 🧪 **`TDD (Test-Driven Development)`:** Actívala solo cuando le pidas crear el motor de la FSM o el calculador del `urgency_score`.
-* 📊 **`SQL Optimization & Database Design`:** Actívala cuando vayas a definir migraciones complejas o transacciones atómicas crtícas en el webhook.
-* 🛡️ **`SRE (Site Reliability Engineering) / PRR`:** Actívala estrictamente en la fase de Code Review de los endpoints asíncronos (Cloud Tasks) y Webhooks para cazar fugas de memoria y *Connection Pool Exhaustion*.
-* ☁️ **`Cloud DevOps & Infra`:** Actívala al final, cuando vayamos a redactar el `Dockerfile`, el `cloudbuild.yaml` y la configuración de escalado a cero en Cloud Run.
+*  **`TDD (Test-Driven Development)`:** Actívala solo cuando le pidas crear el motor de la FSM o el calculador del `urgency_score`.
+*  **`SQL Optimization & Database Design`:** Actívala cuando vayas a definir migraciones complejas o transacciones atómicas crtícas en el webhook.
+*  **`SRE (Site Reliability Engineering) / PRR`:** Actívala estrictamente en la fase de Code Review de los endpoints asíncronos (Cloud Tasks) y Webhooks para cazar fugas de memoria y *Connection Pool Exhaustion*.
+*  **`Cloud DevOps & Infra`:** Actívala al final, cuando vayamos a redactar el `Dockerfile`, el `cloudbuild.yaml` y la configuración de escalado a cero en Cloud Run.
 
 **MCPs Contextuales:**
-* 🌐 **`Google Search / web_search_mcp`:** Actívalo solo si la IA necesita validar algún cambio reciente en la Graph API de Meta (v18.0+) o en la documentación de `uv`.
-* 🐙 **`github_mcp`:** Para automatizar la creación de PRs (Pull Requests) cuando pases de entorno local a tu repositorio remoto.
+*  **`Google Search / web_search_mcp`:** Actívalo solo si la IA necesita validar algún cambio reciente en la Graph API de Meta (v18.0+) o en la documentación de `uv`.
+*  **`github_mcp`:** Para automatizar la creación de PRs (Pull Requests) cuando pases de entorno local a tu repositorio remoto.
 
-### 📦 Gestor de Dependencias y Entorno
+###  Gestor de Dependencias y Entorno
 > **Uso estricto de `uv`** (reemplazando `pip`, `venv` y `poetry`). Todo el manejo de paquetes se hará mediante `uv add` y `uv sync`. El archivo `uv.lock` es la única fuente de la verdad para los despliegues en producción; queda terminantemente prohibido hacer `pip install` manuales o generar `requirements.txt` ad-hoc.
 
 ---
 
-## 🎯 2. Definición del Dominio y Alcance (Scope)
+##  2. Definición del Dominio y Alcance (Scope)
 
-### 🚫 Out of Scope (Restricciones V1)
+###  Out of Scope (Restricciones V1)
 * **Gestión de Inventario (ERP):** El CCRM no es un sistema de stock. Recibe el interés del modelo, pero no gestiona la carga de vehículos.
 * **Pasarela de Pagos:** No procesamos transacciones. El fin es el agendamiento y la calificación, no la venta por e-commerce.
 * **Módulo de Marketing masivo:** No es para enviar spam. Es puramente transaccional y conversacional (CCRM).
 * **Integración con CRMs Legados:** En la V1, el CCRM es el sistema de registro principal. No se sincroniza con Salesforce/HubSpot aún.
 * **Aplicación Móvil o Interfaz Responsiva (Mobile-First):** El Dashboard y la bandeja están optimizados exclusivamente como Web de Escritorio (Desktop Web App). No se construirá versión nativa ni responsiva para celulares en la V1.
 
-### 👤 Historias de Usuario Core
+###  Historias de Usuario Core
 
-**🗣️ Cliente:**
+*** Cliente:**
 * Como interesado, quiero iniciar un chat y recibir opciones claras de botones para no tener que escribir texto largo y obtener una respuesta instantánea.
 
-**👔 Gerente:**
+*** Gerente:**
 * Quiero ver un Leaderboard basado en el Win-Rate real para incentivar la competencia sana entre mi equipo.
 * Quiero auditar el `AuditLog` de cualquier sesión para entender por qué se perdió una venta o si hubo mala praxis de un vendedor.
 * Quiero cambiar el modo de ruteo de `Manual` a `Auto` (Round-Robin) cuando el equipo esté saturado.
 * Quiero acceder a una vista de "Solo Lectura" de cualquier chat activo sin que el vendedor reciba notificaciones de lectura ni el cliente vea un estado de "visto", para supervisar el cumplimiento de los protocolos de venta y el tono de la conversación en tiempo real.
 
-**💼 Vendedor:**
+*** Vendedor:**
 * Quiero ver el historial y las respuestas del bot (modelo, presupuesto) antes de saludar, para no repetir preguntas que el cliente ya contestó.
 * Quiero una interfaz fluida (mediante HTTP Polling rápido) para responder mensajes en menos de 10 segundos (Speed to Lead) sin requerir re-cargar la página manualmente.
 * Quiero marcar un lead como `Ganado` con un clic para que mi comisión y mi Win-Rate se registren correctamente.
 
 ---
 
-## 🔄 3. Arquitectura de Flujo de Datos (Data Flow)
+##  3. Arquitectura de Flujo de Datos (Data Flow)
 
 A continuación, el flujo mapeado desde la lógica de negocio hacia la infraestructura asíncrona:
 
@@ -92,23 +92,23 @@ sequenceDiagram
     end 
 ```
 
-## 🤖 4. Máquina de Estados Finita (FSM - Fricción Cero)
+##  4. Máquina de Estados Finita (FSM - Fricción Cero)
 
 > **Regla de Oro:** El sistema obliga la recolección determinista. Prohibido pedir texto libre para avanzar.
 > **Defensa contra Inyección (FSM Edge Case 3):** La FSM solo responde a selecciones de botones o listas interactivas. Si el lead responde con texto libre, audio u otro formato no soportado en ese instante del flujo, el Worker enviará un recordatorio (hasta 3 veces por estado) insistiendo en usar los botones. Esto neutraliza la posibilidad de inyecciones maliciosas y asegura un JSON estructurado para el cálculo de urgencia.
 
-* 📍 **Estado 1: `VEHICLE_TYPE_QUERY`**
+*  **Estado 1: `VEHICLE_TYPE_QUERY`**
   * **Payload a Twilio:** `LIST` message. (Max 10 opciones de carrocería/modelo).
-* 📍 **Estado 2: `PAYMENT_METHOD_QUERY`**
+*  **Estado 2: `PAYMENT_METHOD_QUERY`**
   * **Payload a Twilio:** `INTERACTIVE_BUTTONS`. Opciones: `[Contado]`, `[Crédito]`, `[Retoma]`.
-* 📍 **Estado 3: `BUDGET_RANGE_QUERY`**
+*  **Estado 3: `BUDGET_RANGE_QUERY`**
   * **Payload a Twilio:** `LIST` o `INTERACTIVE_BUTTONS` (Rangos predefinidos).
-* 📍 **Estado 4: `PURCHASE_INTENT_QUERY`**
+*  **Estado 4: `PURCHASE_INTENT_QUERY`**
   * **Payload a Twilio:** `INTERACTIVE_BUTTONS`. Opciones: `[Hoy]`, `[Esta semana]`, `[Este mes o más]`.
 
 ---
 
-## 🗄️ 5. Diseño de Base de Datos y MER (Resumen Conceptual)
+##  5. Diseño de Base de Datos y MER (Resumen Conceptual)
 
 * **`Tenant`:** Aislamiento lógico. Almacena `waba_id` y `phone_number_id` obtenidos vía el Onboarding Técnico consultando a la API de Twilio.
 * **`Lead`:** Datos del prospecto. `wa_id` (teléfono) debe estar enmascarado en logs (Data Masking).
@@ -125,7 +125,7 @@ sequenceDiagram
 
 ---
 
-## 🚧 7. Reglas de Arquitectura Anti-Junior (Rules of Engagement)
+##  7. Reglas de Arquitectura Anti-Junior (Rules of Engagement)
 
 1. **Transaccionalidad (ACID) y Prevención de Deadlocks:** 
    * Prohibido usar `get_or_create` en el Webhook. Usa Upsert Atómico (`INSERT ... ON CONFLICT DO NOTHING`) apoyado en el `provider_message_id`. 
@@ -139,21 +139,21 @@ sequenceDiagram
 
 ---
 
-## ⚠️ 8. Trade-Offs & Edge Cases Oficiales
+##  8. Trade-Offs & Edge Cases Oficiales
 
-> 💸 **Trade-off de Costos vs Latencia:** Para el servicio de Ingesta (Webhook) en GCP Cloud Run, operaremos en modo Escalado a Cero (`--min-instances 0`) (Principio YAGNI) limitando la facturación base. Asumimos una mínima penalización de "Cold Start" (aprox 2 seg con Uvicorn) en la recepción del primer mensaje tras un periodo largo de inactividad, que es tolerado nativamente por la política de reintentos de Twilio.
+>  **Trade-off de Costos vs Latencia:** Para el servicio de Ingesta (Webhook) en GCP Cloud Run, operaremos en modo Escalado a Cero (`--min-instances 0`) (Principio YAGNI) limitando la facturación base. Asumimos una mínima penalización de "Cold Start" (aprox 2 seg con Uvicorn) en la recepción del primer mensaje tras un periodo largo de inactividad, que es tolerado nativamente por la política de reintentos de Twilio.
 
-> 🧩 **Edge Case de Estructura Dinámica:** Si Twilio cambia el payload de los mensajes interactivos y el Webhook recibe una llave inesperada, el sistema la atrapará sin fallar (Evitar Error 500) devolviendo un error de API estándar (`{"error": "internal_error"}`) y guardará el error estructurado asíncronamente en Sentry/GCP Logging.
+>  **Edge Case de Estructura Dinámica:** Si Twilio cambia el payload de los mensajes interactivos y el Webhook recibe una llave inesperada, el sistema la atrapará sin fallar (Evitar Error 500) devolviendo un error de API estándar (`{"error": "internal_error"}`) y guardará el error estructurado asíncronamente en Sentry/GCP Logging.
 
-> 🔐 **Edge Case 1: Rotación Silenciosa de Llaves JWKS (Multi-Issuer):** Elegimos validación de identidad OIDC stateless por escalabilidad absoluta. El trade-off es que proveedores como Microsoft y Google rotan sus llaves JWKS periódicamente sin previo aviso. Si la firma del JWT falla por `kid` no encontrado, el middleware de Django **debe identificar el emisor (`iss`), invalidar su caché interna en memoria correspondiente, hacer un re-fetch silencioso de las llaves al emisor específico y reintentar la validación 1 vez** antes de generar el error 401 Unauthorized.
+>  **Edge Case 1: Rotación Silenciosa de Llaves JWKS (Multi-Issuer):** Elegimos validación de identidad OIDC stateless por escalabilidad absoluta. El trade-off es que proveedores como Microsoft y Google rotan sus llaves JWKS periódicamente sin previo aviso. Si la firma del JWT falla por `kid` no encontrado, el middleware de Django **debe identificar el emisor (`iss`), invalidar su caché interna en memoria correspondiente, hacer un re-fetch silencioso de las llaves al emisor específico y reintentar la validación 1 vez** antes de generar el error 401 Unauthorized.
 
-> ⛈️ **Edge Case 2: The "Thundering Herd" en Webhooks:** Si un prospecto envía 4 mensajes muy rápidos hacia una infraestructura Cloud Run escalada a 0, Twilio disparará 4 instancias paralelas intentando crear la misma `ChatSession`. Para resolver esto sin Redis, nos apoyaremos nativamente en la base de datos PostgreSQL mediante un `UniqueConstraint` parcial en `ChatSession`: un `lead_id` solo puede tener garantizada UNA sesión si el estado no es terminal. Los contenedores perdedores de la carrera atraparán el `IntegrityError` y buscarán la sesión recién creada.
+>  **Edge Case 2: The "Thundering Herd" en Webhooks:** Si un prospecto envía 4 mensajes muy rápidos hacia una infraestructura Cloud Run escalada a 0, Twilio disparará 4 instancias paralelas intentando crear la misma `ChatSession`. Para resolver esto sin Redis, nos apoyaremos nativamente en la base de datos PostgreSQL mediante un `UniqueConstraint` parcial en `ChatSession`: un `lead_id` solo puede tener garantizada UNA sesión si el estado no es terminal. Los contenedores perdedores de la carrera atraparán el `IntegrityError` y buscarán la sesión recién creada.
 
 ---
 
-## 🗃️ 9. Diseño de Base de Datos y Modelo Entidad-Relación (MER) Completo
+##  9. Diseño de Base de Datos y Modelo Entidad-Relación (MER) Completo
 
-### 🏢 9.1 Entidades de Estructura y Multi-Tenancy
+###  9.1 Entidades de Estructura y Multi-Tenancy
 
 **`Tenant` (Automotora)**
 *La raíz de aislamiento de datos y configuración del negocio.*
@@ -176,7 +176,7 @@ sequenceDiagram
 * `email` (String, Unique, MaxLength 255)
 * `is_active` (Boolean) - Default: `True`.
 
-### 💸 9.2 Entidades Transaccionales (El Motor de Ventas)
+###  9.2 Entidades Transaccionales (El Motor de Ventas)
 
 **`Lead` (Cliente Potencial)**
 *Identidad del prospecto con privacidad garantizada.*
@@ -204,7 +204,7 @@ sequenceDiagram
 * `updated_at` (Timestamp)
 * `is_deleted` (Boolean) - Soft-Delete. Default: `False`.
 
-### 💬 9.3 Entidades de Comunicación y Trazabilidad
+###  9.3 Entidades de Comunicación y Trazabilidad
 
 **`Message` (Historial de Chat)**
 *El registro inmutable de la conversación.*
@@ -231,7 +231,7 @@ sequenceDiagram
 
 ---
 
-## 🛡️ 10. Criterios de Producción (Site Reliability Engineering - SRE)
+##  10. Criterios de Producción (Site Reliability Engineering - SRE)
 
 Todo código generado debe cumplir con las siguientes defensas Anti-Caídas:
 
@@ -252,14 +252,14 @@ Todo código generado debe cumplir con las siguientes defensas Anti-Caídas:
 
 ---
 
-## 🚀 11. Estrategia de Entornos y Despliegue (CI/CD)
+##  11. Estrategia de Entornos y Despliegue (CI/CD)
 
 El desarrollo utilizará un flujo de promoción simplificado apoyado **estrictamente en contenedores (Docker)**.
 
-* 💻 **Local (Development):**
+*  **Local (Development):**
    * **Todo el entorno debe estar contenido en Docker (`docker-compose.yml`).** Incluyendo PostgreSQL y el servidor web Django. Prohibido requerir la instalación de binarios locales distintos a Docker y `uv`.
    * Webhooks y Cloud Tasks Mocking: Expuestos vía `Ngrok` o ejecutados de forma síncrona en local (`TASK_ALWAYS_EAGER=True` o equivalente).
-* 🌟 **Production (Main) con Blue/Green Nativo:**
+*  **Production (Main) con Blue/Green Nativo:**
    * Dada la fuerte cobertura estática y de tests unitarios (MyPy/Pytest), no se mantendrá un clon perpetuo de Staging para ahorrar costos.
    * La instancia principal de Base de Datos es inmutable.
    * **Despliegues Canarios:** Cuando se apruebe un PR, la imagen Docker se despliega en GCP Cloud Run apuntando un **0% del tráfico** hacia ella (Revision Tagging) para pruebas internas de QA. Una vez validada, se promueve al 100%.
@@ -273,7 +273,7 @@ El desarrollo utilizará un flujo de promoción simplificado apoyado **estrictam
 
 ---
 
-## 🧪 12. Estándares de Testing (Quality Assurance)
+##  12. Estándares de Testing (Quality Assurance)
 
 * **Framework Obligatorio:** Uso estricto de `pytest`, `pytest-django`, y `pytest-asyncio`. Prohibido usar el módulo `unittest` nativo de Django.
 * **Aislamiento de Red:** Queda terminantemente prohibido hacer llamadas HTTP reales a Twilio en los tests. Todo envío de HSM o mensajes interactivos debe estar interceptado mediante `unittest.mock.patch` o `responses`.
@@ -292,7 +292,7 @@ El desarrollo utilizará un flujo de promoción simplificado apoyado **estrictam
 
 ---
 
-## 🔐 14. Protocolo de Identidad y Seguridad (OIDC/JWT)
+## 14. Protocolo de Identidad y Seguridad (OIDC/JWT)
 
 Para una arquitectura de identidad impecable, el sistema implementa los siguientes pilares técnicos:
 
@@ -313,3 +313,24 @@ Para una arquitectura de identidad impecable, el sistema implementa los siguient
     *   **Issuer (iss):** Origen comprobado (Google o Microsoft).
     *   **Audience (aud):** Emitido específicamente para el Client ID de tu App corporativa en Google o Azure.
     *   **Expiration (exp):** Validez temporal vigente en Unix time.
+   
+## 15. Reglas de Arquitectura y Resiliencia (Contexto Obligatorio para Agentes)
+
+Las siguientes reglas son innegociables para la implementación del backend y deben aplicarse proactivamente para garantizar la estabilidad, seguridad y consistencia de los datos (ACID).
+
+1. Capa de Identidad: Validación JWT Stateless (OIDC)
+Al implementar el `OIDCStatelessMiddleware` o cualquier decodificación de tokens de Microsoft/Google, se deben respetar las siguientes restricciones:
+
+* **Tolerancia de Sincronización (Leeway):** Los relojes de los servidores en la nube tienen latencia. Al usar `jwt.decode`, es **obligatorio** configurar el parámetro `leeway=30` (30 segundos). Esto absorbe el *Clock Skew* y evita rechazar logins válidos por microsegundos de diferencia, balanceando seguridad estricta y usabilidad.
+* **Manejo de Excepciones y Falsos Positivos:** La decodificación del JWT debe estar estrictamente envuelta en un bloque `try/except`. 
+  * **Riesgo:** Si un token expira (pasados los 30s de leeway) y la excepción (ej. `jwt.ExpiredSignatureError`) no es capturada, Django devolverá un `HTTP 500 Internal Server Error`.
+  * **Solución:** Capturar las excepciones de la librería JWT y retornar un `HTTP 401 Unauthorized` limpio. Esto evita falsos positivos en el monitoreo (Sentry/GCP Logging), donde una simple sesión caducada ensucia los logs haciéndose pasar por una caída del sistema.
+
+2. Ingesta Asíncrona: Idempotencia en Webhooks (Twilio)
+La red no es confiable. GCP y Twilio operan bajo el modelo "at-least-once delivery" (entrega al menos una vez), lo que significa que el sistema recibirá webhooks duplicados ante micro-cortes de red.
+
+* **Validación de Estado vs Confianza en la Red:** No confiaremos en que la red enviará el mensaje una sola vez. Priorizamos la validación de estado.
+* **Regla de Implementación:** 
+   1. A nivel de base de datos, el modelo `Message` debe tener el campo `twilio_sid` marcado como `unique=True`.
+   2. En el Worker asíncrono (el servicio que consume la tarea de Cloud Tasks y ejecuta la máquina de estados), la operación debe estar dentro de un bloque `transaction.atomic()`.
+   3. Antes de procesar el FSM o hacer un *Upsert*, el sistema debe verificar la existencia del `twilio_sid` (ej. capturando un `IntegrityError` o validando antes de insertar). Si el mensaje ya existe, el worker debe abortar la operación silenciosamente y retornar un éxito asíncrono, garantizando que el estado del Lead no avance dos veces por el mismo mensaje.
