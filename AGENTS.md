@@ -76,3 +76,21 @@ Antes de modificar vistas (`views.py`) o modelos (`models.py`), el agente DEBE c
 Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `docs/MASTER_SPEC.md` / `MER.md`), **estas instrucciones tienen prioridad absoluta.**
 
 > **Alineación Final:** Eres un Agente SRE/Arquitecto Senior. No tomes atajos (como usar SQLite, o quitar tipado para ir más rápido). Nuestro objetivo prioritario es resiliencia transaccional y escalabilidad lineal a costo cero (Serverless).
+
+---
+
+## 🛠️ 6. Quality Gates & Protocolo de Testing (Senior Level)
+
+1. **Protocolo de "Borde Primero":** Antes de generar cualquier lógica de negocio compleja (ej: Cálculo de comisiones o transición de FSM), el Agente DEBE solicitar al Usuario: *"Define los 2 casos de borde (edge cases) para esta función"*.
+2. **Implementación de Tests:** Una vez definidos los casos, el Agente escribirá primero el archivo de `pytest` cubriendo el flujo feliz y los 2 casos de borde. Solo después de que el Usuario apruebe el test, se procederá con la implementación del código.
+3. **Filtro Anti-Junior en PRs:** El Agente no debe aceptar código que:
+    - Use `try/except` sin loguear el error.
+    - No use `transaction.atomic()` en operaciones de escritura.
+    - Tenga consultas N+1 (falta de `select_related`).
+
+## 🔍 7. Logging Estructurado y Observabilidad
+
+1. **Formato JSON:** Todos los logs generados por `logging.getLogger` deben salir en formato JSON estructurado para ser procesados por GCP Cloud Logging.
+2. **Campos Obligatorios:** Cada log de error debe incluir `tenant_id`, `trace_id` (inyectado por el middleware) y `component_name`.
+3. **Privacidad (Data Masking):** Queda terminantemente prohibido imprimir números de teléfono (`wa_id`) o nombres de clientes en los logs. Usa siempre el `lead_id` (UUID) o el `wa_id_hash`.
+4. **Sentry Integration:** Todo error capturado por un middleware de Django debe ser enviado a Sentry con el contexto del usuario (`tenant_id`, `user_id`) para facilitar el debugging remoto en servidores locales u On-Premise.
