@@ -1,8 +1,42 @@
-# Bitácora de Decisiones y Cambios Arquitectónicos (CCRM-SAAS)
+# PROMPT DE GESTIÓN DE BITÁCORA PARA APRENDIZAJE SENIOR (ADR-DRIVEN)
 
-*Nota: El contenido de esta bitácora está pensado para ser una fuente de la verdad técnica y, a su vez, material para futuras publicaciones de valor en redes como LinkedIn y X, detallando nuestro proceso de construcción y las decisiones de ingeniería detrás del CCRM-SAAS. Para esta bitacora.md aplicaremos el Principio de Abierto/Cerrado: se pueden agregar nuevas entradas, pero las existentes no deben ser modificadas para mantener un registro histórico inmutable.*
+**Instrucción Permanente para el Agente:** "Actúa como un Ingeniero de Software Senior documentando para un Arquitecto de Sistemas. Tu misión no es solo registrar qué código se escribió, sino el **proceso de pensamiento ingenieril** detrás. Cada vez que actualices esta `BITACORA.md`, debes seguir estrictamente la estructura de Registro de Decisión Arquitectónica (ADR) para transformar el desarrollo en un recurso de estudio de alto nivel."
 
-Este documento actúa como un registro histórico (Architecture Decision Record - ADR) y bitácora de los cambios significativos implementados durante el ciclo de vida del desarrollo. Su propósito es documentar el *por qué* detrás de las implementaciones, sirviendo como guía para el equipo técnico presente y futuro.
+---
+
+###  ESTRUCTURA DE CADA ENTRADA
+
+#### 1. Contexto y Decisión (El "Por Qué")
+* **Descripción:** Explica el problema técnico y la razón de la solución.
+* **Restricción:** Evita descripciones superficiales. Usa terminología de arquitectura (ej: "Aislamiento de dominio", "Consistencia eventual", "Reducción de acoplamiento").
+
+#### 2. Trade-offs (Alternativa A vs. B)
+* **Análisis:** Identifica una solución alternativa que se consideró y por qué se descartó. 
+* **Impacto:** ¿Qué sacrificamos? (ej: "Simplicidad vs. Escalabilidad", "Latencia vs. Consistencia").
+
+#### 3. Anatomía del Edge Case y Resiliencia
+* **Definición:** Detalla los 2 casos de borde (Edge Cases) discutidos en la sesión.
+* **Mitigación:** Explica exactamente cómo el código previene el fallo (ej: "Rollback en transacciones atómicas", "Manejo de timeouts en red", "Validación de idempotencia").
+
+#### 4. Concepto de Ingeniería Consolidado
+* **Teoría:** Nombra el principio fundamental aplicado (SOLID, ACID, CAP Theorem, Idempotencia, Inyección de Dependencias, etc.).
+* **Breve Definición:** Una oración que explique cómo este principio se manifiesta en el código actual.
+
+#### 5. Deuda Técnica o Siguiente Paso (KISS)
+* **Evolución:** ¿Qué se simplificó para cumplir con el sprint (V1) que podría requerir refactorización al escalar a 100x usuarios?
+
+---
+
+###  EJEMPLO DE REFERENCIA (Cómo debe lucir una entrada):
+
+#### [FECHA] - Implementación de Ingesta de Webhooks (Twilio)
+* **Decisión:** Implementación de flujo asíncrono mediante `GCP Cloud Tasks`.
+* **El Por Qué:** Para garantizar que el webhook de Twilio responda con un 200 OK en <200ms, evitando bloqueos por latencia y permitiendo que el procesamiento de la FSM ocurra en un worker independiente.
+* **Trade-off:** Se eligió *Escalado a Cero* en Cloud Run sacrificando un *Cold Start* inicial de 2s, priorizando la optimización de costos para el Tenant.
+* **Edge Case:** 1. **Mensajes Duplicados:** Mitigado mediante `UniqueConstraint` en `provider_message_id`.
+    2. **Fallo de Worker:** Cloud Tasks gestiona el reintento automático (Exponential Backoff).
+* **Concepto Senior:** **Idempotencia**. Garantizamos que procesar el mismo mensaje N veces produzca el mismo estado final en la base de datos sin duplicar registros.
+* **Siguiente Paso:** Implementar monitoreo de cuotas en Cloud Tasks para prevenir el agotamiento de la tasa de despacho.
 
 ## Registro de Cambios
 
@@ -92,3 +126,37 @@ Ante el requerimiento de soportar identidades de diversos ecosistemas (Gerencia 
 
 **Impacto y Próximos Pasos:**
 El backend está técnicamente preparado para recibir y validar tokens de casi cualquier proveedor OIDC. Con esto, el **Sprint 2** avanza firmemente. Lo siguiente será la implementación del frontend en Angular para orquestar los flujos de login (MSAL / Google Identity) y el cierre de este sprint con el login funcional.
+### [18 de Marzo de 2026] Sprint 3: Ingesta Asíncrona Resiliente con Twilio y GCP Cloud Tasks
+
+**Contexto:**
+Se implementa el pipeline de entrada de mensajes (Ingestion Pipeline) para garantizar que el sistema pueda escalar a miles de mensajes concurrentes sin degradar la experiencia del usuario final ni agotar los recursos de la base de datos. La arquitectura separa la *Ingesta* (rápida, pública) del *Procesamiento* (lento, privado, transaccional).
+
+#### 1. Decisión y Proceso Crítico: Validación de Firma HMAC-SHA1
+*   **Decisión:** Uso estricto de `twilio.request_validator.RequestValidator` antes de cualquier procesamiento.
+*   **El "Por Qué":** El endpoint del webhook es público por necesidad. Validar la firma `X-Twilio-Signature` garantiza que el mensaje fue enviado por Twilio y que el payload no ha sido alterado (Integridad).
+*   **Alternativas Consideradas:**
+    1.  **IP Whitelisting (Descartado):** Twilio publica sus rangos de IP, pero mantener esa lista sincronizada en firewalls de GCP es frágil y añade latencia de red.
+    2.  **Secret Token en URL (Descartado):** Usar algo como `/webhook/?token=secreto`. Aunque es simple, el token viaja en logs de acceso y es propenso a ataques de *replay*.
+*   **Elección:** La validación criptográfica HMAC-SHA1 es el estándar de oro (Industry Standard), no depende de la red y es inmune a ataques de interceptación.
+
+#### 2. Decisión y Proceso Crítico: Ingesta Asíncrona (Buffered Inpust)
+*   **Decisión:** La vista del webhook solo valida la firma y encola en `GCP Cloud Tasks` respondiendo en <100ms.
+*   **El "Por Qué":** Twilio exige respuestas rápidas o cancela el webhook. Además, esto nos protege contra el *Thundering Herd Problem* (avalancha de peticiones).
+*   **Alternativas Consideradas:**
+    1.  **Procesamiento In-Process (Descartado):** Ejecutar la lógica de la FSM y guardado en DB dentro del mismo request. Riesgo: Si la DB está lenta (>5s), Twilio cierra la conexión y perdemos el mensaje.
+    2.  **Redis + Celery (Descartado):** Viola la restricción de infraestructura *Zero-Idle-Cost*. Celery requiere un Worker encendido 24/7. Cloud Tasks es *Serverless* y escala a cero.
+*   **Elección:** `GCP Cloud Tasks` actúa como un buffer de suavizado de tráfico (Traffic Smoothing) con reintentos automáticos y DLQ nativo.
+
+#### 3. Decisión y Proceso Crítico: Idempotencia y Concurrencia (Worker Logic)
+*   **Decisión:** Uso de `MessageSid` como llave única, chequeo temprano de existencia y `select_for_update()` en la sesión.
+*   **El "Por Qué":** Los webhooks pueden llegar duplicados o desordenados. Necesitamos que procesar el mensaje 2 o 3 veces resulte en un único registro en la DB (Consistencia).
+*   **Alternativas Consideradas:**
+    1.  **get_or_create simple (Descartado):** En alta concurrencia, dos hilos pueden fallar el chequeo de "no existe" simultáneamente e intentar insertar, causando un `IntegrityError` ruidoso.
+    2.  **Distributed Lock en Redis (Descartado):** Demasiada complejidad para nuestra escala.
+*   **Elección:** El patrón `transaction.atomic()` + `select_for_update()` en Django aprovecha el bloqueo de filas nativo de PostgreSQL, garantizando orden sin añadir piezas móviles externas.
+
+#### 4. Concepto de Ingeniería Consolidado: Desacoplamiento (Decoupling)
+*   Se manifiesta al separar físicamente la entrada del mensaje (Webhook) de su efecto en el sistema (Worker), permitiendo que el sistema sea resiliente ante fallos parciales de la infraestructura.
+
+#### 5. Deuda Técnica (KISS)
+*   **Seguridad del Worker:** Actualmente se usa un `X-Internal-Secret`. Al escalar a alta sensibilidad, deberíamos migrar a validación OIDC nativa de Google (Service-to-Service auth), eliminando el secreto compartido.

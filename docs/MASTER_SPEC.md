@@ -25,26 +25,32 @@ Transformar la gestión de leads de automotoras mediante un CRM Conversacional (
 ---
 
 ## 4. Máquina de Estados Finita (FSM) - Detalle Lógico
-El bot guía al usuario mediante opciones cerradas (botones/listas) para evitar ambigüedad.
+El bot guía al usuario mediante opciones cerradas (botones/listas) para evitar ambigüedad. El flujo se inicia con un mensaje precargado: "Quiero info".
 
-| Estado | Pregunta / Acción | Transición |
-| :--- | :--- | :--- |
-| **INICIO** | Saludo e identificación de interés. | -> VEHICLE_TYPE |
-| **VEHICLE_TYPE** | Lista de carrocerías (SUV, Sedán, etc). | -> PAYMENT_METHOD |
-| **PAYMENT_METHOD** | Botones: Contado, Crédito, Retoma. | -> BUDGET_RANGE |
-| **BUDGET_RANGE** | Rangos de precio predefinidos. | -> PURCHASE_INTENT |
-| **PURCHASE_INTENT** | ¿Cuándo compra? (Hoy, Mes, +3 meses). | -> TRIAGE_COMPLETED |
+| Estado | Pregunta / Acción | Transición | Opciones (Botones) |
+| :--- | :--- | :--- | :--- |
+| **INICIAL** | Recepción de "Quiero info" | -> VEHICLE_TYPE | - |
+| **VEHICLE_TYPE** | ¿Qué tipo de auto buscas? | -> PAYMENT_METHOD | City Car, SUV, Sedán, Pick-up |
+| **PAYMENT_METHOD** | Formato de pago | -> BUDGET_RANGE | Contado, Crédito, Retoma |
+| **BUDGET_RANGE** | Presupuesto estimado | -> PURCHASE_INTENT | < 6M, 7M a 14M, 15M o más |
+| **PURCHASE_INTENT** | Intención de compra | -> QUALIFIED | Hoy, Esta semana, Mes o más |
 
-**Reglas de Reintento:** Si el lead envía texto libre en lugar de usar botones, el bot reitera la instrucción hasta 3 veces antes de marcar la sesión como `ABANDONO_BOT`.
+**Reglas de Reintento y Validación:**
+* **Solo Texto:** Cada paso solo admite texto/botones. Si se envía una imagen/audio, el bot envía un warning pidiendo corregir.
+* **Límite de Advertencias:** Se permite hasta 2 reintentos con warning. Al 3er error, el bot deja de enviar el warning y queda en espera pasiva del paso actual.
+* **Inactividad:** Si se cumple el tiempo designado, la sesión pasa a `ABANDONO_BOT`.
 
 ---
 
 ## 5. Lógica de Dominio y Algoritmos
 ### 5.1 Cálculo de Urgency Score (Priorización)
-Cada lead recibe un puntaje de 0 a 100 basado en:
-* **Purchase Intent:** `Hoy` (+50 pts), `Esta semana` (+20 pts).
-* **Payment Method:** `Crédito` (+30 pts por rentabilidad financiera).
-* **Budget:** Rangos altos (+10 pts).
+Puntaje calculado de forma determinista al finalizar el flujo:
+* **Prioridad Máxima (Score 100):** Si `PURCHASE_INTENT` == "Hoy".
+* **Intención Temporal:** `Esta semana` (+20 pts), `Mes o más` (+10 pts).
+* **Bono por Presupuesto:** `< 6M` (+10 pts), `7M a 14M` (+20 pts), `15M o más` (+40 pts).
+* **Bono por Pago:** `Crédito` (+30 pts).
+
+*Nota: La suma total máxima (excluyendo el "Hoy" absoluto) determina la posición en el Dashboard.*
 
 ### 5.2 Reglas de Ruteo
 * **Modo Manual:** El Gerente asigna leads desde una cola de pendientes.

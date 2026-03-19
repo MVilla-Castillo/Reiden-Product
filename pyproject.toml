@@ -15,5 +15,13 @@ dependencies = [
     "python-json-logger>=4.0.0",
     "requests>=2.32.5",
     "sentry-sdk>=2.54.0",
+    "twilio>=9.10.3",
     "uvicorn[standard]>=0.41.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-django>=4.12.0",
 ]

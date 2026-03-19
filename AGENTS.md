@@ -94,3 +94,13 @@ Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `d
 2. **Campos Obligatorios:** Cada log de error debe incluir `tenant_id`, `trace_id` (inyectado por el middleware) y `component_name`.
 3. **Privacidad (Data Masking):** Queda terminantemente prohibido imprimir números de teléfono (`wa_id`) o nombres de clientes en los logs. Usa siempre el `lead_id` (UUID) o el `wa_id_hash`.
 4. **Sentry Integration:** Todo error capturado por un middleware de Django debe ser enviado a Sentry con el contexto del usuario (`tenant_id`, `user_id`) para facilitar el debugging remoto en servidores locales u On-Premise.
+
+## 8. Blindaje de Producción
+
+1. **Idempotencia de Mensajería:** Todo Message debe usar el MessageSid de Twilio como llave única. El worker debe ignorar duplicados devolviendo 200 OK inmediatamente.
+
+2. **Transacciones Relámpago:** Queda estrictamente prohibido realizar llamadas externas (HTTP) dentro de un bloque transaction.atomic. Primero se asegura la persistencia, luego se dispara la red.
+
+3. **Seguridad OIDC:** Implementar leeway de 30s en la validación de JWT para absorber desincronizaciones de reloj entre servidores de Google/Microsoft y Cloud Run.
+
+4. **Migraciones Zero-Downtime:** Prohibido el uso de ALTER TABLE que bloquee escrituras en tablas de Message o ChatSession. Usar el patrón: Añadir columna -> Backfill -> Eliminar antigua.

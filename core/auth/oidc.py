@@ -25,12 +25,31 @@ class OIDCStatelessMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # 1. Ignorar rutas públicas (healthchecks, webhooks)
-        if request.path.startswith('/health/') or request.path.startswith('/webhook/'):
+        # 1. Ignorar rutas públicas (healthchecks, webhooks de Twilio y workers internos)
+        # SRE Grade: Bypass robusto para endpoints operativos
+        PUBLIC_PATH_PREFIXES = (
+            '/health/', 
+            '/api/webhooks/twilio/', 
+            '/api/workers/process-message/'
+        )
+        if any(request.path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return self.get_response(request)
 
         auth_header = request.headers.get('Authorization')
+
+        # [DEV BYPASS] Permitir acceso al dashboard en desarrollo sin token para pruebas manuales
+        if not auth_header and settings.DEBUG and request.path.startswith('/api/dashboard/leads/'):
+            from crm.models import Tenant
+            tenant = Tenant.objects.first()
+            if tenant:
+                request.tenant = tenant
+                # Inyectamos un flag para saber que es bypass
+                request.oidc_bypass = True 
+                logger.warning(f"OIDC: DEV BYPASS activado para {request.path} usando Tenant {tenant.nombre_legal}")
+                return self.get_response(request)
+
         if not auth_header or not auth_header.startswith('Bearer '):
+            logger.info(f"OIDC: Unauthorized access attempt to {request.path}")
             return self._unauthorized('Token no proveído o formato inválido')
 
         token = auth_header.split(' ')[1]

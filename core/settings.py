@@ -48,7 +48,10 @@ INSTALLED_APPS = [
     
     # Local Apps
     'crm',
+    # PostgreSQL-specific features (GinIndex for JSONB)
+    'django.contrib.postgres',
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -98,6 +101,19 @@ GCP_QUEUE_NAME = env('GCP_QUEUE_NAME', default='ccrm-webhook-tasks')
 # The base URL where Cloud Tasks will send the HTTP push request back to our Django Worker
 GCP_OIDC_SERVICE_ACCOUNT_EMAIL = env('GCP_OIDC_SERVICE_ACCOUNT_EMAIL', default='')
 WORKER_BASE_URL = env('WORKER_BASE_URL', default='https://api.ccrm.example.com')
+
+# Twilio (Sprint 3 - Webhook Ingestion)
+TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
+
+# Internal secret to authenticate Cloud Tasks → Django Worker callbacks (Sprint 3)
+CLOUD_TASKS_INTERNAL_SECRET = env('CLOUD_TASKS_INTERNAL_SECRET', default='dev-internal-secret-change-in-prod')
+
+# Required for correct Twilio signature validation when behind a reverse proxy (Cloud Run)
+# Ensures request.build_absolute_uri() uses the correct public URL
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 
 # Password validation
@@ -154,9 +170,10 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            '()': 'pythonjsonlogger.json.JsonFormatter',
             'format': '%(asctime)s %(levelname)s %(name)s %(process)d %(threadName)s %(message)s'
         },
+
     },
     'handlers': {
         'console': {
