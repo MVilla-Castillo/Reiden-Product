@@ -34,6 +34,9 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-cm#!)y6@9f_^)twirr^%1ti*
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+if DEBUG:
+    # SRE Grade: Permite automáticamente dominios de ngrok en desarrollo
+    ALLOWED_HOSTS += ['.ngrok-free.app', '.ngrok.io', '.ngrok-free.dev']
 
 
 # Application definition

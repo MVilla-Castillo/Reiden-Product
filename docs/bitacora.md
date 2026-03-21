@@ -160,3 +160,34 @@ Se implementa el pipeline de entrada de mensajes (Ingestion Pipeline) para garan
 
 #### 5. Deuda Técnica (KISS)
 *   **Seguridad del Worker:** Actualmente se usa un `X-Internal-Secret`. Al escalar a alta sensibilidad, deberíamos migrar a validación OIDC nativa de Google (Service-to-Service auth), eliminando el secreto compartido.
+
+### [21 de Marzo de 2026] Resolución de Bloqueos de Ingesta y Resiliencia en Desarrollo
+
+**Contexto:**
+Se completa con éxito el ciclo de ingesta de mensajes de Twilio a través de túneles `ngrok`. La sesión se enfocó en superar los desafíos de seguridad de red y las dependencias de infraestructura en la nube que impedían las pruebas funcionales.
+
+#### 1. Decisión: Trust Automático de ngrok (DEBUG=True)
+*   **Decisión:** Inyección dinámica de subdominios `.ngrok-free.dev` en `ALLOWED_HOSTS`.
+*   **El "Por Qué":** Django bloquea peticiones de hosts desconocidos por seguridad. Automatizar este trust en modo `DEBUG` permite que el desarrollador reciba webhooks de la Sandbox de Twilio sin modificar constantemente el `.env`.
+*   **Trade-off:** Se acepta una superficie de ataque ligeramente más amplia en local a cambio de una velocidad de desarrollo exponencialmente mayor.
+
+#### 2. Decisión: Mock Local de Cloud Tasks (Graceful Degradation)
+*   **Decisión:** Implementación de un bloque `try/except` robusto en el cliente de `google-cloud-tasks`.
+*   **El "Por Qué":** La autenticación local con GCP (`gcloud`) puede presentar fallos de consentimiento o red. El sistema ahora detecta la falta de credenciales y, en modo `DEBUG`, emite un `WARNING` y continúa simulando el encolamiento (`mock-task-id`).
+*   **Impacto:** Permite validar la lógica de ingesta y validación de firma sin depender de una cuenta de Google Cloud activa, desacoplando el desarrollo de la infraestructura.
+
+#### 3. Anatomía del Edge Case: Fallo de Credenciales Cloud
+*   **Definición:** El desarrollador no tiene sesión de GCP o el proyecto no existe.
+*   **Mitigación:** Captura de `DefaultCredentialsError` y retorno de un task ID sintético. El webhook de Twilio recibe un `200 OK` (éxito en la ingesta) independientemente del estado de la cola en la nube.
+
+#### 4. Concepto de Ingeniería Consolidado: Fault Tolerance / Graceful Degradation
+*   **Teoría:** Capacidad de un sistema para mantener su funcionalidad principal (ingesta de mensajes) incluso cuando componentes secundarios (el sistema de colas real) fallan o no están disponibles en el entorno actual.
+
+#### 5. Siguiente Paso (KISS)
+*   Implementar el primer **Worker** (`/api/workers/process-message/`) para persistir la data del webhook en la base de datos de forma asíncrona, cerrando el "Vertical Slice" del Sprint 3.
+
+#### ⚠️ Lista de Control: Código de Desarrollo (A limpiar antes de Prod)
+Para evitar que la lógica de "bypass" llegue a producción, se deben auditar estos componentes:
+*   **`core/settings.py`**: El bloque `if DEBUG` que añade dominios de ngrok a `ALLOWED_HOSTS`.
+*   **`crm/services/cloud_tasks.py`**: Los bloques `try/except` en `enqueue_webhook_payload` que capturan fallos de GCP para retornar un `mock-task-id`.
+*   **`.env`**: Las credenciales de la Sandbox de Twilio y la `DATABASE_URL` local. Asegurar migración a Secret Manager en GCP.

@@ -50,8 +50,18 @@ def enqueue_webhook_payload(payload: dict[str, Any]) -> str:
     internal_secret: str = getattr(settings, 'CLOUD_TASKS_INTERNAL_SECRET', '')
     service_account_email: str = getattr(settings, 'GCP_OIDC_SERVICE_ACCOUNT_EMAIL', '')
 
-    client = tasks_v2.CloudTasksClient()
-    parent = client.queue_path(project, location, queue)
+    try:
+        client = tasks_v2.CloudTasksClient()
+        parent = client.queue_path(project, location, queue)
+    except Exception as e:
+        # SRE Grade: Fallback para desarrollo local sin infraestructura de GCP configurada.
+        if settings.DEBUG:
+            logger.warning(
+                f"MODO DESARROLLO LOCAL: Saltando Cloud Tasks ({e}). El mensaje no será procesado por el worker aún.",
+                extra={"component_name": "cloud_tasks_service", "payload": payload}
+            )
+            return f"mock-task-{uuid.uuid4()}"
+        raise e
 
     # El body del request que Cloud Tasks enviará al Worker Django
     body = json.dumps(payload, default=str).encode('utf-8')
@@ -78,15 +88,19 @@ def enqueue_webhook_payload(payload: dict[str, Any]) -> str:
             "audience": worker_url,
         }
 
-    task: Task = client.create_task(request={"parent": parent, "task": task_config})
-
-    logger.info(
-        "Tarea de webhook encolada en Cloud Tasks.",
-        extra={
-            "component_name": "cloud_tasks_service",
-            "task_name": task.name,
-            "queue": queue,
-        },
-    )
-
-    return task.name
+    try:
+        task: Task = client.create_task(request={"parent": parent, "task": task_config})
+        logger.info(
+            "Tarea de webhook encolada en Cloud Tasks.",
+            extra={
+                "component_name": "cloud_tasks_service",
+                "task_name": task.name,
+                "queue": queue,
+            },
+        )
+        return task.name
+    except Exception as e:
+        if settings.DEBUG:
+            logger.warning(f"Error al crear tarea en GCP (en DEBUG): {e}. Continuando localmente.")
+            return f"mock-task-{uuid.uuid4()}"
+        raise e

@@ -43,6 +43,8 @@ class OIDCStatelessMiddleware:
             tenant = Tenant.objects.first()
             if tenant:
                 request.tenant = tenant
+                # Inyectamos también un usuario para evitar fallos en vistas que dependan de request.user
+                request.user = User.objects.filter(tenant=tenant).first() or User.objects.first()
                 # Inyectamos un flag para saber que es bypass
                 request.oidc_bypass = True 
                 logger.warning(f"OIDC: DEV BYPASS activado para {request.path} usando Tenant {tenant.nombre_legal}")
