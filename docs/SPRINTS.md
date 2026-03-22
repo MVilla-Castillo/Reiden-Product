@@ -31,31 +31,39 @@
 
 ## 🧠 Etapa 2: El Cerebro Conversacional (4 Semanas)
 
-### Sprint 3: Ingesta Asíncrona & Workers (1 Semana) - 🟢 "High Concurrency"
+### Sprint 3: Ingesta Asíncrona & Workers (1 Semana) - 🟢 "High Concurrency" 
 *Objetivo: Responder a Twilio en milisegundos. (Dueño: Dev B)*
-- [ ] **(Dev B - Dominio Infra Chat / Back):** Endpoint de Webhook (firma `X-Twilio-Signature`) y encolamiento a GCP Cloud Tasks.
-- [ ] **(Dev B - Dominio Infra Chat / Back):** Worker asíncrono para consumir tareas validando idempotencia (`twilio_sid`).
-- [ ] **Hito:** Ingesta serverless robusta. Dev B garantiza que ningún mensaje se pierda o duplique.
+- [ inicio y fin: 18 marzo. ] **(Dev B - Dominio Infra Chat / Back):** Endpoint de Webhook (firma `X-Twilio-Signature`) y encolamiento a GCP Cloud Tasks.
+- [ inicio y fin: 18 marzo. ] **(Dev B - Dominio Infra Chat / Back):** Worker asíncrono para consumir tareas validando idempotencia (`twilio_sid`).
+- [ inicio y fin: 18 marzo. ] **Hito:** Ingesta serverless robusta. Dev B garantiza que ningún mensaje se pierda o duplique.
 
 ### Sprint 4: Máquina de Estados (FSM) (3 Semanas) - 🔴 "Business Logic"
 *Objetivo: El bot que califica leads. (Dueño: Dev A)*
-- [ ] **(Dev A - Dominio Lógica Chat / Back):** Motor FSM con `select_for_update()` para evitar Race Conditions (Upsert Atómico).
-- [ ] **(Dev A - Dominio Lógica Chat / Back):** Integración API WhatsApp (Mensajes Interactivos).
-- [ ] **(Dev A - Dominio Lógica Chat / Back):** Lógica `urgency_score` en DB (asegurando índice GIN en JSONB).
-- [ ] **Hito:** Lead calificado automáticamente. Dev A cierra el flujo de negocio del bot.
+- [ inicio y fin 18 Marzo ] **(Dev A - Dominio Lógica Chat / Back):** Motor FSM con `select_for_update()` para evitar Race Conditions (Upsert Atómico).
+- [ inicio y fin 18 Marzo ] **(Dev A - Dominio Lógica Chat / Back):** Integración API WhatsApp (Mensajes Interactivos).
+- [ inicio y fin 18 Marzo ] **(Dev A - Dominio Lógica Chat / Back):** Lógica `urgency_score` en DB (asegurando índice GIN en JSONB).
+- [ inicio y fin 18 Marzo ] **Hito:** Lead calificado automáticamente. Dev A cierra el flujo de negocio del bot.
 
 ---
 
-## 💻 Etapa 3: Interfaz y Despliegue Cloud (5 Semanas)
+## 💻 Etapa 3: Interfaz y Despliegue Cloud (6 Semanas)
 
-### Sprint 5: Dashboard de Ventas (2 Semanas) - 🔴 "Real-Time UI"
+### Sprint 5: Integración End-to-End & Persistencia (1 Semana) - 🟢 "The Data Flow"
+*Objetivo: Completar el ciclo de vida del mensaje desde el Webhook hasta la DB.*
+- [ ] **(Dev B - Dominio Persistencia):** Implementación de la Vista de Worker (`/api/workers/process-message/`) validando el secreto interno.
+- [ ] **(Dev B - Dominio Persistencia):** Lógica de Upsert de Lead y creación de registros en `Message` y `AuditLog`.
+- [ ] **(Dev B - Dominio Persistencia):** Orquestación de reintentos e idempotencia basada en `message_sid`.
+- [ ] **Hito:** Mensaje recibido en WhatsApp visible en la Base de Datos local (PostgreSQL).
+
+### Sprint 6: Dashboard de Ventas (2 Semanas) - 🔴 "Real-Time UI"
 *Objetivo: Bandeja de entrada ágil.*
 - [ ] **(Dev B - Dominio Tiempo Real / Fullstack):** Endpoints GET (Listado optimizado sin N+1) + Front Angular RxJS (HTTP Polling + Backoff).
 - [ ] **(Dev A - Dominio Gestión / Fullstack):** Endpoints GET/POST (Detalle de Lead) + Front Angular "Ficha de Cliente" y Toggle de ruteo Gerencial.
 - [ ] **Hito:** Dashboard operativo. Dev B hace la vista general, Dev A hace la vista de detalle.
 
-### Sprint 6: SRE, Cloud & Go-Live (3 Semanas) - 🔴 "Production Readiness"
+### Sprint 7: SRE, Cloud & Go-Live (3 Semanas) - 🔴 "Production Readiness"
 *Objetivo: Despliegue Big Tech.*
+- [ ] **(Dev B - Calidad Ops):** Auditoría y limpieza de código de desarrollo (Mocks de Cloud Tasks, `if DEBUG` en settings, trust de ngrok).
 - [ ] **(Dev A - Infra Cloud):** GCP Secret Manager + Deploy en Cloud Run (Scale to Zero).
 - [ ] **(Dev B - Infra Front/Ops):** Deploy Firebase Hosting + GCP Cloud Scheduler + Sentry.
 - [ ] **Hito:** Producción estable.
