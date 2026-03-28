@@ -56,3 +56,21 @@ def test_send_whatsapp_message_with_interactive_payload(mock_client_class: Magic
     assert "Elige" in kwargs['body']
     assert "Opcion A" in kwargs['body']
     assert "Opcion B" in kwargs['body']
+
+@override_settings(TWILIO_ACCOUNT_SID='ACfake', TWILIO_AUTH_TOKEN='fake_token')
+@patch('crm.services.twilio_client.Client')
+def test_send_whatsapp_message_with_content_sid(mock_client_class: MagicMock) -> None:
+    """Verifica que se usa content_sid (Botones Reales) si se provee."""
+    # ARRANGE
+    mock_instance = mock_client_class.return_value
+    mock_create = mock_instance.messages.create
+
+    # ACT
+    send_whatsapp_message("56912345678", "Texto ignorado", content_sid="HX123", content_variables='{"name": "foo"}')
+
+    # ASSERT
+    mock_create.assert_called_once()
+    kwargs = mock_create.call_args[1]
+    assert kwargs['content_sid'] == "HX123"
+    assert kwargs['content_variables'] == '{"name": "foo"}'
+    assert 'body' not in kwargs

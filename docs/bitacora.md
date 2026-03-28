@@ -191,3 +191,30 @@ Para evitar que la lógica de "bypass" llegue a producción, se deben auditar es
 *   **`core/settings.py`**: El bloque `if DEBUG` que añade dominios de ngrok a `ALLOWED_HOSTS`.
 *   **`crm/services/cloud_tasks.py`**: Los bloques `try/except` en `enqueue_webhook_payload` que capturan fallos de GCP para retornar un `mock-task-id`.
 *   **`.env`**: Las credenciales de la Sandbox de Twilio y la `DATABASE_URL` local. Asegurar migración a Secret Manager en GCP.
+### [22 de Marzo de 2026] Sprint 5: Integración End-to-End, Despacho Local y Telemetría (AuditLog)
+
+**Contexto:**
+Se ha logrado cerrar el ciclo de vida completo del mensaje en el entorno de desarrollo. Hasta ahora, el sistema recibía el mensaje pero este moría en un mock silencioso ("black hole") del servicio de colas. La sesión se centró en "desbloquear" el flujo localmente y añadir la capa de observabilidad obligatoria mediante el `AuditLog`.
+
+#### 1. Decisión y Proceso Crítico: Local Dispatcher via HTTP Loopback
+*   **Decisión:** Refactorización de `crm/services/cloud_tasks.py` para que, en modo `DEBUG=True`, realice un POST HTTP real al endpoint del worker local (`/api/workers/process-message/`).
+*   **El "Por Qué":** Para validar la lógica del worker (autenticación `X-Internal-Secret`, idempotencia y FSM) sin depender de la infraestructura de GCP. El uso de `requests` simula fielmente la naturaleza "Push" de Cloud Tasks.
+*   **Trade-off:** Se eligió **Fidelidad vs. Simplicidad**. Podríamos haber llamado a la función del worker directamente en Python, pero eso ocultaría errores de serialización JSON o fallos en los headers de seguridad que solo aparecen en una comunicación HTTP real.
+
+#### 2. Decisión y Proceso Crítico: Registro Inmutable de Eventos (AuditLog)
+*   **Decisión:** Inserción de registros de auditoría para los eventos `SESSION_START` y `MSG_RECEIVED` dentro de la transacción atómica del worker.
+*   **El "Por Qué":** Cumplimiento del requerimiento de telemetría exacta. El `AuditLog` actúa como la "caja negra" del CRM, permitiendo reconstruir por qué una FSM avanzó a cierto estado o detectar anomalías en la comunicación.
+*   **Impacto:** Se garantiza la consistencia (ACID) entre el mensaje guardado y su registro de auditoría. Si uno de los dos falla, el `transaction.atomic()` hace rollback de ambos, evitando estados corruptos.
+
+#### 3. Anatomía del Edge Case y Resiliencia
+*   1. **Fallo de Red Local (Worker Apagado):** El dispatcher captura `requests.ConnectionError` y propaga el fallo al Webhook. Esto devuelve un `500` a Twilio, activando su mecanismo nativo de reintentos.
+*   2. **Data Masking en Logs:** Se implementó una política estricta donde el `wa_id` y el `Body` del mensaje **nunca** se guardan en el `AuditLog` (solo metadatos como `body_length`), protegiendo la privacidad de los leads según `AGENTS.md §7`.
+
+#### 4. Concepto de Ingeniería Consolidado: Event Sourcing / Audit Trail
+*   **Teoría:** Registro de hechos históricos inmutables que describen cambios de estado en el sistema.
+*   **Definición:** Cada interacción del usuario deja una huella digital no modificable en el `AuditLog`, facilitando el soporte técnico y la auditoría de seguridad sin comprometer la performance.
+
+#### 5. Siguiente Paso (Sprint 6)
+*   Implementación del **Dashboard de Ventas** en Angular. Usaremos RxJS para realizar HTTP Polling sobre la data que el worker ya está persistiendo exitosamente en PostgreSQL, permitiendo que el vendedor vea los mensajes en "tiempo real" simulado.
+
+---

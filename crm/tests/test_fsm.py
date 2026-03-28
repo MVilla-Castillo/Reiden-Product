@@ -25,9 +25,20 @@ def test_fsm_initial_message_moves_to_vehicle_type(active_session: ChatSession) 
     assert "auto buscas" in reply.get('text', '').lower()
 
 @pytest.mark.django_db
+def test_fsm_greeting_restarts_flow_at_start(active_session: ChatSession) -> None:
+    # Ya estábamos en el primer paso (tal vez un intento previo o delay)
+    active_session.fsm_answers = {'current_step': FSMStep.VEHICLE_TYPE}
+    # Pero el lead vuelve a enviar un saludo ("Hola")
+    reply = advance_fsm(active_session, "Hola que tal")
+
+    assert active_session.fsm_answers.get('current_step') == FSMStep.VEHICLE_TYPE
+    assert "auto buscas" in reply.get('text', '').lower()
+    assert active_session.fsm_answers.get('error_count') == 0
+
+@pytest.mark.django_db
 def test_fsm_vehicle_type_moves_to_payment_method(active_session: ChatSession) -> None:
     active_session.fsm_answers = {'current_step': FSMStep.VEHICLE_TYPE}
-    reply = advance_fsm(active_session, "Una SUV")
+    reply = advance_fsm(active_session, "vt_suv")
 
     assert active_session.fsm_answers.get('current_step') == FSMStep.PAYMENT_METHOD
     assert active_session.fsm_answers.get('vehicle_type') == VehicleType.SUV
@@ -39,7 +50,7 @@ def test_fsm_payment_method_moves_to_budget(active_session: ChatSession) -> None
         'current_step': FSMStep.PAYMENT_METHOD,
         'vehicle_type': VehicleType.SUV
     }
-    reply = advance_fsm(active_session, "A crédito por favor")
+    reply = advance_fsm(active_session, "pm_credito")
 
     assert active_session.fsm_answers.get('current_step') == FSMStep.BUDGET_RANGE
     assert active_session.fsm_answers.get('payment_method') == PaymentMethod.CREDITO
@@ -51,7 +62,7 @@ def test_fsm_budget_moves_to_purchase_intent(active_session: ChatSession) -> Non
         'current_step': FSMStep.BUDGET_RANGE,
         'payment_method': PaymentMethod.CREDITO
     }
-    reply = advance_fsm(active_session, "15m o más")
+    reply = advance_fsm(active_session, "br_mas15")
 
     assert active_session.fsm_answers.get('current_step') == FSMStep.PURCHASE_INTENT
     assert active_session.fsm_answers.get('budget_range') == BudgetRange.MAS_15M
@@ -64,12 +75,13 @@ def test_fsm_purchase_intent_completes_qualification_with_accumulated_score(acti
         'payment_method': PaymentMethod.CREDITO,
         'budget_range': BudgetRange.MAS_15M
     }
-    reply = advance_fsm(active_session, "Hoy")
+    reply = advance_fsm(active_session, "pi_hoy")
 
     assert active_session.fsm_answers.get('current_step') == FSMStep.QUALIFIED
     assert active_session.fsm_answers.get('purchase_intent') == PurchaseIntent.HOY
     # El requerimiento explícito: Score = 100 (Hoy) + 20 (Crédito) + 40 (15M+) = 160
     assert active_session.urgency_score == 160
+    assert active_session.status == ChatSession.Status.PENDING_ASSIGNMENT
     assert "asesor" in reply.get('text', '').lower()
 
 from crm.models import ChatSession, Message

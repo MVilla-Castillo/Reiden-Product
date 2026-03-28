@@ -47,6 +47,10 @@ class OIDCStatelessMiddleware:
                 request.user = User.objects.filter(tenant=tenant).first() or User.objects.first()
                 # Inyectamos un flag para saber que es bypass
                 request.oidc_bypass = True 
+                
+                from core.log_utils import tenant_id_var
+                tenant_id_var.set(str(tenant.id))
+
                 logger.warning(f"OIDC: DEV BYPASS activado para {request.path} usando Tenant {tenant.nombre_legal}")
                 return self.get_response(request)
 
@@ -106,6 +110,9 @@ class OIDCStatelessMiddleware:
             
             request.user = user
             request.tenant = tenant
+            
+            from core.log_utils import tenant_id_var
+            tenant_id_var.set(str(tenant.id))
 
         except jwt.ExpiredSignatureError:
             return self._unauthorized('Token expirado')

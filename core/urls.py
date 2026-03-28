@@ -17,9 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from crm.views.health import liveness_view, readiness_view
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Endpoints de Salud (Obligatorio Cloud Run)
+    path('health/liveness', liveness_view),
+    path('health/readiness', readiness_view),
+    
     # CRM App: Webhooks, Workers, API
     path('', include('crm.urls')),
 ]
+
 

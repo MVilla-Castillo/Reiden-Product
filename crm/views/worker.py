@@ -21,7 +21,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from crm.models import ChatSession, Lead, Message, Tenant
+from crm.models import AuditLog, ChatSession, Lead, Message, Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -85,24 +85,27 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
     try:
         with transaction.atomic():
             # 4a. Obtener el Tenant via WaId del número de destino (To)
-            to_number: str = (
+            # El campo 'To' de Twilio es el número de nuestro BOT.
+            tenant_phone_id: str = (
                 payload.get('To', '')
                 .replace('whatsapp:', '')
-                .lstrip('+')  # El phone_number_id en Tenant no incluye el '+'
+                .lstrip('+')
             )
 
             try:
-                tenant: Tenant = Tenant.objects.get(phone_number_id=to_number)
+                tenant: Tenant = Tenant.objects.get(phone_number_id=tenant_phone_id)
+                # SRE: Inyectar tenant_id en el contextvar para que todos los logs 
+                # siguientes en este hilo/corrutina lo incluyan automáticamente.
+                from core.log_utils import tenant_id_var
+                tenant_id_var.set(str(tenant.id))
             except Tenant.DoesNotExist:
-                # Si no hay Tenant, el mensaje es para un número no registrado.
                 logger.error(
                     "Worker: Tenant no encontrado para el número.",
                     extra={
                         "component_name": "process_message_worker",
-                        "to_number": to_number,
+                        "to_number": tenant_phone_id,
                     },
                 )
-                # Retornamos 200 para que Cloud Tasks no reintente (es un error de config, no transitorio)
                 return JsonResponse({"error": "Tenant not found"}, status=200)
 
             # 4b. Upsert atómico del Lead (wa_id_hash como llave única → anti-duplicado)
@@ -136,7 +139,8 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                 .first()
             )
 
-            if session is None:
+            is_new_session = session is None
+            if is_new_session:
                 # Primera vez o sesión previa en estado terminal → crear nueva
                 session = ChatSession.objects.create(
                     tenant=tenant,
@@ -150,6 +154,17 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                         "tenant_id": str(tenant.id),
                         "lead_id": str(lead.id),
                         "session_id": str(session.id),
+                    },
+                )
+                # Event sourcing: telemetría del inicio de sesión (SKILL: event_sourcing)
+                AuditLog.objects.create(
+                    session=session,
+                    tenant=tenant,
+                    action="SESSION_START",
+                    old_value={},
+                    new_value={
+                        "status": session.status,
+                        "lead_id": str(lead.id),
                     },
                 )
 
@@ -169,7 +184,7 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
             _raw_type = payload.get('MessageType', 'text').lower()
             _message_type = _message_type_map.get(_raw_type, Message.Type.TEXT)
 
-            _body = payload.get('Body', '') or payload.get('ButtonText', '') or payload.get('MediaUrl0', '')
+            _body = payload.get('ButtonPayload', '') or payload.get('Body', '') or payload.get('ButtonText', '') or payload.get('MediaUrl0', '')
             
             # 4e. Idempotencia y Guardado de Mensaje Entrante
             message, created = Message.objects.get_or_create(
@@ -189,14 +204,44 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                 )
                 return JsonResponse({"status": "duplicate_ignored"}, status=200)
 
+            # Event sourcing: telemetría del mensaje entrante (SKILL: event_sourcing)
+            # Prohibido loguear wa_id o Body directo (AGENTS.md §7 - Data Masking)
+            AuditLog.objects.create(
+                session=session,
+                tenant=tenant,
+                action="MSG_RECEIVED",
+                old_value={},
+                new_value={
+                    "message_sid": message_sid,
+                    "message_type": _message_type,
+                    "body_length": len(_body),
+                    "is_new_session": is_new_session,
+                },
+            )
+
             # =====================================================================
             # CORE BUSINESS LOGIC (FSM): Evaluación del estado conversacional.
             # Se ejecuta dentro del atomic() para aprovechar el select_for_update.
             # =====================================================================
             from crm.services.fsm_engine import advance_fsm
             
+            old_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
+            old_status = session.status
+
             # Avanzamos la FSM pasando el tipo y cuerpo del mensaje
             reply_instructions = advance_fsm(session, _body, _message_type)
+            
+            new_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
+            new_status = session.status
+            
+            if old_fsm_state.get('current_step') != new_fsm_state.get('current_step') or old_status != new_status:
+                AuditLog.objects.create(
+                    session=session,
+                    tenant=tenant,
+                    action="FSM_TRANSITION",
+                    old_value={'status': old_status, 'fsm_answers': old_fsm_state},
+                    new_value={'status': new_status, 'fsm_answers': new_fsm_state}
+                )
 
             # Persistimos la mutación generada por la FSM en memoria hacia la base de datos
             session.save()
@@ -208,10 +253,28 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
         # =====================================================================
         if reply_instructions:
             from crm.services.twilio_client import send_whatsapp_message
+            # IMPORTANTE: la respuesta se envía al número que originó el mensaje ('From')
+            lead_phone_number = (
+                payload.get('From', '')
+                .replace('whatsapp:', '')
+                .lstrip('+')
+            )
+            
+            # Obtener Content SID si existe para este paso (Botones Reales)
+            current_step = session.fsm_answers.get('current_step')
+            content_sid = settings.TWILIO_CONTENT_SIDS.get(current_step)
+            
+            logger.info(
+                f"Worker: Evaluando envío de botones. Paso={current_step}, ContentSID={content_sid}",
+                extra={"component_name": "process_message_worker"}
+            )
+            
             outbound_msg_sid = send_whatsapp_message(
-                to_number=to_number,
+                to_number=lead_phone_number,
+                from_number=tenant.phone_number_id,
                 text=reply_instructions.get('text', ''),
-                interactive_payload=reply_instructions.get('interactive')
+                interactive_payload=reply_instructions.get('interactive'),
+                content_sid=content_sid
             )
             
             # Guardamos el mensaje saliente en la base de datos (nueva mini-transacción rápida)

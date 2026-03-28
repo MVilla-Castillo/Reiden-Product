@@ -58,7 +58,9 @@ def advance_fsm(session: ChatSession, message_body: str, message_type: str = Non
             return {"text": "⚠️ No entendí esa respuesta. Por favor, selecciona una de las opciones."}
         return {}
         
-    # Inicialización del flujo
+    # -------------------------------------------------------------------------
+    # Inicialización del flujo: Cualquier texto inicia el Paso 1
+    # -------------------------------------------------------------------------
     if not current_step or current_step == FSMStep.INITIAL:
         session.fsm_answers['current_step'] = FSMStep.VEHICLE_TYPE
         session.fsm_answers['error_count'] = 0
@@ -77,12 +79,24 @@ def advance_fsm(session: ChatSession, message_body: str, message_type: str = Non
     # Transición: VEHICLE_TYPE -> PAYMENT_METHOD
     if current_step == FSMStep.VEHICLE_TYPE:
         t = _clean_input(message_body)
-        if "city" in t: session.fsm_answers['vehicle_type'] = VehicleType.CITY_CAR
-        elif "suv" in t: session.fsm_answers['vehicle_type'] = VehicleType.SUV
-        elif "sedan" in t or "sedán" in t: session.fsm_answers['vehicle_type'] = VehicleType.SEDAN
-        elif "pick" in t: session.fsm_answers['vehicle_type'] = VehicleType.PICKUP
+        if t == "vt_citycar": session.fsm_answers['vehicle_type'] = VehicleType.CITY_CAR
+        elif t == "vt_suv": session.fsm_answers['vehicle_type'] = VehicleType.SUV
+        elif t == "vt_sedan": session.fsm_answers['vehicle_type'] = VehicleType.SEDAN
         else:
-            return _invalid_input()
+            # Si estamos en el primer paso y el lead escribe texto libre en lugar de presionar 
+            # el botón, simplemente repetimos la pregunta inicial de forma amigable.
+            session.fsm_answers['error_count'] = 0 # Reseteamos errores para no silenciarlo
+            return {
+                "text": "Por favor, selecciona una de las opciones para comenzar: ¿Qué tipo de auto buscas?",
+                "interactive": {
+                    "type": "button",
+                    "buttons": [
+                        {"id": "vt_citycar", "title": "City Car"},
+                        {"id": "vt_suv", "title": "SUV"},
+                        {"id": "vt_sedan", "title": "Sedán"},
+                    ]
+                }
+            }
 
         session.fsm_answers['current_step'] = FSMStep.PAYMENT_METHOD
         session.fsm_answers['error_count'] = 0
@@ -101,9 +115,9 @@ def advance_fsm(session: ChatSession, message_body: str, message_type: str = Non
     # Transición: PAYMENT_METHOD -> BUDGET_RANGE
     if current_step == FSMStep.PAYMENT_METHOD:
         t = _clean_input(message_body)
-        if "contado" in t: session.fsm_answers['payment_method'] = PaymentMethod.CONTADO
-        elif "credito" in t or "crédito" in t: session.fsm_answers['payment_method'] = PaymentMethod.CREDITO
-        elif "retoma" in t: session.fsm_answers['payment_method'] = PaymentMethod.RETOMA
+        if t == "pm_contado": session.fsm_answers['payment_method'] = PaymentMethod.CONTADO
+        elif t == "pm_credito": session.fsm_answers['payment_method'] = PaymentMethod.CREDITO
+        elif t == "pm_retoma": session.fsm_answers['payment_method'] = PaymentMethod.RETOMA
         else:
             return _invalid_input()
 
@@ -124,9 +138,9 @@ def advance_fsm(session: ChatSession, message_body: str, message_type: str = Non
     # Transición: BUDGET_RANGE -> PURCHASE_INTENT
     if current_step == FSMStep.BUDGET_RANGE:
         t = _clean_input(message_body)
-        if "14" in t or "7" in t: session.fsm_answers['budget_range'] = BudgetRange.DE_7M_A_14M
-        elif "15" in t or "m" in t and "15" in t: session.fsm_answers['budget_range'] = BudgetRange.MAS_15M
-        elif "6" in t or "<" in t: session.fsm_answers['budget_range'] = BudgetRange.MENOS_6M
+        if t == "br_7a14": session.fsm_answers['budget_range'] = BudgetRange.DE_7M_A_14M
+        elif t == "br_mas15": session.fsm_answers['budget_range'] = BudgetRange.MAS_15M
+        elif t == "br_menos6": session.fsm_answers['budget_range'] = BudgetRange.MENOS_6M
         else:
             return _invalid_input()
 
@@ -147,17 +161,20 @@ def advance_fsm(session: ChatSession, message_body: str, message_type: str = Non
     # Transición: PURCHASE_INTENT -> QUALIFIED (Con lógica de Puntuación)
     if current_step == FSMStep.PURCHASE_INTENT:
         t = _clean_input(message_body)
-        if "hoy" in t:
+        if t == "pi_hoy":
             session.fsm_answers['purchase_intent'] = PurchaseIntent.HOY
-        elif "semana" in t:
+        elif t == "pi_semana":
             session.fsm_answers['purchase_intent'] = PurchaseIntent.ESTA_SEMANA
-        elif "mes" in t:
+        elif t == "pi_mes":
             session.fsm_answers['purchase_intent'] = PurchaseIntent.MES_O_MAS
         else:
             return _invalid_input()
 
         session.fsm_answers['current_step'] = FSMStep.QUALIFIED
         session.fsm_answers['error_count'] = 0
+        
+        # Hito de Finalización: El bot terminó su trabajo, el lead pasa a cola de asignación
+        session.status = ChatSession.Status.PENDING_ASSIGNMENT
         
         # ================================
         # Lógica matemática de Urgency Score

@@ -17,7 +17,7 @@ from unittest.mock import patch
 from django.test import Client
 from django.conf import settings
 
-from crm.models import Lead, Message, ChatSession
+from crm.models import AuditLog, Lead, Message, ChatSession
 
 
 # Payload de Twilio simulado (ya sanitizado, como lo manda cloud_tasks.py)
@@ -197,3 +197,79 @@ def test_invalid_json_body_returns_400() -> None:
 
     # ASSERT
     assert response.status_code == 400
+
+
+# ==============================================================================
+# TEST: AuditLog A — SESSION_START escrito al primer contacto del lead
+# ==============================================================================
+@pytest.mark.django_db
+@patch('crm.services.twilio_client.send_whatsapp_message')
+def test_auditlog_session_start_created(mock_send, tenant) -> None:
+    """
+    ARRANGE: Tenant existe. Primer mensaje de un lead nuevo.
+    ACT: POST al worker con payload válido (primer contacto).
+    ASSERT: Existe exactamente 1 AuditLog con action='SESSION_START'.
+    """
+    # ARRANGE
+    mock_send.return_value = "SMoutbound_auditlog_01"
+    client = Client()
+    payload = _make_payload("SMaudit_session_start_01")
+
+    # ACT
+    response = _post_to_worker(client, payload)
+
+    # ASSERT
+    assert response.status_code == 200
+    session_start_logs = AuditLog.objects.filter(action="SESSION_START")
+    assert session_start_logs.count() == 1, (
+        f"Se esperaba 1 AuditLog SESSION_START, se encontraron {session_start_logs.count()}"
+    )
+    log = session_start_logs.first()
+    assert log is not None
+    assert "lead_id" in log.new_value
+    assert log.new_value["status"] == "BOT"
+
+
+# ==============================================================================
+# TEST: AuditLog B — MSG_RECEIVED escrito en cada mensaje entrante
+# ==============================================================================
+@pytest.mark.django_db
+@patch('crm.services.twilio_client.send_whatsapp_message')
+def test_auditlog_msg_received_written_per_message(mock_send, tenant) -> None:
+    """
+    ARRANGE: Tenant existe. Lead con sesión activa (returning lead).
+    ACT: POST al worker con un nuevo MessageSid (mensaje número 2 en la sesión).
+    ASSERT: Se escribe 1 AuditLog con action='MSG_RECEIVED'.
+             El campo new_value contiene 'message_sid' y 'body_length'.
+    """
+    # ARRANGE: Creamos el lead con su primera sesión (simula returning lead)
+    import hashlib
+    from crm.models import Lead, ChatSession
+    wa_id = "56987654321"
+    lead = Lead.objects.create(
+        tenant=tenant,
+        wa_id=wa_id,
+        wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
+    )
+    ChatSession.objects.create(tenant=tenant, lead=lead, status=ChatSession.Status.BOT)
+    mock_send.return_value = "SMoutbound_auditlog_02"
+
+    client = Client()
+    # Segundo mensaje del mismo lead (sesión ya existe)
+    payload = _make_payload("SMaudit_msg_received_02")
+
+    # ACT
+    response = _post_to_worker(client, payload)
+
+    # ASSERT
+    assert response.status_code == 200
+    msg_logs = AuditLog.objects.filter(action="MSG_RECEIVED")
+    assert msg_logs.count() == 1, (
+        f"Se esperaba 1 AuditLog MSG_RECEIVED, se encontraron {msg_logs.count()}"
+    )
+    log = msg_logs.first()
+    assert log is not None
+    assert log.new_value["message_sid"] == "SMaudit_msg_received_02"
+    assert "body_length" in log.new_value
+    # Para un returning lead, is_new_session debe ser False
+    assert log.new_value["is_new_session"] is False

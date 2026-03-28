@@ -57,6 +57,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    'core.log_utils.TraceIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -96,6 +97,8 @@ DATABASES = {
         default='postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db'
     )
 }
+# SRE Grade: Connection Management
+DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
 
 # GCP Cloud Tasks Configuration (Serverless Asynchronous Enqueuing)
 GCP_PROJECT_ID = env('GCP_PROJECT_ID', default='ccrm-saas-dev')
@@ -108,6 +111,11 @@ WORKER_BASE_URL = env('WORKER_BASE_URL', default='https://api.ccrm.example.com')
 # Twilio (Sprint 3 - Webhook Ingestion)
 TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
+
+# Mapeo de SIDs para botones reales de WhatsApp (Content API)
+# Las llaves deben coincidir con los valores de FSMStep en crm/services/fsm_types.py
+TWILIO_CONTENT_SIDS = env.json('TWILIO_CONTENT_SIDS', default={})
+
 
 # Internal secret to authenticate Cloud Tasks → Django Worker callbacks (Sprint 3)
 CLOUD_TASKS_INTERNAL_SECRET = env('CLOUD_TASKS_INTERNAL_SECRET', default='dev-internal-secret-change-in-prod')
@@ -171,10 +179,15 @@ OIDC_GOOGLE_AUDIENCE = env('OIDC_GOOGLE_AUDIENCE', default='CLIENT_ID_GOOGLE')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'context_filter': {
+            '()': 'core.log_utils.ContextFilter',
+        },
+    },
     'formatters': {
         'json': {
             '()': 'pythonjsonlogger.json.JsonFormatter',
-            'format': '%(asctime)s %(levelname)s %(name)s %(process)d %(threadName)s %(message)s'
+            'format': '%(asctime)s %(levelname)s %(name)s %(process)d %(threadName)s %(message)s %(trace_id)s %(tenant_id)s'
         },
 
     },
@@ -182,6 +195,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'json',
+            'filters': ['context_filter'],
         },
     },
     'root': {

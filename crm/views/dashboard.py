@@ -23,12 +23,12 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
     if not tenant:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
-    # Clean Architecture: El filtro de Tenant se delega al Manager activo
+    # Clean Architecture: El filtro de Tenant se delega al Manager activo (RLS Lógico)
     # Ordenamos por score descendente (los de 100 van primero)
     # limitamos a 50 para evitar sobrecarga en polling.
     sessions = (
-        ChatSession.objects
-        .filter(tenant=tenant, is_deleted=False)
+        ChatSession.tenant_objects
+        .for_tenant(tenant.id)
         .order_by('-urgency_score', '-updated_at')
         .select_related('lead')
         [:50]

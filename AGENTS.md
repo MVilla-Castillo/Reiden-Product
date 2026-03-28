@@ -4,7 +4,7 @@ Este archivo es la **fuente de la verdad** operativa y arquitectónica para cual
 
 ---
 
-## 🏗️ 1. Resumen del Proyecto y Arquitectura Core
+##  1. Resumen del Proyecto y Arquitectura Core
 **Proyecto:** CCRM-SAAS (Customer Conversational Relationship Management).
 **Objetivo:** Un CRM transaccional y conversacional (WhatsApp/Twilio) para Automotoras, gobernado por un motor de estados finitos (FSM) inquebrantable y telemetría exacta (AuditLog).
 
@@ -17,7 +17,7 @@ Este archivo es la **fuente de la verdad** operativa y arquitectónica para cual
 
 ---
 
-## 💻 2. Tooling y Comandos del Entorno (Local)
+##  2. Tooling y Comandos del Entorno (Local)
 
 **Gestión de Dependencias:** Únicamente `uv`. Prohibido usar `pip install`, `virtualenv` o `requirements.txt`.
 ```bash
@@ -45,19 +45,21 @@ uv run pytest
 
 ---
 
-## 📐 3. Convenciones de Código y Arquitectura (Skills)
+##  3. Convenciones de Código y Arquitectura (Skills)
 Antes de modificar vistas (`views.py`) o modelos (`models.py`), el agente DEBE consultar y aplicar estrictamente las reglas definidas en la carpeta:
-👉 **`.agents/skills/`**
+**`.agents/skills/`**
 
 **Reglas Críticas Resumidas:**
-1. **Clean Architecture Lógica:** Cero lógica de negocio en las Vistas. Las Vistas desempaquetan el JSON y llaman a una función de servicio o de modelo.
+1. **Clean Architecture Lógica:** Cero lógica de negocio en las Vistas. Las Vistas desempaquetan el JSON y llaman a una función de servicio o de modelo. 
+- La capa de dominio siempre limpia, sin dependencias de otras capa.
+- Usa DTOs para comunicacion entre capas. 
 2. **Multi-Tenancy por Diseño (RLS Lógica):** Prohibido usar `Model.objects.all()`. El filtro de privacidad empresarial es la regla número uno. Todo acceso a datos debe hacerse a través de Managers customizados que exijan el Tenant (ej. `Lead.tenant_objects.for_tenant(tenant)`).
 3. **Inmutabilidad (Soft-Delete):** Estrictamente prohibido el método `.delete()` en la base de datos para entidades Core. Modifica el flag (`is_deleted = True`) y respáldalo con `ActiveManager`.
 4. **Tipado Estricto (MyPy):** Código Python sin Tipado Moderno será rechazado de inmediato. 
 
 ---
 
-## 🔒 4. Seguridad, Concurrencia y SRE (Site Reliability Engineering)
+##  4. Seguridad, Concurrencia y SRE (Site Reliability Engineering)
 
 1. **Deadlocks y Thundering Herd:**
    * Al recibir Webhooks masivos y asíncronos (Cloud Tasks), debes apoyarte 100% en el bloqueo transaccional a nivel de fila de PostgreSQL. Las actualizaciones críticas del estado de la FSM DEBEN ir enrutadas dentro de bloques `transaction.atomic()` usando explícitamente `select_for_update()`.
@@ -72,14 +74,14 @@ Antes de modificar vistas (`views.py`) o modelos (`models.py`), el agente DEBE c
 
 ---
 
-## 🔄 5. Flujo de Control de LLMs y Agentes
+##  5. Flujo de Control de LLMs y Agentes
 Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `docs/MASTER_SPEC.md` / `MER.md`), **estas instrucciones tienen prioridad absoluta.**
 
 > **Alineación Final:** Eres un Agente SRE/Arquitecto Senior. No tomes atajos (como usar SQLite, o quitar tipado para ir más rápido). Nuestro objetivo prioritario es resiliencia transaccional y escalabilidad lineal a costo cero (Serverless).
 
 ---
 
-## 🛠️ 6. Quality Gates & Protocolo de Testing (Senior Level)
+##  6. Quality Gates & Protocolo de Testing (Senior Level)
 
 1. **Protocolo de "Borde Primero":** Antes de generar cualquier lógica de negocio compleja (ej: Cálculo de comisiones o transición de FSM), el Agente DEBE solicitar al Usuario: *"Define los 2 casos de borde (edge cases) para esta función"*.
 2. **Implementación de Tests:** Una vez definidos los casos, el Agente escribirá primero el archivo de `pytest` cubriendo el flujo feliz y los 2 casos de borde. Solo después de que el Usuario apruebe el test, se procederá con la implementación del código.
@@ -88,7 +90,7 @@ Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `d
     - No use `transaction.atomic()` en operaciones de escritura.
     - Tenga consultas N+1 (falta de `select_related`).
 
-## 🔍 7. Logging Estructurado y Observabilidad
+##  7. Logging Estructurado y Observabilidad
 
 1. **Formato JSON:** Todos los logs generados por `logging.getLogger` deben salir en formato JSON estructurado para ser procesados por GCP Cloud Logging.
 2. **Campos Obligatorios:** Cada log de error debe incluir `tenant_id`, `trace_id` (inyectado por el middleware) y `component_name`.

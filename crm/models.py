@@ -150,6 +150,7 @@ class ChatSession(models.Model):
     urgency_score = models.IntegerField(default=0, db_index=True)
     last_fsm_step = models.CharField(max_length=100, blank=True, null=True)
     last_client_message_at = models.DateTimeField(blank=True, null=True)
+    last_message_timestamp = models.CharField(max_length=50, blank=True, null=True, help_text="Timestamp nativo de Twilio del último mensaje procesado (RNF-03)")
     lost_reason = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -206,6 +207,12 @@ class Message(models.Model):
 
     objects = models.Manager()
     tenant_objects = TenantManager()
+
+    class Meta:
+        # RNF-44: Optimización de carga inicial de mensajes (O(log n))
+        indexes = [
+            models.Index(fields=['session', '-created_at']),
+        ]
 
     def __str__(self) -> str:
         return str(self.provider_message_id)

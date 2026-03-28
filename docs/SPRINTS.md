@@ -1,15 +1,15 @@
-# 📅 SPRINTS.md - CCRM SAAS (Fase de Ignición)
+#  SPRINTS.md - CCRM SAAS (Fase de Ignición)
 
-## 👤 Equipo & Capacidad
+##  Equipo & Capacidad
 - **Dev A & Dev B:** 4 horas/día totales (potenciadas por Agentes).
 - **Metodología:** Docs-as-Code / Vertical Slicing (DDD) / Zero Merge Conflicts.
-- **Estado Global:** 🟢 Fase 1 - Cimientos (En progreso).
+- **Estado Global:**  Fase 1 - Cimientos (En progreso).
 
 ---
 
-## 🚀 Etapa 1: Cimientos e Identidad (2 Semanas)
+##  Etapa 1: Cimientos e Identidad (2 Semanas)
 
-### Sprint 1: Setup & Data Core (1 Semana) - 🟢 "The Fast Start"
+### Sprint 1: Setup & Data Core (1 Semana) -  "The Fast Start"
 *Objetivo: Tener el entorno listo y la base de datos blindada.*
 - [x] Init del repo con `uv` y estructura de carpetas `backend/` y `frontend/`.
 - [x] Definición de modelos Django: `Tenant`, `AppUser`, `Lead`, `ChatSession`, `Message`, `AuditLog`.
@@ -18,7 +18,7 @@
 - [x] Implementación de RLS (Row/Tenant Level Security) vía Custom Managers en Django.
 - [x] **Hito:** Base de datos con aislamiento multi-tenant verificada.
 
-### Sprint 2: OIDC Stateless Identity (1 Semana) - 🔴 "Deep Security"
+### Sprint 2: OIDC Stateless Identity (1 Semana) -  "Deep Security"
 *Objetivo: Login corporativo real sin contraseñas locales. (Dueño: Dev A)*
 - [x] Refactor del modelo `AppUser` a estándares agnósticos (`oidc_sub`, `oidc_issuer`).
 - [x] Implementación de `OIDCStatelessMiddleware` con JWT Multi-Issuer y `leeway=30`.
@@ -31,13 +31,13 @@
 
 ## 🧠 Etapa 2: El Cerebro Conversacional (4 Semanas)
 
-### Sprint 3: Ingesta Asíncrona & Workers (1 Semana) - 🟢 "High Concurrency" 
+### Sprint 3: Ingesta Asíncrona & Workers (1 Semana) -  "High Concurrency" 
 *Objetivo: Responder a Twilio en milisegundos. (Dueño: Dev B)*
 - [ inicio y fin: 18 marzo. ] **(Dev B - Dominio Infra Chat / Back):** Endpoint de Webhook (firma `X-Twilio-Signature`) y encolamiento a GCP Cloud Tasks.
 - [ inicio y fin: 18 marzo. ] **(Dev B - Dominio Infra Chat / Back):** Worker asíncrono para consumir tareas validando idempotencia (`twilio_sid`).
 - [ inicio y fin: 18 marzo. ] **Hito:** Ingesta serverless robusta. Dev B garantiza que ningún mensaje se pierda o duplique.
 
-### Sprint 4: Máquina de Estados (FSM) (3 Semanas) - 🔴 "Business Logic"
+### Sprint 4: Máquina de Estados (FSM) (3 Semanas) -  "Business Logic"
 *Objetivo: El bot que califica leads. (Dueño: Dev A)*
 - [ inicio y fin 18 Marzo ] **(Dev A - Dominio Lógica Chat / Back):** Motor FSM con `select_for_update()` para evitar Race Conditions (Upsert Atómico).
 - [ inicio y fin 18 Marzo ] **(Dev A - Dominio Lógica Chat / Back):** Integración API WhatsApp (Mensajes Interactivos).
@@ -46,22 +46,22 @@
 
 ---
 
-## 💻 Etapa 3: Interfaz y Despliegue Cloud (6 Semanas)
+##  Etapa 3: Interfaz y Despliegue Cloud (6 Semanas)
 
-### Sprint 5: Integración End-to-End & Persistencia (1 Semana) - 🟢 "The Data Flow"
+### Sprint 5: Integración End-to-End & Persistencia (1 Semana) -  "The Data Flow"
 *Objetivo: Completar el ciclo de vida del mensaje desde el Webhook hasta la DB.*
-- [ ] **(Dev B - Dominio Persistencia):** Implementación de la Vista de Worker (`/api/workers/process-message/`) validando el secreto interno.
-- [ ] **(Dev B - Dominio Persistencia):** Lógica de Upsert de Lead y creación de registros en `Message` y `AuditLog`.
-- [ ] **(Dev B - Dominio Persistencia):** Orquestación de reintentos e idempotencia basada en `message_sid`.
-- [ ] **Hito:** Mensaje recibido en WhatsApp visible en la Base de Datos local (PostgreSQL).
+- [x] **(Dev B - Dominio Persistencia):** Implementación de la Vista de Worker (`/api/workers/process-message/`) validando el secreto interno.
+- [x] **(Dev B - Dominio Persistencia):** Lógica de Upsert de Lead y creación de registros en `Message` y `AuditLog`.
+- [x] **(Dev B - Dominio Persistencia):** Orquestación de reintentos e idempotencia basada en `message_sid`.
+- [x] **Hito:** Mensaje recibido en WhatsApp visible en la Base de Datos local (PostgreSQL).
 
-### Sprint 6: Dashboard de Ventas (2 Semanas) - 🔴 "Real-Time UI"
+### Sprint 6: Dashboard de Ventas (2 Semanas) -  "Real-Time UI"
 *Objetivo: Bandeja de entrada ágil.*
 - [ ] **(Dev B - Dominio Tiempo Real / Fullstack):** Endpoints GET (Listado optimizado sin N+1) + Front Angular RxJS (HTTP Polling + Backoff).
 - [ ] **(Dev A - Dominio Gestión / Fullstack):** Endpoints GET/POST (Detalle de Lead) + Front Angular "Ficha de Cliente" y Toggle de ruteo Gerencial.
 - [ ] **Hito:** Dashboard operativo. Dev B hace la vista general, Dev A hace la vista de detalle.
 
-### Sprint 7: SRE, Cloud & Go-Live (3 Semanas) - 🔴 "Production Readiness"
+### Sprint 7: SRE, Cloud & Go-Live (3 Semanas) - "Production Readiness"
 *Objetivo: Despliegue Big Tech.*
 - [ ] **(Dev B - Calidad Ops):** Auditoría y limpieza de código de desarrollo (Mocks de Cloud Tasks, `if DEBUG` en settings, trust de ngrok).
 - [ ] **(Dev A - Infra Cloud):** GCP Secret Manager + Deploy en Cloud Run (Scale to Zero).

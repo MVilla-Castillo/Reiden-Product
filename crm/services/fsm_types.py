@@ -22,7 +22,7 @@ class VehicleType(StrEnum):
     CITY_CAR = "CITY_CAR"
     SUV = "SUV"
     SEDAN = "SEDAN"
-    PICKUP = "PICKUP"
+
 
 
 class PaymentMethod(StrEnum):

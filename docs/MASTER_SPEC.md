@@ -48,7 +48,8 @@ Puntaje calculado de forma determinista al finalizar el flujo:
 * **Prioridad Máxima (Score 100):** Si `PURCHASE_INTENT` == "Hoy".
 * **Intención Temporal:** `Esta semana` (+20 pts), `Mes o más` (+10 pts).
 * **Bono por Presupuesto:** `< 6M` (+10 pts), `7M a 14M` (+20 pts), `15M o más` (+40 pts).
-* **Bono por Pago:** `Crédito` (+30 pts).
+* **Bono por Pago:** `Crédito` (+20 pts).
+* **Score máximo:** El score puede exceder 100. 
 
 *Nota: La suma total máxima (excluyendo el "Hoy" absoluto) determina la posición en el Dashboard.*
 
