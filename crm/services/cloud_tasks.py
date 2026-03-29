@@ -7,9 +7,6 @@ REGLA SRE: Esta función NO toca la base de datos y NO está dentro de ninguna
 transaction.atomic(). Su única responsabilidad es hacer una llamada HTTP a la
 API de Cloud Tasks para encolar la tarea de procesamiento.
 
-Orden correcto (anti-deadlock):
-  1. Vista valida firma → guarda payload en DB si aplica → CIERRA transacción
-  2. DESPUÉS llama a esta función para encolar el trabajo pesado.
 
 Modo LOCAL (DEBUG=True):
   Cuando no hay credenciales de GCP, la función despacha el payload directamente
@@ -39,12 +36,6 @@ def enqueue_webhook_payload(payload: dict[str, Any]) -> str:
     En producción: Cloud Tasks actúa como buffer de rate-limiting natural — si
     Twilio dispara webhooks en ráfaga, las tareas se procesan en orden sin
     saturar la DB.
-
-    En desarrollo (DEBUG=True y sin credenciales GCP): despacha el payload
-    directamente al worker local vía HTTP para cerrar el ciclo E2E localmente.
-
-    Args:
-        payload: El dict del payload POST de Twilio (ya validado y limpio).
 
     Returns:
         El nombre de la tarea creada (GCP task name o ID local).

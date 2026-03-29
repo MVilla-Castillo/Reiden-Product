@@ -38,6 +38,17 @@ if DEBUG:
     # SRE Grade: Permite automáticamente dominios de ngrok en desarrollo
     ALLOWED_HOSTS += ['.ngrok-free.app', '.ngrok.io', '.ngrok-free.dev']
 
+# Production Security Hardening (SRE)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 
 # Application definition
 
@@ -97,8 +108,15 @@ DATABASES = {
         default='postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db'
     )
 }
-# SRE Grade: Connection Management
+# SRE Grade: Connection Management & Cloud SQL SSL
 DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
+
+# Si estamos en producción, forzamos SSL para la base de datos si no es un Unix Socket
+if not DEBUG and '127.0.0.1' not in DATABASES['default']['HOST'] and 'localhost' not in DATABASES['default']['HOST']:
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'verify-ca',
+        'sslrootcert': env('DATABASE_SSL_CA', default=''),
+    }
 
 # GCP Cloud Tasks Configuration (Serverless Asynchronous Enqueuing)
 GCP_PROJECT_ID = env('GCP_PROJECT_ID', default='ccrm-saas-dev')

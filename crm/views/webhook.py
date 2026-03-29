@@ -6,7 +6,6 @@ Responsabilidad: validar firma y encolar payload en Cloud Tasks en <100ms.
 
 REGLAS CLAVE (SKILL: api_security + high_concurrency):
 - NO toca la base de datos. Eso es responsabilidad del Worker.
-- NO está protegida por OIDC (bypass en OIDCStatelessMiddleware).
 - Responde 200 OK tan rápido como sea posible.
 """
 import logging
@@ -25,15 +24,7 @@ logger = logging.getLogger(__name__)
 @csrf_exempt  # Twilio no envía CSRF tokens; la seguridad viene de validate_twilio_signature
 @require_POST
 def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
-    """
-    Endpoint de Ingesta de Webhooks de Twilio.
 
-    Flujo (objetivo: <100ms total):
-    1. Validar firma criptográfica HMAC-SHA1 → 403 si falla.
-    2. Extraer payload de forma defensiva con .get() → 400 si falta MessageSid.
-    3. Encolar payload en GCP Cloud Tasks (llamada HTTP externa, no DB).
-    4. Responder 200 OK. Twilio marcará el webhook como exitoso.
-    """
     # PASO 1: Validación Criptográfica (Regla #1 - SKILL api_security §1)
     if not validate_twilio_signature(request):
         logger.warning(

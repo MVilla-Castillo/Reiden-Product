@@ -218,3 +218,35 @@ Se ha logrado cerrar el ciclo de vida completo del mensaje en el entorno de desa
 *   Implementación del **Dashboard de Ventas** en Angular. Usaremos RxJS para realizar HTTP Polling sobre la data que el worker ya está persistiendo exitosamente en PostgreSQL, permitiendo que el vendedor vea los mensajes en "tiempo real" simulado.
 
 ---
+
+### [28 de Marzo de 2026] Hardening de Seguridad SRE y Blindaje de Producción
+
+**Contexto:**
+Con el "Cerebro Conversacional" (FSM) estabilizado, el sistema entra en su fase de preparación para despliegue en la nube (Production Readiness). Se requiere blindar la aplicación contra ataques de red comunes (Man-in-the-Middle, XSS, Host Poisoning) y asegurar que la comunicación con la base de datos en GCP sea cifrada y privada.
+
+**Decisiones de Implementación Destacadas:**
+
+1.  **Blindaje de Transporte (HTTPS/SSL & HSTS):**
+    *   **Decisión:** Activación de `SECURE_SSL_REDIRECT` y `SECURE_HSTS_SECONDS` (1 año).
+    *   **El Por Qué:** Forzamos a que cualquier navegador o cliente (incluyendo Twilio) use estrictamente canales cifrados. HSTS garantiza que el navegador del usuario "recuerde" esta preferencia, eliminando ataques de downgrade a HTTP.
+
+2.  **Aislamiento de Perímetro (Allowed Hosts Dinámicos):**
+    *   **Decisión:** Implementación de un filtro dinámico basado en `DEBUG`.
+    *   **El Por Qué:** En local permitimos subdominios de `ngrok` para pruebas, pero en producción el servidor solo responderá a la lista blanca oficial definida en el `.env`, mitigando ataques de *HTTP Host Header Poisoning*.
+
+3.  **Higiene y Protección del Navegador (Security Headers):**
+    *   **Decisión:** Implementación de `X-Content-Type-Options: nosniff` y `X-XSS-Protection`.
+    *   **El Por Qué:** Previene que el navegador ejecute scripts malintencionados disfrazados de otros tipos de archivo y activa filtros nativos contra Inyección de Código (XSS).
+
+4.  **Seguridad de Datos en Tránsito (Database SSL Enforce):**
+    *   **Decisión:** Configuración de `sslmode='verify-ca'` en el ORM utilizando la variable de entorno `DATABASE_SSL_CA` para la ruta del certificado.
+    *   **El Por Qué:** Aseguramos que la conexión a Cloud SQL sea cifrada y verificada contra un certificado CA oficial. Si el tráfico intentara salir por IP pública sin SSL, la conexión fallará preventivamente, protegiendo las credenciales.
+
+**Trade-offs (Simplicidad vs. Blindaje):**
+*   Se decidió mantener estas reglas **desactivadas en desarrollo (`if DEBUG`)** para no obligar al equipo a gestionar certificados SSL locales o túneles complejos fuera de ngrok, manteniendo la agilidad de desarrollo.
+
+**Concepto de Ingeniería Consolidado: Defense in Depth (Defensa en Profundidad)**
+*   **Definición:** Aplicación de múltiples capas de seguridad (Red, Aplicación, Base de Datos) donde el fallo de una no compromete la integridad del sistema total.
+
+**Siguiente Paso (Sprint 6):**
+*   Inicio del desarrollo del Dashboard de Ventas en Angular 18, ahora con el canal de comunicación backend ya blindado para manejar tokens de identidad y perfiles de leads.
