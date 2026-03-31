@@ -112,7 +112,7 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
             # Prohibido get_or_create en webhooks masivos → usamos update_or_create
             # con wa_id_hash para garantizar ACID (RNF-09, AGENTS.md §4)
             wa_id_raw: str = payload.get('WaId', '') or payload.get('From', '').replace('whatsapp:', '')
-            wa_id_clean: str = wa_id_raw[:50]
+            wa_id_clean: str = wa_id_raw[:12]
             wa_id_hash: str = hashlib.sha256(wa_id_clean.encode()).hexdigest()
 
             lead, _ = Lead.objects.update_or_create(
