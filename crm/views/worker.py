@@ -139,6 +139,26 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                 .first()
             )
 
+            # =========================================================================
+            # SRE FALLBACK: Auto-Expiración (Robuztez ante fallos del Cloud Scheduler)
+            # Requisito RNF: Si el lead dejó tirada la sesión por más de 24 horas,
+            # cerramos la sesión forzosamente para que cualquier "Hola" nuevo 
+            # comience el ciclo de la máquina de estados (FSM) desde cero.
+            # =========================================================================
+            if session:
+                from datetime import timedelta
+                from django.utils import timezone
+                
+                # Para evitar loops en el mismo día, comprobamos inactividad de 24h
+                if session.updated_at < timezone.now() - timedelta(hours=24):
+                    logger.info(
+                        "Worker: Cerrando sesión por inactividad (>24h). Forzando flujo nuevo.",
+                        extra={"component_name": "process_message_worker", "session_id": str(session.id)}
+                    )
+                    session.status = ChatSession.Status.ABANDONO_BOT
+                    session.save()
+                    session = None # Forzará la creación de una nueva en la siguiente línea
+
             is_new_session = session is None
             if is_new_session:
                 # Primera vez o sesión previa en estado terminal → crear nueva
@@ -184,8 +204,8 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
             _raw_type = payload.get('MessageType', 'text').lower()
             _message_type = _message_type_map.get(_raw_type, Message.Type.TEXT)
 
-            _body = payload.get('ButtonPayload', '') or payload.get('Body', '') or payload.get('ButtonText', '') or payload.get('MediaUrl0', '')
-            
+            _body = payload.get('Body', '') or payload.get('ButtonPayload', '') or payload.get('ButtonText', '') or payload.get('MediaUrl0', '')
+
             # 4e. Idempotencia y Guardado de Mensaje Entrante
             message, created = Message.objects.get_or_create(
                 provider_message_id=message_sid,

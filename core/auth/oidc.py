@@ -28,6 +28,7 @@ class OIDCStatelessMiddleware:
         # 1. Ignorar rutas públicas (healthchecks, webhooks de Twilio y workers internos)
         # SRE Grade: Bypass robusto para endpoints operativos
         PUBLIC_PATH_PREFIXES = (
+            '/admin/',
             '/health/', 
             '/api/webhooks/twilio/', 
             '/api/workers/process-message/'
