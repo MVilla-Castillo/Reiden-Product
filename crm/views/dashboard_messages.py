@@ -18,7 +18,6 @@ from django.views.decorators.http import require_http_methods
 
 from crm.adapters.dependency_injection import DIContainer
 from crm.application.use_cases.send_outbound_message import MessageDeliveryError
-from crm.application.use_cases.send_outbound_message import MessageDeliveryError
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +130,14 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     sp_raw = body.get("salesperson_id")
     if sp_raw is not None:
-        try:
-            sp_id = UUID(sp_raw)
-        except ValueError:
-            return JsonResponse({"error": "salesperson_id inválido"}, status=400)
+        # Soporta UUID explícito o "AUTO" para Round-Robin
+        if sp_raw == "AUTO":
+            sp_id = "AUTO"
+        else:
+            try:
+                sp_id = UUID(sp_raw)
+            except ValueError:
+                return JsonResponse({"error": "salesperson_id inválido"}, status=400)
     else:
         sp_id = None
 
@@ -143,7 +146,10 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     try:
         result = use_case.execute(session_id, request.tenant.id, sp_id)
     except ValueError as e:
-        return JsonResponse({"error": str(e)}, status=404)
+        error_str = str(e)
+        if "no encontrado" in error_str.lower() or "disponible" in error_str.lower():
+            return JsonResponse({"error": error_str}, status=404)
+        return JsonResponse({"error": error_str}, status=400)
 
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)

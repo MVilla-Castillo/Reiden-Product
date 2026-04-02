@@ -196,6 +196,7 @@ class DIContainer:
             self._assign_lead_use_case = AssignLeadUseCase(
                 session_repo=self.session_repo,
                 user_repo=self.user_repo,
+                tenant_repo=self.tenant_repo,
                 audit_logger=self.audit_logger,
             )
         return self._assign_lead_use_case

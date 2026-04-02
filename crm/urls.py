@@ -17,7 +17,7 @@ from django.urls import path
 
 from crm.views.webhook import twilio_webhook_view
 from crm.views.worker import process_message_worker_view
-from crm.views.dashboard import leads_dashboard_api
+from crm.views.dashboard import leads_dashboard_api, pending_leads_api
 from crm.views.dashboard_messages import (
     assign_lead_api,
     change_session_status_api,
@@ -38,6 +38,12 @@ urlpatterns = [
     ),
     # Sprint 5: Dashboard API (privado, requiere sesión OIDC)
     path("api/dashboard/leads/", leads_dashboard_api, name="dashboard_leads"),
+    # Cola de leads pendientes de asignación
+    path(
+        "api/dashboard/leads/pending/",
+        pending_leads_api,
+        name="pending_leads",
+    ),
     # Sprint 6: Detalle de mensajes de una sesión
     path(
         "api/dashboard/leads/<uuid:session_id>/messages/",

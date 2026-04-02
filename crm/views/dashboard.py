@@ -48,3 +48,20 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
     data = [_serialize_session(s) for s in sessions]
 
     return JsonResponse({"leads": data}, status=200)
+
+
+def pending_leads_api(request: HttpRequest) -> JsonResponse:
+    """API para obtener la cola de leads pendientes de asignación."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method Not Allowed"}, status=405)
+
+    tenant = getattr(request, "tenant", None)
+    if not tenant:
+        return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    session_repo = DIContainer.instance().session_repo
+    sessions = session_repo.get_pending_sessions(tenant, limit=50)
+
+    data = [_serialize_session(s) for s in sessions]
+
+    return JsonResponse({"pending_leads": data}, status=200)

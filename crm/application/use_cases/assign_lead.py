@@ -4,6 +4,10 @@ a un vendedor (o desasignarlo).
 
 Regla Event Sourcing: Todo cambio de asignación DEBE registrar un AuditLog
 dentro de la misma transacción atómica.
+
+Soporta dos modos de routing:
+- MANUAL: El Gerente asigna explícitamente a un vendedor.
+- AUTO: Round-Robin automático al vendedor con menos sesiones activas.
 """
 
 from __future__ import annotations
@@ -14,7 +18,13 @@ from uuid import UUID
 
 from django.db import transaction
 
-from crm.domain.ports import AuditEntry, AuditLogger, SessionRepository, UserRepository
+from crm.domain.ports import (
+    AuditEntry,
+    AuditLogger,
+    SessionRepository,
+    TenantRepository,
+    UserRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,23 +43,26 @@ class AssignLeadUseCase:
     Asigna o desasigna un vendedor a una sesión.
     - Si salesperson_id es un UUID: asigna y cambia status a CON_VENDEDOR.
     - Si salesperson_id es None: desasigna y cambia status a PENDING_ASSIGNMENT.
+    - Si salesperson_id es "AUTO" y tenant.routing_mode=AUTO: asigna Round-Robin.
     """
 
     def __init__(
         self,
         session_repo: SessionRepository,
         user_repo: UserRepository,
+        tenant_repo: TenantRepository,
         audit_logger: AuditLogger,
     ) -> None:
         self._session_repo = session_repo
         self._user_repo = user_repo
+        self._tenant_repo = tenant_repo
         self._audit_logger = audit_logger
 
     def execute(
         self,
         session_id: UUID,
         tenant_id: UUID,
-        salesperson_id: UUID | None,
+        salesperson_id: UUID | None | str,
     ) -> AssignLeadResult | None:
         session = self._session_repo.find_by_id(session_id, tenant_id)
         if session is None:
@@ -58,7 +71,34 @@ class AssignLeadUseCase:
         old_status = session.status
         old_salesperson_id = session.salesperson_id
 
-        if salesperson_id is not None:
+        # Auto-assign: buscar vendedor con menor carga
+        if salesperson_id == "AUTO":
+            tenant = self._tenant_repo.find_by_id(tenant_id)
+            if tenant is None or tenant.get("routing_mode") != "AUTO":
+                raise ValueError("Routing AUTO no habilitado para este tenant")
+
+            salespeople = self._user_repo.find_salespeople_by_tenant(tenant_id)
+            if not salespeople:
+                raise ValueError("No hay vendedores disponibles en este tenant")
+
+            # Ordenar por menor carga de sesiones activas
+            salespeople_sorted = sorted(
+                salespeople, key=lambda x: x["active_sessions_count"]
+            )
+            selected = salespeople_sorted[0]
+            salesperson_id = selected["id"]
+
+            logger.info(
+                "Auto-assign Round-Robin",
+                extra={
+                    "component_name": "assign_lead_use_case",
+                    "session_id": str(session_id),
+                    "selected_salesperson": selected["email"],
+                    "active_sessions": selected["active_sessions_count"],
+                },
+            )
+
+        if salesperson_id is not None and not isinstance(salesperson_id, str):
             sp = self._user_repo.find_by_id_and_tenant(
                 salesperson_id, tenant_id, role="SALESPERSON"
             )

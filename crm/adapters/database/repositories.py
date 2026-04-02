@@ -322,6 +322,22 @@ class DjangoSessionRepository(SessionRepository):
         )
         return [_session_to_entity(m) for m in models]
 
+    def get_pending_sessions(self, tenant: Any, limit: int = 50) -> list[SessionEntity]:
+        """Retorna sesiones pendientes de asignación (status=BOT o PENDING_ASSIGNMENT)."""
+        tenant_id = _tenant_to_id(tenant)
+        models = (
+            ChatSession.tenant_objects.for_tenant(tenant_id)
+            .filter(
+                status__in=[
+                    ChatSession.Status.BOT,
+                    ChatSession.Status.PENDING_ASSIGNMENT,
+                ]
+            )
+            .order_by("-urgency_score", "-updated_at")
+            .select_related("lead")[:limit]
+        )
+        return [_session_to_entity(m) for m in models]
+
     def expire_if_inactive(
         self,
         tenant: Any,
@@ -451,6 +467,16 @@ class DjangoTenantRepository(TenantRepository):
             .first()
         )
         return result
+
+    def find_by_id(self, tenant_id: uuid.UUID) -> dict[str, Any] | None:
+        tenant = (
+            Tenant.objects.filter(id=tenant_id)
+            .values("id", "nombre_legal", "routing_mode", "is_verified")
+            .first()
+        )
+        if tenant:
+            tenant["routing_mode"] = str(tenant["routing_mode"])
+        return tenant
 
 
 class DjangoUserRepository(UserRepository):

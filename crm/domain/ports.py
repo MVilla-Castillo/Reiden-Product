@@ -194,6 +194,12 @@ class SessionRepository(Protocol):
         """Retorna sesiones ordenadas por urgency_score para el dashboard."""
         ...
 
+    def get_pending_sessions(
+        self, tenant_id: UUID, limit: int = 50
+    ) -> list[SessionEntity]:
+        """Retorna sesiones pendientes de asignación (status=BOT o PENDING_ASSIGNMENT)."""
+        ...
+
     def find_active_for_update(
         self, tenant_id: UUID, lead_id: UUID
     ) -> SessionEntity | None:
@@ -268,4 +274,8 @@ class TenantRepository(Protocol):
 
     def find_id_by_phone_number(self, phone_number_id: str) -> UUID | None:
         """Busca el ID de un Tenant por su phone_number_id de WhatsApp."""
+        ...
+
+    def find_by_id(self, tenant_id: UUID) -> dict[str, Any] | None:
+        """Busca un Tenant por su ID y retorna sus datos."""
         ...
