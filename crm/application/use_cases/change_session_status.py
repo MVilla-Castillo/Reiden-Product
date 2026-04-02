@@ -2,7 +2,8 @@
 crm/application/use_cases/change_session_status.py — Caso de uso para cerrar
 una sesión (GANADO, PERDIDO, ABANDONO_BOT).
 
-Regla Event Sourcing: Todo cambio de estado DEBE registrar un AuditLog.
+Regla Event Sourcing: Todo cambio de estado DEBE registrar un AuditLog
+dentro de la misma transacción atómica.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from uuid import UUID
+
+from django.db import transaction
 
 from crm.domain.ports import AuditEntry, AuditLogger, SessionRepository
 
@@ -51,19 +54,20 @@ class ChangeSessionStatusUseCase:
 
         old_status = old_session.status
 
-        result = self._session_repo.change_status(session_id, tenant_id, new_status)
-        if result is None:
-            return None
+        with transaction.atomic():
+            result = self._session_repo.change_status(session_id, tenant_id, new_status)
+            if result is None:
+                return None
 
-        self._audit_logger.record(
-            AuditEntry(
-                session_id=session_id,
-                tenant_id=tenant_id,
-                action="STATUS_CHANGED",
-                old_value={"status": old_status},
-                new_value={"status": new_status},
+            self._audit_logger.record(
+                AuditEntry(
+                    session_id=session_id,
+                    tenant_id=tenant_id,
+                    action="STATUS_CHANGED",
+                    old_value={"status": old_status},
+                    new_value={"status": new_status},
+                )
             )
-        )
 
         return ChangeSessionStatusResult(
             session_id=result.id,

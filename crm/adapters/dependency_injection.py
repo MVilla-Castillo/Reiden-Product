@@ -186,6 +186,7 @@ class DIContainer:
                 lead_repo=self.lead_repo,
                 message_provider=self.message_provider,
                 tenant_phone_number_id=tenant_phone,
+                audit_logger=self.audit_logger,
             )
         return self._send_outbound_message_use_case
 

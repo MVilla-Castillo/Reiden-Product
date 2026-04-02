@@ -1,6 +1,8 @@
 """
 crm/application/use_cases/send_outbound_message.py — Caso de uso para que un
 vendedor envíe un mensaje a un lead vía Twilio.
+
+Regla Event Sourcing: Todo mensaje saliente DEBE registrar un AuditLog.
 """
 
 from __future__ import annotations
@@ -10,6 +12,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from crm.domain.ports import (
+    AuditEntry,
+    AuditLogger,
     LeadRepository,
     MessageProvider,
     MessageRepository,
@@ -49,12 +53,14 @@ class SendOutboundMessageUseCase:
         lead_repo: LeadRepository,
         message_provider: MessageProvider,
         tenant_phone_number_id: str,
+        audit_logger: AuditLogger,
     ) -> None:
         self._session_repo = session_repo
         self._message_repo = message_repo
         self._lead_repo = lead_repo
         self._message_provider = message_provider
         self._tenant_phone_number_id = tenant_phone_number_id
+        self._audit_logger = audit_logger
 
     def execute(
         self,
@@ -109,6 +115,21 @@ class SendOutboundMessageUseCase:
             direction="OUTBOUND",
             message_type="TEXT",
             body=body,
+        )
+
+        self._audit_logger.record(
+            AuditEntry(
+                session_id=session_id,
+                tenant_id=tenant_id,
+                action="OUTBOUND_MESSAGE_SENT",
+                old_value={},
+                new_value={
+                    "message_id": str(message.id),
+                    "provider_message_sid": send_result.provider_message_id,
+                    "body_length": len(body),
+                    "message_type": "TEXT",
+                },
+            )
         )
 
         return SendOutboundMessageResult(

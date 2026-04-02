@@ -2,7 +2,8 @@
 crm/application/use_cases/assign_lead.py — Caso de uso para asignar un lead
 a un vendedor (o desasignarlo).
 
-Regla Event Sourcing: Todo cambio de asignación DEBE registrar un AuditLog.
+Regla Event Sourcing: Todo cambio de asignación DEBE registrar un AuditLog
+dentro de la misma transacción atómica.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from uuid import UUID
+
+from django.db import transaction
 
 from crm.domain.ports import AuditEntry, AuditLogger, SessionRepository, UserRepository
 
@@ -62,30 +65,31 @@ class AssignLeadUseCase:
             if sp is None:
                 raise ValueError("Vendedor no encontrado en este tenant")
 
-            result = self._session_repo.assign_salesperson(
-                session_id, tenant_id, salesperson_id
-            )
-            if result is None:
-                return None
-
-            self._audit_logger.record(
-                AuditEntry(
-                    session_id=session_id,
-                    tenant_id=tenant_id,
-                    action="LEAD_ASSIGNED",
-                    old_value={
-                        "status": old_status,
-                        "salesperson_id": str(old_salesperson_id)
-                        if old_salesperson_id
-                        else None,
-                    },
-                    new_value={
-                        "status": result.status,
-                        "salesperson_id": str(salesperson_id),
-                        "salesperson_email": sp["email"],
-                    },
+            with transaction.atomic():
+                result = self._session_repo.assign_salesperson(
+                    session_id, tenant_id, salesperson_id
                 )
-            )
+                if result is None:
+                    return None
+
+                self._audit_logger.record(
+                    AuditEntry(
+                        session_id=session_id,
+                        tenant_id=tenant_id,
+                        action="LEAD_ASSIGNED",
+                        old_value={
+                            "status": old_status,
+                            "salesperson_id": str(old_salesperson_id)
+                            if old_salesperson_id
+                            else None,
+                        },
+                        new_value={
+                            "status": result.status,
+                            "salesperson_id": str(salesperson_id),
+                            "salesperson_email": sp["email"],
+                        },
+                    )
+                )
 
             return AssignLeadResult(
                 session_id=result.id,
@@ -97,27 +101,30 @@ class AssignLeadUseCase:
                 else None,
             )
         else:
-            result = self._session_repo.assign_salesperson(session_id, tenant_id, None)
-            if result is None:
-                return None
-
-            self._audit_logger.record(
-                AuditEntry(
-                    session_id=session_id,
-                    tenant_id=tenant_id,
-                    action="LEAD_UNASSIGNED",
-                    old_value={
-                        "status": old_status,
-                        "salesperson_id": str(old_salesperson_id)
-                        if old_salesperson_id
-                        else None,
-                    },
-                    new_value={
-                        "status": result.status,
-                        "salesperson_id": None,
-                    },
+            with transaction.atomic():
+                result = self._session_repo.assign_salesperson(
+                    session_id, tenant_id, None
                 )
-            )
+                if result is None:
+                    return None
+
+                self._audit_logger.record(
+                    AuditEntry(
+                        session_id=session_id,
+                        tenant_id=tenant_id,
+                        action="LEAD_UNASSIGNED",
+                        old_value={
+                            "status": old_status,
+                            "salesperson_id": str(old_salesperson_id)
+                            if old_salesperson_id
+                            else None,
+                        },
+                        new_value={
+                            "status": result.status,
+                            "salesperson_id": None,
+                        },
+                    )
+                )
 
             return AssignLeadResult(
                 session_id=result.id,

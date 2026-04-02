@@ -35,6 +35,7 @@ from crm.domain.ports import (
     SessionRepository,
     TenantRepository,
 )
+from crm.adapters.messaging.twilio_adapter import MessagingError
 from crm.services.fsm_engine import FSMContext, FSMResult, advance_fsm
 
 logger = logging.getLogger(__name__)
@@ -281,7 +282,7 @@ class ProcessMessageUseCase:
                 send_result: SendMessageResult = self._message_provider.send_message(
                     send_request
                 )
-            except Exception:
+            except MessagingError:
                 logger.exception(
                     "UseCase: Fallo al enviar respuesta (mensaje entrante ya persistido).",
                     extra={
