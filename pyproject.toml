@@ -5,6 +5,7 @@ description = "CCRM SAAS Backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=46.0.5",
     "django>=6.0.3",
     "django-environ>=0.13.0",
     "google-cloud-tasks>=2.21.0",
@@ -24,4 +25,17 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-django>=4.12.0",
+    "mypy>=1.15.0",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["mypy_django_plugin.main"]
+exclude = ["migrations/", "tests/"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings"
+
+[tool.pytest.ini_options]
+addopts = "--cov=crm --cov=core --cov-report=term-missing --cov-fail-under=80"

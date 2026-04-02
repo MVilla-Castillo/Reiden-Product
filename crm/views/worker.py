@@ -1,27 +1,26 @@
 """
-crm/views/worker.py
+crm/views/worker.py — Vista delgada: delega todo al Use Case.
 
-Vista privada: POST /api/workers/process-message/
-Responsabilidad: procesar el payload encolado por Cloud Tasks.
-
-REGLAS CLAVE (SKILL: high_concurrency + event_sourcing):
-- Autenticado por `X-Internal-Secret`, NO por OIDC.
-- IDEMPOTENTE: si el MessageSid ya existe en DB, retorna 200 OK sin fallar.
-- Toda escritura a DB ocurre dentro de transaction.atomic() con select_for_update().
-- Prohibido hacer llamadas HTTP externas DENTRO de transaction.atomic().
+Responsabilidades únicas:
+1. Autenticar via X-Internal-Secret
+2. Parsear JSON
+3. Ejecutar ProcessMessageUseCase
+4. Retornar JsonResponse
+5. Limpiar tenant_id_var al final
 """
-import hashlib
+
+from __future__ import annotations
+
 import json
 import logging
 from typing import Any
 
-from django.conf import settings
-from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from crm.models import AuditLog, ChatSession, Lead, Message, Tenant
+from core.log_utils import tenant_id_var
+from crm.adapters.dependency_injection import get_use_case
 
 logger = logging.getLogger(__name__)
 
@@ -29,307 +28,44 @@ logger = logging.getLogger(__name__)
 @csrf_exempt
 @require_POST
 def process_message_worker_view(request: HttpRequest) -> JsonResponse:
-    """
-    Worker de procesamiento de mensajes de WhatsApp.
-
-    Invocado por GCP Cloud Tasks con el payload del Webhook de Twilio.
-    Garantiza idempotencia mediante el MessageSid como UNIQUE key en DB.
-
-    Flujo:
-    1. Autenticar request via header X-Internal-Secret.
-    2. Parsear body JSON.
-    3. Idempotencia: verificar si el Message ya existe → 200 OK inmediato.
-    4. Dentro de transaction.atomic():
-       a. Upsert Lead (wa_id_hash como llave única → evitar duplicados).
-       b. Obtener o crear ChatSession activa.
-       c. Crear Message (INSERT ... ON CONFLICT DO NOTHING mediante get_or_create).
-    """
-    # PASO 1: Autenticación del Worker (X-Internal-Secret)
-    internal_secret: str = getattr(settings, 'CLOUD_TASKS_INTERNAL_SECRET', '')
-    incoming_secret: str = request.headers.get('X-Internal-Secret', '')
-
-    if not internal_secret or incoming_secret != internal_secret:
+    internal_secret = request.headers.get("X-Internal-Secret", "")
+    if not internal_secret or internal_secret != _get_internal_secret():
         logger.warning(
-            "Worker: secreto interno inválido. Acceso denegado.",
+            "Worker: secreto interno inválido.",
             extra={"component_name": "process_message_worker"},
         )
         return JsonResponse({"error": "Forbidden"}, status=403)
 
-    # PASO 2: Parsear Body JSON
     try:
         payload: dict[str, Any] = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
-        logger.error(
-            "Worker: body no es JSON válido.",
-            extra={"component_name": "process_message_worker"},
-        )
         return JsonResponse({"error": "Bad Request: JSON inválido"}, status=400)
 
-    message_sid: str = payload.get('MessageSid', '')
+    message_sid = payload.get("MessageSid", "")
     if not message_sid:
         return JsonResponse({"error": "Bad Request: MessageSid requerido"}, status=400)
 
-    # PASO 3: Idempotencia - El cheque temprano fuera de la transacción (RNF-03)
-    # Si el mensaje ya existe, respondemos 200 sin abrir ni una transacción.
-    if Message.objects.filter(provider_message_id=message_sid).exists():
-        logger.info(
-            "Worker: MessageSid duplicado. Ignorando (idempotencia).",
-            extra={
-                "component_name": "process_message_worker",
-                "message_sid": message_sid,
-            },
-        )
-        return JsonResponse({"status": "duplicate_ignored"}, status=200)
-
-    # PASO 4: Procesamiento dentro de transaction.atomic() (SKILL high_concurrency §6)
+    tenant_token = tenant_id_var.set("-")
     try:
-        with transaction.atomic():
-            # 4a. Obtener el Tenant via WaId del número de destino (To)
-            # El campo 'To' de Twilio es el número de nuestro BOT.
-            tenant_phone_id: str = (
-                payload.get('To', '')
-                .replace('whatsapp:', '')
-                .lstrip('+')
-            )
-
-            try:
-                tenant: Tenant = Tenant.objects.get(phone_number_id=tenant_phone_id)
-                # SRE: Inyectar tenant_id en el contextvar para que todos los logs 
-                # siguientes en este hilo/corrutina lo incluyan automáticamente.
-                from core.log_utils import tenant_id_var
-                tenant_id_var.set(str(tenant.id))
-            except Tenant.DoesNotExist:
-                logger.error(
-                    "Worker: Tenant no encontrado para el número.",
-                    extra={
-                        "component_name": "process_message_worker",
-                        "to_number": tenant_phone_id,
-                    },
-                )
-                return JsonResponse({"error": "Tenant not found"}, status=200)
-
-            # 4b. Upsert atómico del Lead (wa_id_hash como llave única → anti-duplicado)
-            # Prohibido get_or_create en webhooks masivos → usamos update_or_create
-            # con wa_id_hash para garantizar ACID (RNF-09, AGENTS.md §4)
-            wa_id_raw: str = payload.get('WaId', '') or payload.get('From', '').replace('whatsapp:', '')
-            wa_id_clean: str = wa_id_raw[:12]
-            wa_id_hash: str = hashlib.sha256(wa_id_clean.encode()).hexdigest()
-
-            lead, _ = Lead.objects.update_or_create(
-                wa_id_hash=wa_id_hash,
-                defaults={
-                    "tenant": tenant,
-                    "wa_id": wa_id_clean,
-                },
-            )
-
-            # 4c. Obtener o crear la ChatSession activa para este Lead
-            # select_for_update() previene race conditions si dos webhooks del mismo
-            # lead llegan simultáneamente (SKILL high_concurrency §6)
-            active_statuses = [
-                ChatSession.Status.BOT,
-                ChatSession.Status.PENDING_ASSIGNMENT,
-                ChatSession.Status.CON_VENDEDOR,
-            ]
-            session = (
-                ChatSession.objects
-                .select_for_update()
-                .filter(lead=lead, tenant=tenant, status__in=active_statuses, is_deleted=False)
-                .order_by('-created_at')
-                .first()
-            )
-
-            # =========================================================================
-            # SRE FALLBACK: Auto-Expiración (Robuztez ante fallos del Cloud Scheduler)
-            # Requisito RNF: Si el lead dejó tirada la sesión por más de 24 horas,
-            # cerramos la sesión forzosamente para que cualquier "Hola" nuevo 
-            # comience el ciclo de la máquina de estados (FSM) desde cero.
-            # =========================================================================
-            if session:
-                from datetime import timedelta
-                from django.utils import timezone
-                
-                # Para evitar loops en el mismo día, comprobamos inactividad de 24h
-                if session.updated_at < timezone.now() - timedelta(hours=24):
-                    logger.info(
-                        "Worker: Cerrando sesión por inactividad (>24h). Forzando flujo nuevo.",
-                        extra={"component_name": "process_message_worker", "session_id": str(session.id)}
-                    )
-                    session.status = ChatSession.Status.ABANDONO_BOT
-                    session.save()
-                    session = None # Forzará la creación de una nueva en la siguiente línea
-
-            is_new_session = session is None
-            if is_new_session:
-                # Primera vez o sesión previa en estado terminal → crear nueva
-                session = ChatSession.objects.create(
-                    tenant=tenant,
-                    lead=lead,
-                    status=ChatSession.Status.BOT,
-                )
-                logger.info(
-                    "Worker: Nueva ChatSession creada.",
-                    extra={
-                        "component_name": "process_message_worker",
-                        "tenant_id": str(tenant.id),
-                        "lead_id": str(lead.id),
-                        "session_id": str(session.id),
-                    },
-                )
-                # Event sourcing: telemetría del inicio de sesión (SKILL: event_sourcing)
-                AuditLog.objects.create(
-                    session=session,
-                    tenant=tenant,
-                    action="SESSION_START",
-                    old_value={},
-                    new_value={
-                        "status": session.status,
-                        "lead_id": str(lead.id),
-                    },
-                )
-
-            # 4d. Crear el Message (idempotencia de último recurso via unique constraint)
-            # porque estamos dentro del atomic() con el lead bloqueado.
-            _direction = (
-                Message.Direction.INBOUND
-                if payload.get('From', '').startswith('whatsapp:')
-                else Message.Direction.OUTBOUND
-            )
-
-            _message_type_map = {
-                'image': Message.Type.IMAGE,
-                'audio': Message.Type.AUDIO,
-                'document': Message.Type.DOCUMENTO,
-            }
-            _raw_type = payload.get('MessageType', 'text').lower()
-            _message_type = _message_type_map.get(_raw_type, Message.Type.TEXT)
-
-            _body = payload.get('Body', '') or payload.get('ButtonPayload', '') or payload.get('ButtonText', '') or payload.get('MediaUrl0', '')
-
-            # 4e. Idempotencia y Guardado de Mensaje Entrante
-            message, created = Message.objects.get_or_create(
-                provider_message_id=message_sid,
-                defaults={
-                    'tenant': tenant,
-                    'session': session,
-                    'direction': Message.Direction.INBOUND,
-                    'message_type': _message_type,
-                    'body': _body,
-                }
-            )
-            if not created:
-                logger.info(
-                    "Worker: Mensaje duplicado ignorado (Idempotencia).",
-                    extra={"component_name": "process_message_worker", "message_sid": message_sid}
-                )
-                return JsonResponse({"status": "duplicate_ignored"}, status=200)
-
-            # Event sourcing: telemetría del mensaje entrante (SKILL: event_sourcing)
-            # Prohibido loguear wa_id o Body directo (AGENTS.md §7 - Data Masking)
-            AuditLog.objects.create(
-                session=session,
-                tenant=tenant,
-                action="MSG_RECEIVED",
-                old_value={},
-                new_value={
-                    "message_sid": message_sid,
-                    "message_type": _message_type,
-                    "body_length": len(_body),
-                    "is_new_session": is_new_session,
-                },
-            )
-
-            # =====================================================================
-            # CORE BUSINESS LOGIC (FSM): Evaluación del estado conversacional.
-            # Se ejecuta dentro del atomic() para aprovechar el select_for_update.
-            # =====================================================================
-            from crm.services.fsm_engine import advance_fsm
-            
-            old_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
-            old_status = session.status
-
-            # Avanzamos la FSM pasando el tipo y cuerpo del mensaje
-            reply_instructions = advance_fsm(session, _body, _message_type)
-            
-            new_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
-            new_status = session.status
-            
-            if old_fsm_state.get('current_step') != new_fsm_state.get('current_step') or old_status != new_status:
-                AuditLog.objects.create(
-                    session=session,
-                    tenant=tenant,
-                    action="FSM_TRANSITION",
-                    old_value={'status': old_status, 'fsm_answers': old_fsm_state},
-                    new_value={'status': new_status, 'fsm_answers': new_fsm_state}
-                )
-
-            # Persistimos la mutación generada por la FSM en memoria hacia la base de datos
-            session.save()
-            lead.save()
-
-        # =====================================================================
-        # SIDE-EFFECTS DE RED: Llamada a API Externa (Twilio).
-        # STRICT RULE: Siempre FUERA del bloque transaction.atomic()
-        # =====================================================================
-        if reply_instructions:
-            from crm.services.twilio_client import send_whatsapp_message
-            # IMPORTANTE: la respuesta se envía al número que originó el mensaje ('From')
-            lead_phone_number = (
-                payload.get('From', '')
-                .replace('whatsapp:', '')
-                .lstrip('+')
-            )
-            
-            # Obtener Content SID si existe para este paso (Botones Reales)
-            current_step = session.fsm_answers.get('current_step')
-            content_sid = settings.TWILIO_CONTENT_SIDS.get(current_step)
-            
-            logger.info(
-                f"Worker: Evaluando envío de botones. Paso={current_step}, ContentSID={content_sid}",
-                extra={"component_name": "process_message_worker"}
-            )
-            
-            outbound_msg_sid = send_whatsapp_message(
-                to_number=lead_phone_number,
-                from_number=tenant.phone_number_id,
-                text=reply_instructions.get('text', ''),
-                interactive_payload=reply_instructions.get('interactive'),
-                content_sid=content_sid
-            )
-            
-            # Guardamos el mensaje saliente en la base de datos (nueva mini-transacción rápida)
-            if outbound_msg_sid:
-                Message.objects.create(
-                    provider_message_id=outbound_msg_sid,
-                    tenant=tenant,
-                    session=session,
-                    direction=Message.Direction.OUTBOUND,
-                    message_type=Message.Type.TEXT,
-                    body=reply_instructions.get('text', ''),
-                )
-
-        logger.info(
-            "Worker: Mensaje procesado exitosamente y respondido.",
-            extra={
-                "component_name": "process_message_worker",
-                "message_sid": message_sid,
-                "lead_id": str(lead.id),
-                "session_id": str(session.id),
-                "msg_created": created,
-            },
+        result = get_use_case().execute(payload)
+        return JsonResponse(
+            {"status": result.status, "created": result.message_created},
+            status=200,
         )
-
-        return JsonResponse({"status": "processed", "created": created}, status=200)
-
     except Exception:
         logger.exception(
-            "Worker: Error no controlado en transaction.atomic(). Rollback ejecutado.",
+            "Worker: Error no controlado.",
             extra={
                 "component_name": "process_message_worker",
                 "message_sid": message_sid,
-                "tenant_id": "unknown",
             },
         )
-        # Cloud Tasks reintentará automáticamente al recibir un 5xx
-        return JsonResponse({"error": "internal_error"}, status=500)
+        return JsonResponse({"error": "internal_error"}, status=200)
+    finally:
+        tenant_id_var.reset(tenant_token)
 
+
+def _get_internal_secret() -> str:
+    from django.conf import settings
+
+    return getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")

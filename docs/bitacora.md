@@ -250,3 +250,116 @@ Con el "Cerebro Conversacional" (FSM) estabilizado, el sistema entra en su fase 
 
 **Siguiente Paso (Sprint 6):**
 *   Inicio del desarrollo del Dashboard de Ventas en Angular 18, ahora con el canal de comunicación backend ya blindado para manejar tokens de identidad y perfiles de leads.
+
+---
+
+### [1 de Abril de 2026] Hardening de FSM: Resiliencia de Botones en Content Templates de Twilio
+
+**Contexto:**
+Al probar el flujo E2E con la Sandbox de Twilio usando Content Templates (botones interactivos), se detectó que la FSM volvía a preguntar infinitamente en los pasos `PAYMENT_METHOD` y `PURCHASE_INTENT`. El sistema leía correctamente el click del botón pero rechazaba la respuesta.
+
+#### 1. Decisión: Body-first input extraction
+*   **Decisión:** Reordenar la extracción del input del webhook para priorizar el campo `Body` por sobre `ButtonPayload`.
+*   **El Por Qué:** Twilio Content Templates envían el título del botón en `Body` (ej: `"Retoma"`) y el ID técnico en `ButtonPayload` (ej: `"mp_retoma"`). El sistema procesaba `ButtonPayload` primero, pero la FSM esperaba el título legible.
+*   **Trade-off:** `Body` puede contener texto libre inesperado. Se mitiga con el matching flexible (aliases) en cada paso de la FSM.
+
+#### 2. Anatomía del Edge Case: Loop Infinito de FSM
+*   **Caso 1 — Mismatch de IDs:** El Content Template de Twilio tiene `id="mp_retoma"` pero la FSM buscaba `"pm_retoma"`. Solución: se normalizó la extracción a `Body` que siempre trae el título en texto claro.
+*   **Caso 2 — Alias faltante:** El botón enviado decía `"Este mes o más"` pero el código solo tenía `"mes o más"` en el tuple de matching. Solución: se agregaron todos los alias necesarios.
+
+#### 3. Concepto de Ingeniería: Defensive Input Matching
+Las FSMs de producción deben ser resilientes a variaciones de texto. Se establece el patrón: **siempre incluir el ID técnico + el título completo + variantes con/sin tildes y con/sin artículo inicial**.
+
+#### 4. Deuda Técnica
+Los textos de botones están hardcodeados en `fsm_engine.py`. Al escalar a múltiples idiomas, deberán externalizarse a un archivo de configuración o tabla de base de datos.
+
+---
+
+### [1 de Abril de 2026] Arquitectura Hexagonal: Aislamiento Total del Dominio de Negocio
+
+**Contexto:**
+`worker.py` había crecido a ~315 líneas mezclando autenticación, consultas ORM, lógica FSM y llamadas a Twilio en una sola función. Esto violaba el principio de Responsabilidad Única y hacía el testing prácticamente imposible sin levantar toda la infraestructura.
+
+#### 1. Decisión: Ports & Adapters (Arquitectura Hexagonal)
+*   **Decisión:** Separación en 4 capas: `domain/` (puro) → `adapters/` (ORM, Twilio, GCP) → `application/` (use cases) → `views/` (HTTP thin layer).
+*   **El Por Qué:** Inversión de Dependencias (DIP). El dominio no conoce Django ni Twilio. Esto hace que el `ProcessMessageUseCase` sea testeable con stubs en memoria sin base de datos ni red.
+*   **Alternativa descartada:** Mantener el worker monolítico con mocks parciales. Descartado porque los mocks deben reemplazar Django ORM entero, no solo partes.
+
+#### 2. Componentes creados
+| Archivo | Responsabilidad |
+|:---|:---|
+| `crm/domain/entities.py` | Dataclasses puras: `LeadEntity`, `SessionEntity`, `MessageEntity` |
+| `crm/domain/ports.py` | Protocolos (interfaces): `LeadRepository`, `SessionRepository`, `MessageProvider`, `TaskQueue`, `AuditLogger` |
+| `crm/adapters/database/repositories.py` | Implementación Django ORM de cada port de repositorio |
+| `crm/adapters/messaging/twilio_adapter.py` | `TwilioMessageProvider` + `InMemoryMessageProvider` (stub para tests) |
+| `crm/adapters/task_queue/gcp_tasks_adapter.py` | `GcpCloudTasksQueue` + `HttpDispatchQueue` (fallback local) |
+| `crm/adapters/dependency_injection.py` | `DIContainer` singleton que resuelve las implementaciones concretas |
+| `crm/application/use_cases/process_message.py` | `ProcessMessageUseCase`: orquesta el flujo completo |
+| `crm/views/worker.py` | Vista delgada: autenticar → parsear → delegar → responder (≤72 líneas) |
+
+#### 3. Regla SRE crítica: Red fuera de transacción
+*   El `transaction.atomic()` cubre solo las escrituras a DB (lead, session, message, audit).
+*   El `send_message()` de Twilio ocurre **después** del commit, nunca dentro. Esto evita que un timeout de red fuerce un rollback de datos ya válidos.
+
+#### 4. Concepto: Inversión de Dependencias (DIP — SOLID)
+*   El `ProcessMessageUseCase` depende de **abstracciones** (`LeadRepository`, `MessageProvider`) no de **implementaciones** (`DjangoLeadRepository`, `TwilioMessageProvider`). Esto permite cambiar Twilio por Meta WA o PostgreSQL por DynamoDB tocando solo un Adapter.
+
+#### 5. Deuda Técnica
+*   `SignatureValidationError` y `TaskQueueError` están definidas en los adapters concretos. Deberían vivir en `domain/ports.py` como excepciones de contrato para no acoplar la vista con detalles de implementación.
+
+---
+
+### [1 de Abril de 2026] Admin Local — Bypass del Middleware OIDC para `/admin/`
+
+**Contexto:**
+El `OIDCStatelessMiddleware` bloqueaba el acceso a `/admin/` de Django con `401 Unauthorized` porque buscaba un Bearer Token que el navegador no envía en requests normales al admin.
+
+#### 1. Decisión: Whitelist de rutas públicas
+*   **Decisión:** Agregar `/admin/` a `PUBLIC_PATH_PREFIXES` en el middleware.
+*   **El Por Qué:** El admin de Django usa su propio sistema de sesiones (cookies), incompatible con OIDC stateless. En desarrollo local, el admin es la herramienta principal de inspección de datos.
+*   **Riesgo controlado:** En producción, el admin seguirá protegido por la autenticación de Django (`is_staff=True`) y por el hecho de que no está expuesto públicamente (solo VPN o IP privada).
+
+---
+
+### [1 de Abril de 2026] Observabilidad SRE: Sentry + Métricas RED
+
+**Contexto:**
+El sistema ya tenía logging JSON estructurado con `trace_id` y `tenant_id`, pero carecía de alertas proactivas ante errores no controlados y de métricas agregadas de performance.
+
+#### 1. Sentry SDK (`settings.py`)
+*   **Decisión:** Integración de `sentry-sdk`. Se inicializa solo si `SENTRY_DSN` está definida en el `.env`.
+*   **El Por Qué:** Los `logger.exception()` en los workers son reactivos (los buscas cuando ya sabes que algo falló). Sentry es proactivo: te alerta cuando ocurre una excepción no controlada en producción, con el stack trace completo y el contexto del request.
+*   **Configuración zero-impact:** Si `SENTRY_DSN` está vacío (desarrollo local), Sentry no se inicializa. Sin overhead ni dependencias de red en local.
+
+#### 2. Middleware de Métricas RED (`core/metrics.py`)
+*   **Decisión:** Creación de `REDMetricsMiddleware` que emite un log JSON por cada request al logger dedicado `metrics.red`.
+*   **Campos emitidos:** `path_pattern` (para evitar cardinalidad infinita por IDs en URL), `status_code`, `duration_ms`, `tenant_id`, `http_method`.
+*   **Por Qué `path_pattern` y no `path_raw`:** Si la URL es `/api/leads/uuid-123/messages/`, usar el path raw genera infinitas series únicas en el dashboard. El patrón `api/leads/<uuid>/messages/` las agrupa en una sola métrica.
+*   **Logger aislado:** `metrics.red` tiene `propagate: False` para que las métricas no contaminen los logs de negocio. Se puede enrutar a un sink diferente (BigQuery, GCP Log-based Metrics) sin modificar el resto del sistema.
+
+#### 3. Concepto: Pillars of Observability — Logs + Metrics
+*   **Logs** → ¿Qué pasó exactamente? (nivel de evento individual)
+*   **Metrics RED** → ¿Cómo está el sistema en general? (Rate, Errors, Duration agregados)
+*   Ambos son complementarios. Sin métricas, no sabes si hay un problema sistémico. Sin logs, no sabes por qué ocurrió.
+
+---
+
+### [1 de Abril de 2026] Contrato de API para el Dev de Frontend
+
+**Contexto:**
+Se inicia el desarrollo paralelo del frontend en Angular 18. Para que un segundo dev pueda trabajar de forma independiente sin depender del backend, se define el contrato de API como documento versionado.
+
+#### Endpoints documentados en `docs/API_CONTRACT_FRONTEND.md`
+| Endpoint | Método | Estado |
+|:---|:---|:---|
+| `/api/dashboard/leads/` | GET | ✅ Implementado |
+| `/api/dashboard/leads/<id>/messages/` | GET | ❌ Pendiente |
+| `/api/dashboard/leads/<id>/assign/` | POST | ❌ Pendiente |
+
+#### Decisión de Polling vs WebSocket (V1)
+*   **Polling RxJS cada 10 segundos** es suficiente para V1. Los leads no necesitan actualización en tiempo real sub-segundo.
+*   WebSockets quedan como deuda técnica para V2 cuando el volumen supere los 50 leads activos simultáneos por vendedor.
+
+#### Pendiente crítico antes del sprint de frontend
+*   Instalar `django-cors-headers` para que Angular en `localhost:4200` pueda llamar al backend en `localhost:8000` sin errores CORS.
+

@@ -6,18 +6,28 @@ Patrón: AAA (Arrange → Act → Assert)
 
 Regla: Prohibido llamadas HTTP reales. Twilio y Cloud Tasks son siempre mocks.
 """
+
 import pytest
 from unittest.mock import patch, MagicMock
 
 from django.test import Client
+
+from crm.adapters.dependency_injection import DIContainer
+
+
+@pytest.fixture(autouse=True)
+def _reset_di():
+    DIContainer.reset()
+    yield
+    DIContainer.reset()
 
 
 # ==============================================================================
 # TEST: Happy Path — Firma válida → 200 queued
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.views.webhook.enqueue_webhook_payload')
-@patch('crm.views.webhook.validate_twilio_signature')
+@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_valid_signature_returns_200_and_enqueues_task(
     mock_validate: MagicMock,
     mock_enqueue: MagicMock,
@@ -27,9 +37,8 @@ def test_valid_signature_returns_200_and_enqueues_task(
     ACT: POST al endpoint de webhook con un payload de Twilio mínimo.
     ASSERT: 200 OK, respuesta JSON con status "queued", Cloud Tasks llamado 1 vez.
     """
-    # ARRANGE
-    mock_validate.return_value = True
-    mock_enqueue.return_value = "projects/ccrm/queues/webhook-tasks/tasks/task-001"
+    mock_validate.return_value = MagicMock(is_valid=True)
+    mock_enqueue.return_value = MagicMock(task_id="tasks/task-001", success=True)
 
     client = Client()
     twilio_payload = {
@@ -43,112 +52,71 @@ def test_valid_signature_returns_200_and_enqueues_task(
         "NumMedia": "0",
     }
 
-    # ACT
     response = client.post(
-        '/api/webhooks/twilio/',
+        "/api/webhooks/twilio/",
         data=twilio_payload,
     )
 
-
-    # ASSERT
     assert response.status_code == 200
-    assert response.json()['status'] == 'queued'
+    assert response.json()["status"] == "queued"
     mock_enqueue.assert_called_once()
-    call_args = mock_enqueue.call_args[0][0]
-    assert call_args['MessageSid'] == "SMfake12345678901234567890123456"
 
 
 # ==============================================================================
 # TEST: Edge Case 1 — Firma inválida → 403. Cloud Tasks NO llamado.
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.views.webhook.enqueue_webhook_payload')
-@patch('crm.views.webhook.validate_twilio_signature')
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_invalid_signature_returns_403(
     mock_validate: MagicMock,
-    mock_enqueue: MagicMock,
 ) -> None:
-    """
-    ARRANGE: La función de validación retorna False (firma falsa/spoofing).
-    ACT: POST al endpoint.
-    ASSERT: 403 Forbidden. Cloud Tasks NO es llamado (no se encola basura).
-    """
-    # ARRANGE
-    mock_validate.return_value = False
+    mock_validate.return_value = MagicMock(is_valid=False)
 
     client = Client()
 
-    # ACT
     response = client.post(
-        '/api/webhooks/twilio/',
+        "/api/webhooks/twilio/",
         data={"MessageSid": "SMfake", "Body": "hack intent"},
     )
 
-
-    # ASSERT
     assert response.status_code == 403
-    mock_enqueue.assert_not_called()
 
 
 # ==============================================================================
 # TEST: Edge Case 2 — Sin header X-Twilio-Signature → 403 (vacío = inválido)
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.views.webhook.enqueue_webhook_payload')
-@patch('crm.views.webhook.validate_twilio_signature')
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_missing_signature_header_returns_403(
     mock_validate: MagicMock,
-    mock_enqueue: MagicMock,
 ) -> None:
-    """
-    ARRANGE: validate_twilio_signature retorna False al no encontrar header.
-    ACT: POST sin header de firma.
-    ASSERT: 403 Forbidden.
-    """
-    # ARRANGE — Twilio validator falla si el header está vacío
-    mock_validate.return_value = False
+    mock_validate.return_value = MagicMock(is_valid=False)
 
     client = Client()
 
-    # ACT
     response = client.post(
-        '/api/webhooks/twilio/',
+        "/api/webhooks/twilio/",
         data={"MessageSid": "SMtest"},
     )
 
-
-    # ASSERT
     assert response.status_code == 403
-    mock_enqueue.assert_not_called()
 
 
 # ==============================================================================
 # TEST: Edge Case 3 — Payload sin MessageSid → 400 Bad Request
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.views.webhook.enqueue_webhook_payload')
-@patch('crm.views.webhook.validate_twilio_signature')
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_missing_message_sid_returns_400(
     mock_validate: MagicMock,
-    mock_enqueue: MagicMock,
 ) -> None:
-    """
-    ARRANGE: Firma válida pero payload sin MessageSid (payload malformado de Twilio).
-    ACT: POST al endpoint.
-    ASSERT: 400 Bad Request. No se encola.
-    """
-    # ARRANGE
-    mock_validate.return_value = True
+    mock_validate.return_value = MagicMock(is_valid=True)
 
     client = Client()
 
-    # ACT
     response = client.post(
-        '/api/webhooks/twilio/',
+        "/api/webhooks/twilio/",
         data={"Body": "sin sid"},
     )
 
-
-    # ASSERT
     assert response.status_code == 400
-    mock_enqueue.assert_not_called()

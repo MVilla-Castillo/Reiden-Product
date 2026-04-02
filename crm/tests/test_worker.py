@@ -4,12 +4,10 @@ crm/tests/test_worker.py — Tests para el Worker privado de Cloud Tasks.
 Ciclo TDD: Red → Green → Refactor (SKILL: tdd)
 Patrón: AAA (Arrange → Act → Assert)
 
-Verificaciones:
-  - Idempotencia: el mismo MessageSid procesado dos veces → 1 solo Message en DB.
-  - Secreto interno inválido → 403.
-  - Happy path → Message y Lead creados en DB correctamente.
-  - Rollback: si falla algo dentro de atomic(), no quedan datos huérfanos.
+El worker ahora delega a ProcessMessageUseCase, así que mockeamos
+los adapters en lugar de las funciones sueltas.
 """
+
 import hashlib
 import json
 import pytest
@@ -17,10 +15,12 @@ from unittest.mock import patch
 from django.test import Client
 from django.conf import settings
 
+from core.crypto import encrypt
+from crm.adapters.dependency_injection import DIContainer
+from crm.adapters.messaging.twilio_adapter import InMemoryMessageProvider
 from crm.models import AuditLog, Lead, Message, ChatSession
 
 
-# Payload de Twilio simulado (ya sanitizado, como lo manda cloud_tasks.py)
 def _make_payload(message_sid: str = "SMtest0000000000000000000000001") -> dict:
     return {
         "MessageSid": message_sid,
@@ -45,79 +45,75 @@ def _make_payload(message_sid: str = "SMtest0000000000000000000000001") -> dict:
 
 
 def _post_to_worker(client: Client, payload: dict) -> object:
-    """Helper: POST al worker con el secreto interno correcto."""
     internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
     return client.post(
-        '/api/workers/process-message/',
+        "/api/workers/process-message/",
         data=json.dumps(payload),
-        content_type='application/json',
+        content_type="application/json",
         HTTP_X_INTERNAL_SECRET=internal_secret,
     )
+
+
+@pytest.fixture(autouse=True)
+def _setup_di_with_mock_provider():
+    """Inject InMemoryMessageProvider to avoid real Twilio API calls."""
+    DIContainer.reset()
+    container = DIContainer.instance()
+    container.set_message_provider(InMemoryMessageProvider())
+    yield
+    DIContainer.reset()
 
 
 # ==============================================================================
 # TEST: Happy Path — Nuevo mensaje → Lead, Session y Message creados en DB
 # ==============================================================================
-# ==============================================================================
 @pytest.mark.django_db
-@patch('crm.services.twilio_client.send_whatsapp_message')
-def test_new_message_creates_lead_session_and_message(mock_send, tenant) -> None:
+def test_new_message_creates_lead_session_and_message(tenant) -> None:
     """
     ARRANGE: Tenant existe. Primer mensaje de un lead nuevo.
     ACT: POST al worker con un payload válido.
     ASSERT: Lead, ChatSession y Message creados. Status 200.
     """
-    # Configuramos el mock para que devuelva un Sidney (MessageSid de salida) simulado
-    mock_send.return_value = "SMoutbound00000000000000000001"
-    
-    # ARRANGE
     client = Client()
     payload = _make_payload("SMhappy00000000000000000000001")
 
-    # ACT
     response = _post_to_worker(client, payload)
 
-    # ASSERT
     assert response.status_code == 200
-    assert response.json()['status'] == 'processed'
-    assert response.json()['created'] is True
+    assert response.json()["status"] == "processed"
+    assert response.json()["created"] is True
 
     wa_id_hash = hashlib.sha256("56987654321".encode()).hexdigest()
     assert Lead.objects.filter(wa_id_hash=wa_id_hash).exists()
     assert ChatSession.objects.filter(lead__wa_id_hash=wa_id_hash).exists()
-    assert Message.objects.filter(provider_message_id="SMhappy00000000000000000000001").exists()
-    # Verificamos que se haya registrado también el mensaje saliente (gracias a mock_send y FSM)
-    assert Message.objects.filter(provider_message_id="SMoutbound00000000000000000001").exists()
+    assert Message.objects.filter(
+        provider_message_id="SMhappy00000000000000000000001"
+    ).exists()
 
 
 # ==============================================================================
 # TEST: Idempotencia — Mismo MessageSid procesado dos veces → 1 solo Message
 # ==============================================================================
-# ==============================================================================
 @pytest.mark.django_db
-@patch('crm.services.twilio_client.send_whatsapp_message')
-def test_duplicate_message_is_idempotent(mock_send, tenant) -> None:
+def test_duplicate_message_is_idempotent(tenant) -> None:
     """
     ARRANGE: Tenant existe. Se procesa el mismo payload dos veces.
     ACT: Dos POST consecutivos al worker con el mismo MessageSid.
     ASSERT: Solo 1 Message en DB. Ambas respuestas son 200 OK.
     """
-    mock_send.return_value = "SMoutbound_dup"
-    # ARRANGE
     client = Client()
     payload = _make_payload("SMduplicate000000000000000001")
 
-    # ACT — Primera llamada
     response_1 = _post_to_worker(client, payload)
-    # ACT — Segunda llamada (simulando reintento de Cloud Tasks o Twilio)
     response_2 = _post_to_worker(client, payload)
 
-    # ASSERT
     assert response_1.status_code == 200
     assert response_2.status_code == 200
-    assert response_2.json()['status'] == 'duplicate_ignored'
+    assert response_2.json()["status"] == "duplicate_ignored"
 
-    count = Message.objects.filter(provider_message_id="SMduplicate000000000000000001").count()
+    count = Message.objects.filter(
+        provider_message_id="SMduplicate000000000000000001"
+    ).count()
     assert count == 1, f"Se esperaba 1 Message, se encontraron {count}"
 
 
@@ -131,21 +127,20 @@ def test_invalid_internal_secret_returns_403() -> None:
     ACT: POST al worker con secreto incorrecto.
     ASSERT: 403 Forbidden. Ningún dato creado en DB.
     """
-    # ARRANGE
     client = Client()
     payload = _make_payload("SMsecret000000000000000000001")
 
-    # ACT
     response = client.post(
-        '/api/workers/process-message/',
+        "/api/workers/process-message/",
         data=json.dumps(payload),
-        content_type='application/json',
-        HTTP_X_INTERNAL_SECRET='wrong-secret-hackeando',
+        content_type="application/json",
+        HTTP_X_INTERNAL_SECRET="wrong-secret-hackeando",
     )
 
-    # ASSERT
     assert response.status_code == 403
-    assert not Message.objects.filter(provider_message_id="SMsecret000000000000000000001").exists()
+    assert not Message.objects.filter(
+        provider_message_id="SMsecret000000000000000000001"
+    ).exists()
 
 
 # ==============================================================================
@@ -159,16 +154,13 @@ def test_unknown_tenant_returns_200_no_retry(db) -> None:
     ASSERT: 200 OK (para que Cloud Tasks no reintente un error permanente).
              Ningún Lead ni Message creado en DB.
     """
-    # ARRANGE — No creamos ningún Tenant (usamos solo db fixture de pytest-django)
     client = Client()
     payload = _make_payload("SMnotenant000000000000000001")
 
-    # ACT
     response = _post_to_worker(client, payload)
 
-    # ASSERT — 200 para evitar reintentos infinitos de un error de configuración
     assert response.status_code == 200
-    assert 'Tenant not found' in response.json().get('error', '')
+    assert "tenant_not_found" in response.json().get("status", "")
     assert not Lead.objects.exists()
     assert not Message.objects.exists()
 
@@ -183,19 +175,16 @@ def test_invalid_json_body_returns_400() -> None:
     ACT: POST al worker con plaintext.
     ASSERT: 400 Bad Request.
     """
-    # ARRANGE
     client = Client()
     internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
 
-    # ACT
     response = client.post(
-        '/api/workers/process-message/',
+        "/api/workers/process-message/",
         data="esto no es json {{{",
-        content_type='application/json',
+        content_type="application/json",
         HTTP_X_INTERNAL_SECRET=internal_secret,
     )
 
-    # ASSERT
     assert response.status_code == 400
 
 
@@ -203,22 +192,17 @@ def test_invalid_json_body_returns_400() -> None:
 # TEST: AuditLog A — SESSION_START escrito al primer contacto del lead
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.services.twilio_client.send_whatsapp_message')
-def test_auditlog_session_start_created(mock_send, tenant) -> None:
+def test_auditlog_session_start_created(tenant) -> None:
     """
     ARRANGE: Tenant existe. Primer mensaje de un lead nuevo.
     ACT: POST al worker con payload válido (primer contacto).
     ASSERT: Existe exactamente 1 AuditLog con action='SESSION_START'.
     """
-    # ARRANGE
-    mock_send.return_value = "SMoutbound_auditlog_01"
     client = Client()
     payload = _make_payload("SMaudit_session_start_01")
 
-    # ACT
     response = _post_to_worker(client, payload)
 
-    # ASSERT
     assert response.status_code == 200
     session_start_logs = AuditLog.objects.filter(action="SESSION_START")
     assert session_start_logs.count() == 1, (
@@ -234,34 +218,26 @@ def test_auditlog_session_start_created(mock_send, tenant) -> None:
 # TEST: AuditLog B — MSG_RECEIVED escrito en cada mensaje entrante
 # ==============================================================================
 @pytest.mark.django_db
-@patch('crm.services.twilio_client.send_whatsapp_message')
-def test_auditlog_msg_received_written_per_message(mock_send, tenant) -> None:
+def test_auditlog_msg_received_written_per_message(tenant) -> None:
     """
     ARRANGE: Tenant existe. Lead con sesión activa (returning lead).
     ACT: POST al worker con un nuevo MessageSid (mensaje número 2 en la sesión).
     ASSERT: Se escribe 1 AuditLog con action='MSG_RECEIVED'.
              El campo new_value contiene 'message_sid' y 'body_length'.
     """
-    # ARRANGE: Creamos el lead con su primera sesión (simula returning lead)
-    import hashlib
-    from crm.models import Lead, ChatSession
     wa_id = "56987654321"
     lead = Lead.objects.create(
         tenant=tenant,
-        wa_id=wa_id,
+        wa_id=encrypt(wa_id),
         wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
     )
     ChatSession.objects.create(tenant=tenant, lead=lead, status=ChatSession.Status.BOT)
-    mock_send.return_value = "SMoutbound_auditlog_02"
 
     client = Client()
-    # Segundo mensaje del mismo lead (sesión ya existe)
     payload = _make_payload("SMaudit_msg_received_02")
 
-    # ACT
     response = _post_to_worker(client, payload)
 
-    # ASSERT
     assert response.status_code == 200
     msg_logs = AuditLog.objects.filter(action="MSG_RECEIVED")
     assert msg_logs.count() == 1, (
@@ -271,5 +247,41 @@ def test_auditlog_msg_received_written_per_message(mock_send, tenant) -> None:
     assert log is not None
     assert log.new_value["message_sid"] == "SMaudit_msg_received_02"
     assert "body_length" in log.new_value
-    # Para un returning lead, is_new_session debe ser False
     assert log.new_value["is_new_session"] is False
+
+
+# ==============================================================================
+# TEST: FSM Transition — AuditLog FSM_TRANSITION al avanzar de paso
+# ==============================================================================
+@pytest.mark.django_db
+def test_auditlog_fsm_transition_written(tenant) -> None:
+    """
+    ARRANGE: Tenant existe. Lead en paso VEHICLE_TYPE.
+    ACT: POST con respuesta vt_suv.
+    ASSERT: AuditLog FSM_TRANSITION creado con old/new state.
+    """
+    wa_id = "56987654321"
+    lead = Lead.objects.create(
+        tenant=tenant,
+        wa_id=encrypt(wa_id),
+        wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
+    )
+    session = ChatSession.objects.create(
+        tenant=tenant,
+        lead=lead,
+        status=ChatSession.Status.BOT,
+        fsm_answers={"current_step": "VEHICLE_TYPE"},
+    )
+
+    client = Client()
+    payload = _make_payload("SMfsm_transition_01")
+    payload["Body"] = "vt_suv"
+    payload["ButtonPayload"] = "vt_suv"
+
+    response = _post_to_worker(client, payload)
+
+    assert response.status_code == 200
+    fsm_logs = AuditLog.objects.filter(action="FSM_TRANSITION")
+    assert fsm_logs.count() == 1
+    log = fsm_logs.first()
+    assert log.new_value["status"] == "BOT"

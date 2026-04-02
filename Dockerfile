@@ -1,40 +1,42 @@
-FROM python:3.12-slim AS builder
+# syntax=docker/dockerfile:1
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+COPY . /app
+RUN uv sync --frozen --no-dev
+
+# ─────────────────────────────────────────────────────────
+# Runtime stage
+# ─────────────────────────────────────────────────────────
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1
+    PORT=8080
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1000 appuser \
+    && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
 
 WORKDIR /app
 
-# Install uv
-RUN apt-get update && apt-get install -y curl && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
+COPY --from=builder --chown=appuser:appuser /app /app
+COPY --from=builder --chown=appuser:appuser /root/.local /root/.local
 ENV PATH="/root/.local/bin:$PATH"
 
-# Install dependencies using uv
-COPY pyproject.toml uv.lock ./
-RUN uv pip install --system -r pyproject.toml
+USER appuser
 
-FROM python:3.12-slim AS runner
+EXPOSE 8080
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/liveness')" || exit 1
 
-WORKDIR /app
-
-# Install runtime dependencies if needed, e.g. libpq
-RUN apt-get update && apt-get install -y libpq-dev && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
-COPY --from=builder /usr/local/bin/ /usr/local/bin/
-
-COPY . /app/
-
-# Port for Cloud Run and local Uvicorn
-EXPOSE 8000
-
-# Default entrypoint using uvicorn
-CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]

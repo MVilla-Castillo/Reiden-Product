@@ -22,21 +22,24 @@ env = environ.Env(
 )
 
 # Take environment variables from .env file
-environ.Env.read_env(BASE_DIR / '.env')
+environ.Env.read_env(BASE_DIR / ".env")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-cm#!)y6@9f_^)twirr^%1ti*_^x3-)yuq5axgviejec&g+t&px')
+SECRET_KEY = env(
+    "SECRET_KEY",
+    default="django-insecure-cm#!)y6@9f_^)twirr^%1ti*_^x3-)yuq5axgviejec&g+t&px",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 if DEBUG:
     # SRE Grade: Permite automáticamente dominios de ngrok en desarrollo
-    ALLOWED_HOSTS += ['.ngrok-free.app', '.ngrok.io', '.ngrok-free.dev']
+    ALLOWED_HOSTS += [".ngrok-free.app", ".ngrok.io", ".ngrok-free.dev"]
 
 # Production Security Hardening (SRE)
 if not DEBUG:
@@ -53,96 +56,108 @@ if not DEBUG:
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Local Apps
-    'crm',
+    "crm",
     # PostgreSQL-specific features (GinIndex for JSONB)
-    'django.contrib.postgres',
+    "django.contrib.postgres",
 ]
 
 
 MIDDLEWARE = [
-    'core.log_utils.TraceIDMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.auth.oidc.OIDCStatelessMiddleware',
+    "core.log_utils.TraceIDMiddleware",
+    "core.metrics.REDMetricsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.auth.oidc.OIDCStatelessMiddleware",
 ]
 
-ROOT_URLCONF = 'core.urls'
+ROOT_URLCONF = "core.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'core.wsgi.application'
+WSGI_APPLICATION = "core.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': env.db(
-        'DATABASE_URL',
-        default='postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db'
+    "default": env.db(
+        "DATABASE_URL",
+        default="postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db",
     )
 }
 # SRE Grade: Connection Management & Cloud SQL SSL
-DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
 # Si estamos en producción, forzamos SSL para la base de datos si no es un Unix Socket
-if not DEBUG and '127.0.0.1' not in DATABASES['default']['HOST'] and 'localhost' not in DATABASES['default']['HOST']:
-    DATABASES['default']['OPTIONS'] = {
-        'sslmode': 'verify-ca',
-        'sslrootcert': env('DATABASE_SSL_CA', default=''),
+if (
+    not DEBUG
+    and "127.0.0.1" not in DATABASES["default"]["HOST"]
+    and "localhost" not in DATABASES["default"]["HOST"]
+):
+    DATABASES["default"]["OPTIONS"] = {
+        "sslmode": "verify-ca",
+        "sslrootcert": env("DATABASE_SSL_CA", default=""),
     }
 
 # GCP Cloud Tasks Configuration (Serverless Asynchronous Enqueuing)
-GCP_PROJECT_ID = env('GCP_PROJECT_ID', default='ccrm-saas-dev')
-GCP_LOCATION = env('GCP_LOCATION', default='us-central1')
-GCP_QUEUE_NAME = env('GCP_QUEUE_NAME', default='ccrm-webhook-tasks')
+GCP_PROJECT_ID = env("GCP_PROJECT_ID", default="ccrm-saas-dev")
+GCP_LOCATION = env("GCP_LOCATION", default="us-central1")
+GCP_QUEUE_NAME = env("GCP_QUEUE_NAME", default="ccrm-webhook-tasks")
 # The base URL where Cloud Tasks will send the HTTP push request back to our Django Worker
-GCP_OIDC_SERVICE_ACCOUNT_EMAIL = env('GCP_OIDC_SERVICE_ACCOUNT_EMAIL', default='')
-WORKER_BASE_URL = env('WORKER_BASE_URL', default='https://api.ccrm.example.com')
+GCP_OIDC_SERVICE_ACCOUNT_EMAIL = env("GCP_OIDC_SERVICE_ACCOUNT_EMAIL", default="")
+WORKER_BASE_URL = env("WORKER_BASE_URL", default="https://api.ccrm.example.com")
 
 # Twilio (Sprint 3 - Webhook Ingestion)
-TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
-TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
+TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", default="")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")
 
 # Mapeo de SIDs para botones reales de WhatsApp (Content API)
 # Las llaves deben coincidir con los valores de FSMStep en crm/services/fsm_types.py
-TWILIO_CONTENT_SIDS = env.json('TWILIO_CONTENT_SIDS', default={})
+TWILIO_CONTENT_SIDS = env.json("TWILIO_CONTENT_SIDS", default={})
 
 
 # Internal secret to authenticate Cloud Tasks → Django Worker callbacks (Sprint 3)
-CLOUD_TASKS_INTERNAL_SECRET = env('CLOUD_TASKS_INTERNAL_SECRET', default='dev-internal-secret-change-in-prod')
+CLOUD_TASKS_INTERNAL_SECRET = env(
+    "CLOUD_TASKS_INTERNAL_SECRET", default="dev-internal-secret-change-in-prod"
+)
+
+# WA ID Encryption (PII Compliance — AES-256 via Fernet)
+# Generate a key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+WA_ID_ENCRYPTION_KEY = env("WA_ID_ENCRYPTION_KEY", default="")
+
+# Tenant Phone Number ID (for outbound messages — injected per-environment)
+TENANT_PHONE_NUMBER_ID = env("TENANT_PHONE_NUMBER_ID", default="")
 
 # Required for correct Twilio signature validation when behind a reverse proxy (Cloud Run)
 # Ensures request.build_absolute_uri() uses the correct public URL
 USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # Password validation
@@ -150,29 +165,29 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 # Custom User Model
-AUTH_USER_MODEL = 'crm.AppUser'
+AUTH_USER_MODEL = "crm.AppUser"
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -182,42 +197,64 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
-# OIDC Multi-Issuer Configuration (Stateless Auth)
-OIDC_MICROSOFT_ISSUER = env('OIDC_MICROSOFT_ISSUER', default='https://sts.windows.net/COMMON_OR_TENANT_ID/')
-OIDC_MICROSOFT_JWKS_URL = env('OIDC_MICROSOFT_JWKS_URL', default='https://login.microsoftonline.com/common/discovery/v2.0/keys')
-OIDC_MICROSOFT_AUDIENCE = env('OIDC_MICROSOFT_AUDIENCE', default='CLIENT_ID_AZURE')
-
-OIDC_GOOGLE_ISSUER = env('OIDC_GOOGLE_ISSUER', default='https://accounts.google.com')
-OIDC_GOOGLE_JWKS_URL = env('OIDC_GOOGLE_JWKS_URL', default='https://www.googleapis.com/oauth2/v3/certs')
-OIDC_GOOGLE_AUDIENCE = env('OIDC_GOOGLE_AUDIENCE', default='CLIENT_ID_GOOGLE')
+# OIDC Configuration (Google Workspace — OAuth 2.0 / OIDC)
+OIDC_GOOGLE_ISSUER = env("OIDC_GOOGLE_ISSUER", default="https://accounts.google.com")
+OIDC_GOOGLE_JWKS_URL = env(
+    "OIDC_GOOGLE_JWKS_URL", default="https://www.googleapis.com/oauth2/v3/certs"
+)
+OIDC_GOOGLE_AUDIENCE = env(
+    "OIDC_GOOGLE_AUDIENCE", default="GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+)
 
 # Observability (SRE): JSON Structured Logging
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'filters': {
-        'context_filter': {
-            '()': 'core.log_utils.ContextFilter',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "context_filter": {
+            "()": "core.log_utils.ContextFilter",
         },
     },
-    'formatters': {
-        'json': {
-            '()': 'pythonjsonlogger.json.JsonFormatter',
-            'format': '%(asctime)s %(levelname)s %(name)s %(process)d %(threadName)s %(message)s %(trace_id)s %(tenant_id)s'
-        },
-
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'json',
-            'filters': ['context_filter'],
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(process)d %(threadName)s %(message)s %(trace_id)s %(tenant_id)s",
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["context_filter"],
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "metrics.red": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
+# Sentry Integration (Observability & Error Tracking)
+import sentry_sdk
+
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        profiles_sample_rate=1.0,
+        environment="production" if not DEBUG else "development",
+    )
