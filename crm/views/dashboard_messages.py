@@ -28,8 +28,35 @@ def session_messages_api(request: HttpRequest, session_id: UUID) -> JsonResponse
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
+    limit_raw = request.GET.get("limit")
+    if limit_raw is None:
+        return JsonResponse(
+            {"error": "El parámetro 'limit' es requerido"},
+            status=400,
+        )
+
+    try:
+        limit = int(limit_raw)
+    except (ValueError, TypeError):
+        return JsonResponse(
+            {"error": "El parámetro 'limit' debe ser un entero válido"},
+            status=400,
+        )
+
+    if limit <= 0 or limit > 100:
+        return JsonResponse(
+            {"error": "El parámetro 'limit' debe estar entre 1 y 100"},
+            status=400,
+        )
+
+    offset_raw = request.GET.get("offset", "0")
+    try:
+        offset = int(offset_raw)
+    except (ValueError, TypeError):
+        offset = 0
+
     use_case = DIContainer.instance().get_session_messages_use_case
-    result = use_case.execute(session_id, request.tenant.id)
+    result = use_case.execute(session_id, request.tenant.id, limit=limit, offset=offset)
 
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)

@@ -7,8 +7,10 @@ incluyendo llamadas a tareas asíncronas y registros de log.
 """
 
 import logging
+import time
 import uuid
 import contextvars
+from typing import Any
 
 from django.http import HttpRequest, HttpResponse
 
@@ -72,3 +74,54 @@ class ContextFilter(logging.Filter):
         record.trace_id = trace_id_var.get()
         record.tenant_id = tenant_id_var.get()
         return True
+
+
+def mask_pii(wa_id: str) -> str:
+    if not wa_id or len(wa_id) < 4:
+        return "****"
+    return "****" + wa_id[-4:]
+
+
+_stage_timings: contextvars.ContextVar[dict[str, float]] = contextvars.ContextVar(
+    "_stage_timings", default=None
+)
+
+
+def _get_stage_timings() -> dict[str, float]:
+    timings = _stage_timings.get()
+    if timings is None:
+        timings = {}
+        _stage_timings.set(timings)
+    return timings
+
+
+def stage_start(stage_name: str) -> None:
+    timings = _get_stage_timings()
+    timings[stage_name] = time.perf_counter()
+
+
+def stage_end(
+    stage_name: str,
+    logger: logging.Logger,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    timings = _get_stage_timings()
+    start_time = timings.pop(stage_name, None)
+    if start_time is None:
+        return
+    duration_ms = (time.perf_counter() - start_time) * 1000
+
+    log_extra = {
+        "metric_type": "STAGE_DURATION",
+        "stage": stage_name,
+        "duration_ms": round(duration_ms, 2),
+        "trace_id": trace_id_var.get(),
+        "tenant_id": tenant_id_var.get(),
+    }
+    if extra:
+        log_extra.update(extra)
+
+    logger.info(
+        f"Stage: {stage_name}",
+        extra=log_extra,
+    )

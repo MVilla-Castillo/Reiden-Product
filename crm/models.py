@@ -209,6 +209,10 @@ class ChatSession(models.Model):
     class Meta:
         indexes = [
             GinIndex(fields=["fsm_answers"]),
+            models.Index(
+                fields=["tenant", "lead", "is_deleted", "status"],
+                name="idx_chatsession_tenant_lead_active",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(

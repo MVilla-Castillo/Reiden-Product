@@ -38,6 +38,8 @@ from crm.domain.ports import (
 from crm.adapters.messaging.twilio_adapter import MessagingError
 from crm.services.fsm_engine import FSMContext, FSMResult, advance_fsm
 
+from core.log_utils import mask_pii, stage_start, stage_end
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,8 +84,15 @@ class ProcessMessageUseCase:
         if not message_sid:
             return ProcessMessageResult(status="error_no_message_sid")
 
+        stage_start("idempotency_check")
+
         # Idempotencia temprana
         if self._message_repo.exists_by_provider_id(message_sid):
+            stage_end(
+                "idempotency_check",
+                logger,
+                extra={"message_sid": message_sid, "result": "duplicate_ignored"},
+            )
             logger.info(
                 "UseCase: MessageSid duplicado. Ignorando.",
                 extra={
@@ -93,19 +102,40 @@ class ProcessMessageUseCase:
             )
             return ProcessMessageResult(status="duplicate_ignored")
 
+        stage_end(
+            "idempotency_check",
+            logger,
+            extra={"message_sid": message_sid},
+        )
+
+        stage_start("tenant_resolution")
+
         # Resolver tenant
         tenant_phone_id = payload.get("To", "").replace("whatsapp:", "").lstrip("+")
         tenant_id = self._tenant_repo.find_id_by_phone_number(tenant_phone_id)
 
         if tenant_id is None:
+            stage_end(
+                "tenant_resolution",
+                logger,
+                extra={"to_number": mask_pii(tenant_phone_id), "result": "not_found"},
+            )
             logger.error(
                 "UseCase: Tenant no encontrado.",
                 extra={
                     "component_name": "process_message_use_case",
-                    "to_number": tenant_phone_id,
+                    "to_number": mask_pii(tenant_phone_id),
                 },
             )
             return ProcessMessageResult(status="tenant_not_found")
+
+        stage_end(
+            "tenant_resolution",
+            logger,
+            extra={"tenant_id": str(tenant_id)},
+        )
+
+        stage_start("lead_upsert")
 
         # Upsert Lead
         wa_id_raw = payload.get("WaId", "") or payload.get("From", "").replace(
@@ -119,6 +149,14 @@ class ProcessMessageUseCase:
             wa_id_hash=wa_id_hash,
             defaults={"wa_id": wa_id_clean},
         )
+
+        stage_end(
+            "lead_upsert",
+            logger,
+            extra={"lead_id": str(lead.id)},
+        )
+
+        stage_start("db_transaction")
 
         # Procesar sesión + mensaje + FSM dentro de transacción
         reply_result: FSMResult | None = None
@@ -167,7 +205,36 @@ class ProcessMessageUseCase:
                 else:
                     session = not_expired
             else:
-                session = existing
+                is_expired = self._session_repo.check_session_expired(
+                    session_id=existing.id,
+                    hours=24,
+                )
+
+                if is_expired:
+                    self._session_repo.mark_as_abandoned(existing.id)
+
+                    session = self._session_repo.create(
+                        tenant=tenant_id,
+                        lead_id=lead.id,
+                        status="BOT",
+                    )
+
+                    is_new_session = True
+
+                    self._audit_logger.record(
+                        AuditEntry(
+                            session_id=session.id,
+                            tenant_id=tenant_id,
+                            action="SESSION_START",
+                            old_value={},
+                            new_value={
+                                "status": session.status,
+                                "lead_id": str(lead.id),
+                            },
+                        )
+                    )
+                else:
+                    session = existing
 
             # Guardar mensaje entrante
             _message_type_map = {
@@ -262,10 +329,22 @@ class ProcessMessageUseCase:
             # Persistir cambios de sesión
             self._session_repo.save(updated_session)
 
+        stage_end(
+            "db_transaction",
+            logger,
+            extra={
+                "session_id": str(session.id) if session else None,
+                "is_new_session": is_new_session,
+                "message_created": message_created,
+            },
+        )
+
         # FUERA de transacción: enviar respuesta
         outbound_sid: str | None = None
         if reply_result and reply_result.text:
+            stage_start("twilio_send")
             lead_phone = payload.get("From", "").replace("whatsapp:", "").lstrip("+")
+            lead_phone_masked = mask_pii(lead_phone)
 
             current_step = reply_result.updated_fsm_answers.get("current_step")
             content_sid = self._content_sids.get(current_step)
@@ -306,6 +385,15 @@ class ProcessMessageUseCase:
                     message_type="TEXT",
                     body=reply_result.text,
                 )
+
+            stage_end(
+                "twilio_send",
+                logger,
+                extra={
+                    "success": send_result.success,
+                    "provider_message_id": send_result.provider_message_id,
+                },
+            )
 
         logger.info(
             "UseCase: Mensaje procesado exitosamente.",

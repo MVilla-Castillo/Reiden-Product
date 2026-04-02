@@ -240,6 +240,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "stage_duration": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 

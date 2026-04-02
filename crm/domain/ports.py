@@ -206,6 +206,14 @@ class SessionRepository(Protocol):
         """Marca como ABANDONO_BOT si inactiva >hours. Retorna None si expiró."""
         ...
 
+    def check_session_expired(self, session_id: UUID, hours: int = 24) -> bool:
+        """Verifica si una sesión activa ha expirado por inactividad."""
+        ...
+
+    def mark_as_abandoned(self, session_id: UUID) -> None:
+        """Marca una sesión como ABANDONO_BOT."""
+        ...
+
 
 class MessageRepository(Protocol):
     """Puerto para persistencia de Messages."""

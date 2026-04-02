@@ -355,6 +355,29 @@ class DjangoSessionRepository(SessionRepository):
 
         return _session_to_entity(model)
 
+    def check_session_expired(
+        self,
+        session_id: uuid.UUID,
+        hours: int = 24,
+    ) -> bool:
+        model = (
+            ChatSession.objects.select_for_update()
+            .filter(
+                id=session_id,
+                status__in=self.ACTIVE_STATUSES,
+                is_deleted=False,
+            )
+            .first()
+        )
+        if model is None:
+            return False
+        return model.updated_at < timezone.now() - timedelta(hours=hours)
+
+    def mark_as_abandoned(self, session_id: uuid.UUID) -> None:
+        ChatSession.objects.filter(id=session_id).update(
+            status=ChatSession.Status.ABANDONO_BOT
+        )
+
 
 class DjangoMessageRepository(MessageRepository):
     def exists_by_provider_id(
@@ -389,7 +412,11 @@ class DjangoMessageRepository(MessageRepository):
         return _message_to_entity(model)
 
     def find_by_session(
-        self, session_id: uuid.UUID, tenant: Any
+        self,
+        session_id: uuid.UUID,
+        tenant: Any,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[MessageEntity]:
         tenant_id = _tenant_to_id(tenant)
         models = (
@@ -399,7 +426,7 @@ class DjangoMessageRepository(MessageRepository):
                 is_deleted=False,
             )
             .order_by("created_at")
-            .select_related("session")
+            .select_related("session")[offset : offset + limit]
         )
         return [_message_to_entity(m) for m in models]
 

@@ -58,12 +58,6 @@ class TwilioMessageProvider(MessageProvider):
             raise MessagingError(
                 "TWILIO_ACCOUNT_SID o TWILIO_AUTH_TOKEN no configurados"
             )
-            raise MessagingError(
-                "TWILIO_ACCOUNT_SID o TWILIO_AUTH_TOKEN no configurados"
-            )
-            raise MessagingError(
-                "TWILIO_ACCOUNT_SID o TWILIO_AUTH_TOKEN no configurados"
-            )
 
         http_client = TwilioHttpClient(timeout=5.0)
         client = Client(

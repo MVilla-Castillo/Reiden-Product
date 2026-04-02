@@ -35,13 +35,19 @@ class GetSessionMessagesUseCase:
         self._message_repo = message_repo
 
     def execute(
-        self, session_id: UUID, tenant_id: UUID
+        self,
+        session_id: UUID,
+        tenant_id: UUID,
+        limit: int = 50,
+        offset: int = 0,
     ) -> GetSessionMessagesResult | None:
         session = self._session_repo.find_by_id(session_id, tenant_id)
         if session is None:
             return None
 
-        messages = self._message_repo.find_by_session(session_id, tenant_id)
+        messages = self._message_repo.find_by_session(
+            session_id, tenant_id, limit=limit, offset=offset
+        )
 
         serialized = [
             {

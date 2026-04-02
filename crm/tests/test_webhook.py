@@ -120,3 +120,146 @@ def test_missing_message_sid_returns_400(
     )
 
     assert response.status_code == 400
+
+
+# ==============================================================================
+# TEST: Multimedia image → 200 con rechazo, Cloud Tasks NO llamado
+# ==============================================================================
+@pytest.mark.django_db
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.send_message")
+def test_image_message_rejected_without_enqueue(
+    mock_send: MagicMock,
+    mock_validate: MagicMock,
+) -> None:
+    mock_validate.return_value = MagicMock(is_valid=True)
+    mock_send.return_value = MagicMock(provider_message_id="SM_reject", success=True)
+
+    client = Client()
+    response = client.post(
+        "/api/webhooks/twilio/",
+        data={
+            "MessageSid": "SMimage123",
+            "From": "whatsapp:+56987654321",
+            "To": "whatsapp:+56912345678",
+            "MessageType": "image",
+            "MediaUrl0": "https://api.twilio.com/media",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected_unsupported_type"
+    mock_send.assert_called_once()
+
+
+# ==============================================================================
+# TEST: Multimedia audio → 200 con rechazo, Cloud Tasks NO llamado
+# ==============================================================================
+@pytest.mark.django_db
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.send_message")
+def test_audio_message_rejected_without_enqueue(
+    mock_send: MagicMock,
+    mock_validate: MagicMock,
+) -> None:
+    mock_validate.return_value = MagicMock(is_valid=True)
+    mock_send.return_value = MagicMock(provider_message_id="SM_reject", success=True)
+
+    client = Client()
+    response = client.post(
+        "/api/webhooks/twilio/",
+        data={
+            "MessageSid": "SMaudio123",
+            "From": "whatsapp:+56987654321",
+            "To": "whatsapp:+56912345678",
+            "MessageType": "audio",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected_unsupported_type"
+    mock_send.assert_called_once()
+
+
+# ==============================================================================
+# TEST: Body > 4096 chars → 413, Cloud Tasks NO llamado
+# ==============================================================================
+@pytest.mark.django_db
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
+def test_oversized_body_returns_413(
+    mock_validate: MagicMock,
+) -> None:
+    mock_validate.return_value = MagicMock(is_valid=True)
+
+    client = Client()
+    response = client.post(
+        "/api/webhooks/twilio/",
+        data={
+            "MessageSid": "SMlong123",
+            "From": "whatsapp:+56987654321",
+            "To": "whatsapp:+56912345678",
+            "MessageType": "text",
+            "Body": "A" * 5000,
+        },
+    )
+
+    assert response.status_code == 413
+
+
+# ==============================================================================
+# TEST: Button y list_reply → aceptados (son interacciones de texto validas)
+# ==============================================================================
+@pytest.mark.django_db
+@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
+def test_button_message_accepted(
+    mock_validate: MagicMock,
+    mock_enqueue: MagicMock,
+) -> None:
+    mock_validate.return_value = MagicMock(is_valid=True)
+    mock_enqueue.return_value = MagicMock(task_id="tasks/task-002", success=True)
+
+    client = Client()
+    response = client.post(
+        "/api/webhooks/twilio/",
+        data={
+            "MessageSid": "SMbutton123",
+            "From": "whatsapp:+56987654321",
+            "To": "whatsapp:+56912345678",
+            "MessageType": "button",
+            "ButtonText": "Ver precios",
+            "ButtonPayload": "precios",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    mock_enqueue.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
+def test_list_reply_message_accepted(
+    mock_validate: MagicMock,
+    mock_enqueue: MagicMock,
+) -> None:
+    mock_validate.return_value = MagicMock(is_valid=True)
+    mock_enqueue.return_value = MagicMock(task_id="tasks/task-003", success=True)
+
+    client = Client()
+    response = client.post(
+        "/api/webhooks/twilio/",
+        data={
+            "MessageSid": "SMlistreply123",
+            "From": "whatsapp:+56987654321",
+            "To": "whatsapp:+56912345678",
+            "MessageType": "list_reply",
+            "ButtonText": "Sedan",
+            "ButtonPayload": "sedan",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    mock_enqueue.assert_called_once()

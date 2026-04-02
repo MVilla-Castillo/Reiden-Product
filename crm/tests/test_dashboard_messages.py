@@ -101,7 +101,7 @@ def test_session_messages_returns_messages_ordered(
 ) -> None:
     with OVERM:
         response = client.get(
-            f"/api/dashboard/leads/{con_vendedor_session.id}/messages/"
+            f"/api/dashboard/leads/{con_vendedor_session.id}/messages/?limit=50"
         )
 
     assert response.status_code == 200
@@ -118,7 +118,7 @@ def test_session_messages_returns_messages_ordered(
 def test_session_messages_not_found(client: Client, tenant: Tenant) -> None:
     fake_id = uuid.uuid4()
     with OVERM:
-        response = client.get(f"/api/dashboard/leads/{fake_id}/messages/")
+        response = client.get(f"/api/dashboard/leads/{fake_id}/messages/?limit=50")
 
     assert response.status_code == 404
     assert response.json()["error"] == "Sesión no encontrada"
