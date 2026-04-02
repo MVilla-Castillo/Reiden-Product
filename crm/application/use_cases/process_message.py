@@ -238,6 +238,9 @@ class ProcessMessageUseCase:
 
             # Guardar mensaje entrante
             _message_type_map = {
+                "text": "TEXT",
+                "button": "TEXT",
+                "interactive": "TEXT",  # Botones interactivos de Twilio (listas, botones)
                 "image": "IMAGE",
                 "audio": "AUDIO",
                 "document": "DOCUMENTO",

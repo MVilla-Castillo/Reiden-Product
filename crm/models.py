@@ -211,7 +211,7 @@ class ChatSession(models.Model):
             GinIndex(fields=["fsm_answers"]),
             models.Index(
                 fields=["tenant", "lead", "is_deleted", "status"],
-                name="idx_chatsession_tenant_lead_active",
+                name="idx_chat_sess_active",
             ),
         ]
         constraints = [

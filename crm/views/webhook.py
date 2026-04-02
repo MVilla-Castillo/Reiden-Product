@@ -33,7 +33,14 @@ from core.log_utils import trace_id_var
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_MESSAGE_TYPES = {"text", "button", "list", "button_reply", "list_reply"}
+ALLOWED_MESSAGE_TYPES = {
+    "text",
+    "button",
+    "list",
+    "button_reply",
+    "list_reply",
+    "interactive",
+}
 REJECTION_TEXT = "Por el momento solo podemos recibir mensajes de texto. Las imagenes, audios y documentos no son soportados aun."
 
 MAX_BODY_LENGTH = 4096
