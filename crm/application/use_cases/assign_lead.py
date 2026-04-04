@@ -136,8 +136,8 @@ class AssignLeadUseCase:
                 status=result.status,
                 salesperson_id=salesperson_id,
                 salesperson_name=sp["email"].split("@")[0],
-                assigned_at=result.updated_at.isoformat()
-                if result.updated_at
+                assigned_at=result.assigned_at.isoformat()
+                if result.assigned_at
                 else None,
             )
         else:

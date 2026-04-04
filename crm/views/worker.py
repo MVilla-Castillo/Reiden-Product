@@ -62,7 +62,7 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                 "message_sid": message_sid,
             },
         )
-        return JsonResponse({"error": "internal_error"}, status=200)
+        return JsonResponse({"error": "internal_error"}, status=500)
     finally:
         trace_id_var.reset(trace_id_token)
         tenant_id_var.reset(tenant_token)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from django.http import HttpRequest, JsonResponse
 
+from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.domain.entities import SessionEntity
@@ -21,10 +22,75 @@ def _serialize_session(s: SessionEntity) -> dict:
         "status": s.status,
         "urgency_score": s.urgency_score,
         "fsm_step": s.fsm_answers.get("current_step", "UNKNOWN"),
-        "intent": s.fsm_answers.get("purchase_intent"),
+        "vehicle_type": s.fsm_answers.get("vehicle_type"),
+        "payment_method": s.fsm_answers.get("payment_method"),
+        "budget_range": s.fsm_answers.get("budget_range"),
+        "purchase_intent": s.fsm_answers.get("purchase_intent"),
+        "salesperson_id": str(s.salesperson_id) if s.salesperson_id else None,
+        "assigned_at": s.assigned_at.isoformat() if s.assigned_at else None,
+        "closed_at": s.closed_at.isoformat() if s.closed_at else None,
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
     }
+
+
+def _build_filters(request: HttpRequest) -> dict:
+    """Construye diccionario de filtros desde query params."""
+    from datetime import date
+
+    filters = {}
+
+    date_filter = request.GET.get("date_filter")
+    date_from_param = request.GET.get("date_from")
+    date_to_param = request.GET.get("date_to")
+
+    if date_filter in ("today", "week", "month", "year", "all"):
+        date_range = get_date_range_from_filter(date_filter)
+        if date_range:
+            filters["date_from"], filters["date_to"] = date_range
+    elif date_from_param or date_to_param:
+        filters["date_from"] = parse_date_param(date_from_param)
+        filters["date_to"] = parse_date_param(date_to_param, date.today())
+
+    status = request.GET.get("status")
+    if status:
+        filters["status"] = status
+
+    vehicle_type = request.GET.get("vehicle_type")
+    if vehicle_type:
+        filters["vehicle_type"] = vehicle_type
+
+    payment_method = request.GET.get("payment_method")
+    if payment_method:
+        filters["payment_method"] = payment_method
+
+    budget_range = request.GET.get("budget_range")
+    if budget_range:
+        filters["budget_range"] = budget_range
+
+    purchase_intent = request.GET.get("purchase_intent")
+    if purchase_intent:
+        filters["purchase_intent"] = purchase_intent
+
+    salesperson_id = request.GET.get("salesperson_id")
+    if salesperson_id:
+        filters["salesperson_id"] = salesperson_id
+
+    min_urgency = request.GET.get("min_urgency")
+    if min_urgency:
+        try:
+            filters["min_urgency"] = int(min_urgency)
+        except ValueError:
+            pass
+
+    max_urgency = request.GET.get("max_urgency")
+    if max_urgency:
+        try:
+            filters["max_urgency"] = int(max_urgency)
+        except ValueError:
+            pass
+
+    return filters
 
 
 def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
@@ -42,12 +108,22 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
             status=429,
         )
 
+    limit_raw = request.GET.get("limit", "50")
+    try:
+        limit = min(int(limit_raw), 100)
+    except ValueError:
+        limit = 50
+
+    filters = _build_filters(request)
+
     session_repo = DIContainer.instance().session_repo
-    sessions = session_repo.get_dashboard_sessions(tenant, limit=50)
+    sessions = session_repo.get_dashboard_sessions(
+        tenant.id, limit=limit, filters=filters
+    )
 
     data = [_serialize_session(s) for s in sessions]
 
-    return JsonResponse({"leads": data}, status=200)
+    return JsonResponse({"leads": data, "count": len(data)}, status=200)
 
 
 def pending_leads_api(request: HttpRequest) -> JsonResponse:
@@ -60,7 +136,7 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
     session_repo = DIContainer.instance().session_repo
-    sessions = session_repo.get_pending_sessions(tenant, limit=50)
+    sessions = session_repo.get_pending_sessions(tenant.id, limit=50)
 
     data = [_serialize_session(s) for s in sessions]
 

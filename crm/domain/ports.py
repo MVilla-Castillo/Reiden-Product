@@ -9,6 +9,7 @@ Cero dependencias externas. Las implementaciones concretas
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -171,7 +172,10 @@ class SessionRepository(Protocol):
         ...
 
     def save(
-        self, session: SessionEntity, update_fields: list[str] | None = None
+        self,
+        session: SessionEntity,
+        update_fields: list[str] | None = None,
+        **extra_fields: Any,
     ) -> SessionEntity:
         """Persiste los cambios de una sesión existente."""
         ...
@@ -189,7 +193,7 @@ class SessionRepository(Protocol):
         ...
 
     def get_dashboard_sessions(
-        self, tenant_id: UUID, limit: int = 50
+        self, tenant_id: UUID, limit: int = 50, filters: dict[str, Any] | None = None
     ) -> list[SessionEntity]:
         """Retorna sesiones ordenadas por urgency_score para el dashboard."""
         ...
@@ -216,8 +220,51 @@ class SessionRepository(Protocol):
         """Verifica si una sesión activa ha expirado por inactividad."""
         ...
 
-    def mark_as_abandoned(self, session_id: UUID) -> None:
-        """Marca una sesión como ABANDONO_BOT."""
+    def mark_as_abandoned(self, session_id: UUID, tenant_id: UUID) -> None:
+        """Marca una sesión como ABANDONO_BOT dentro de un tenant."""
+        ...
+
+    def get_funnel_metrics(
+        self, tenant_id: UUID, date_from: date, date_to: date
+    ) -> dict[str, Any]:
+        """
+        Retorna métricas de embudo de conversión para un período dado.
+        """
+        ...
+
+    def get_fsm_distribution(
+        self, tenant_id: UUID, date_from: date, date_to: date
+    ) -> dict[str, Any]:
+        """
+        Retorna distribución de respuestas FSM (vehicle_type, payment_method, etc).
+        """
+        ...
+
+    def get_urgency_distribution(
+        self,
+        tenant_id: UUID,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> dict[str, int]:
+        """
+        Retorna histograma de urgency_score por buckets.
+        """
+        ...
+
+    def get_time_metrics(
+        self, tenant_id: UUID, date_from: date, date_to: date
+    ) -> dict[str, float]:
+        """
+        Retorna métricas de tiempo (speed to lead).
+        """
+        ...
+
+    def get_salesperson_performance(
+        self, tenant_id: UUID, date_from: date, date_to: date
+    ) -> list[dict[str, Any]]:
+        """
+        Retorna performance por vendedor.
+        """
         ...
 
 
@@ -242,8 +289,14 @@ class MessageRepository(Protocol):
         """Crea un nuevo mensaje y lo retorna."""
         ...
 
-    def find_by_session(self, session_id: UUID, tenant_id: UUID) -> list[MessageEntity]:
-        """Retorna todos los mensajes de una sesión ordenados cronológicamente."""
+    def find_by_session(
+        self,
+        session_id: UUID,
+        tenant_id: UUID,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[MessageEntity]:
+        """Retorna mensajes de una sesión ordenados cronológicamente con paginación."""
         ...
 
 

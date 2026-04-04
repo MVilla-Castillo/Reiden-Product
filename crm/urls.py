@@ -26,6 +26,7 @@ from crm.views.dashboard_messages import (
     send_message_api,
     session_messages_api,
 )
+from crm.views.metrics import metrics_api
 
 urlpatterns = [
     # Sprint 3: Endpoint de Ingesta de Webhooks Twilio (público, validado por firma HMAC)
@@ -79,5 +80,11 @@ urlpatterns = [
         "api/dashboard/salespeople/",
         salespeople_api,
         name="salespeople",
+    ),
+    # Métricas de negocio
+    path(
+        "api/dashboard/metrics/",
+        metrics_api,
+        name="metrics",
     ),
 ]

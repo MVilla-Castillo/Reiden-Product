@@ -43,7 +43,7 @@
 - **tenant_id**: FK (-> Tenant.id, Indexed)
 - **lead_id**: FK (-> Lead.id, Indexed)
 - **salesperson_id**: FK (-> User.id, Nullable, Indexed) - NULL si es del bot
-- **status**: Enum (BOT, PENDING_ASSIGNMENT, CON_VENDEDOR, GANADO, PERDIDO, ABANDONO_BOT, PERDIDO_SISTEMA)
+- **status**: Enum (BOT, PENDING_ASSIGNMENT, CON_VENDEDOR, GANADO, PERDIDO, ABANDONO_BOT)
 - **fsm_answers**: JSONB (GIN Indexed) - "Ficha del Cliente" (RNF-05)
 - **urgency_score**: Integer (B-Tree Indexed) - Para ORDER BY ultrarrápido (RNF-20)
 - **last_fsm_step**: String (Rastreo de paso en la FSM)

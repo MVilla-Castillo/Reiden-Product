@@ -333,7 +333,8 @@ def test_session_expire_if_inactive_expired(
         tenant=tenant, lead=lead, status=ChatSession.Status.BOT
     )
     ChatSession.objects.filter(id=session.id).update(
-        updated_at=timezone.now() - timedelta(hours=48)
+        created_at=timezone.now() - timedelta(hours=48),
+        updated_at=timezone.now() - timedelta(hours=48),
     )
 
     result = session_repo.expire_if_inactive(tenant.id, lead.id, hours=24)
@@ -373,7 +374,7 @@ def test_message_create(
     session = ChatSession.objects.create(tenant=tenant, lead=lead)
 
     result = message_repo.create(
-        tenant=tenant.id,
+        tenant_id=tenant.id,
         session_id=session.id,
         provider_message_id="SM_NEW",
         direction="OUTBOUND",

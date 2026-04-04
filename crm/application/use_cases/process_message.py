@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, replace
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from crm.domain.entities import SessionEntity
 from crm.domain.ports import (
@@ -38,7 +38,7 @@ from crm.domain.ports import (
 from crm.adapters.messaging.twilio_adapter import MessagingError
 from crm.services.fsm_engine import FSMContext, FSMResult, advance_fsm
 
-from core.log_utils import mask_pii, stage_start, stage_end
+from core.log_utils import mask_pii, stage_start, stage_end, tenant_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,8 @@ class ProcessMessageUseCase:
             )
             return ProcessMessageResult(status="tenant_not_found")
 
+        tenant_id_var.set(str(tenant_id))
+
         stage_end(
             "tenant_resolution",
             logger,
@@ -145,7 +147,7 @@ class ProcessMessageUseCase:
         wa_id_hash = hashlib.sha256(wa_id_clean.encode()).hexdigest()
 
         lead = self._lead_repo.upsert(
-            tenant=tenant_id,
+            tenant_id=tenant_id,
             wa_id_hash=wa_id_hash,
             defaults={"wa_id": wa_id_clean},
         )
@@ -168,40 +170,55 @@ class ProcessMessageUseCase:
             # Obtener sesión con bloqueo de fila (SELECT FOR UPDATE)
             # Previene race conditions cuando dos webhooks del mismo lead llegan simultáneamente
             existing = self._session_repo.find_active_for_update(
-                tenant=tenant_id,
+                tenant_id=tenant_id,
                 lead_id=lead.id,
             )
 
             if existing is None:
                 # Expirar sesión inactiva (también usa select_for_update internamente)
                 not_expired = self._session_repo.expire_if_inactive(
-                    tenant=tenant_id,
+                    tenant_id=tenant_id,
                     lead_id=lead.id,
                     hours=24,
                 )
 
                 if not_expired is None:
-                    # Crear nueva sesión
-                    session = self._session_repo.create(
-                        tenant=tenant_id,
-                        lead_id=lead.id,
-                        status="BOT",
-                    )
-
-                    is_new_session = True
-
-                    self._audit_logger.record(
-                        AuditEntry(
-                            session_id=session.id,
+                    # Crear nueva sesión (puede fallar por race condition con otro thread)
+                    try:
+                        with transaction.atomic():
+                            session = self._session_repo.create(
+                                tenant_id=tenant_id,
+                                lead_id=lead.id,
+                                status="BOT",
+                            )
+                    except IntegrityError:
+                        # Otro thread ya creó la sesión. Re-fetch con lock.
+                        session = self._session_repo.find_active_for_update(
                             tenant_id=tenant_id,
-                            action="SESSION_START",
-                            old_value={},
-                            new_value={
-                                "status": session.status,
-                                "lead_id": str(lead.id),
-                            },
+                            lead_id=lead.id,
                         )
-                    )
+                        if session is None:
+                            raise
+
+                    if session is not None and not is_new_session:
+                        is_new_session = (
+                            session.status == "BOT"
+                            and not session.fsm_answers.get("current_step")
+                        )
+
+                        if is_new_session:
+                            self._audit_logger.record(
+                                AuditEntry(
+                                    session_id=session.id,
+                                    tenant_id=tenant_id,
+                                    action="SESSION_START",
+                                    old_value={},
+                                    new_value={
+                                        "status": session.status,
+                                        "lead_id": str(lead.id),
+                                    },
+                                )
+                            )
                 else:
                     session = not_expired
             else:
@@ -211,13 +228,24 @@ class ProcessMessageUseCase:
                 )
 
                 if is_expired:
-                    self._session_repo.mark_as_abandoned(existing.id)
-
-                    session = self._session_repo.create(
-                        tenant=tenant_id,
-                        lead_id=lead.id,
-                        status="BOT",
+                    self._session_repo.mark_as_abandoned(
+                        existing.id, tenant_id=tenant_id
                     )
+
+                    try:
+                        with transaction.atomic():
+                            session = self._session_repo.create(
+                                tenant_id=tenant_id,
+                                lead_id=lead.id,
+                                status="BOT",
+                            )
+                    except IntegrityError:
+                        session = self._session_repo.find_active_for_update(
+                            tenant_id=tenant_id,
+                            lead_id=lead.id,
+                        )
+                        if session is None:
+                            raise
 
                     is_new_session = True
 
@@ -254,30 +282,36 @@ class ProcessMessageUseCase:
                 or payload.get("MediaUrl0", "")
             )
 
-            self._message_repo.create(
-                tenant=tenant_id,
-                session_id=session.id,
-                provider_message_id=message_sid,
-                direction="INBOUND",
-                message_type=_message_type,
-                body=_body,
-            )
-            message_created = True
+            try:
+                with transaction.atomic():
+                    self._message_repo.create(
+                        tenant_id=tenant_id,
+                        session_id=session.id,
+                        provider_message_id=message_sid,
+                        direction="INBOUND",
+                        message_type=_message_type,
+                        body=_body,
+                    )
+                    message_created = True
 
-            self._audit_logger.record(
-                AuditEntry(
-                    session_id=session.id,
-                    tenant_id=tenant_id,
-                    action="MSG_RECEIVED",
-                    old_value={},
-                    new_value={
-                        "message_sid": message_sid,
-                        "message_type": _message_type,
-                        "body_length": len(_body),
-                        "is_new_session": is_new_session,
-                    },
-                )
-            )
+                    self._audit_logger.record(
+                        AuditEntry(
+                            session_id=session.id,
+                            tenant_id=tenant_id,
+                            action="MSG_RECEIVED",
+                            old_value={},
+                            new_value={
+                                "message_sid": message_sid,
+                                "message_type": _message_type,
+                                "body_length": len(_body),
+                                "is_new_session": is_new_session,
+                            },
+                        )
+                    )
+            except IntegrityError:
+                # Otro thread ya persistió este mensaje (race condition en idempotencia).
+                # Continuamos procesando la FSM normalmente.
+                message_created = False
 
             # Ejecutar FSM
             old_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
@@ -381,7 +415,7 @@ class ProcessMessageUseCase:
             if send_result.success and send_result.provider_message_id:
                 outbound_sid = send_result.provider_message_id
                 self._message_repo.create(
-                    tenant=tenant_id,
+                    tenant_id=tenant_id,
                     session_id=session.id,
                     provider_message_id=outbound_sid,
                     direction="OUTBOUND",

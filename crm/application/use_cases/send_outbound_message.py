@@ -11,6 +11,8 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+from django.utils import timezone
+
 from crm.domain.ports import (
     AuditEntry,
     AuditLogger,
@@ -109,13 +111,21 @@ class SendOutboundMessageUseCase:
             raise MessageDeliveryError("Fallo al enviar mensaje por Twilio")
 
         message = self._message_repo.create(
-            tenant=tenant_id,
+            tenant_id=tenant_id,
             session_id=session_id,
             provider_message_id=send_result.provider_message_id,
             direction="OUTBOUND",
             message_type="TEXT",
             body=body,
         )
+
+        if session.first_response_at is None:
+            now = timezone.now()
+            self._session_repo.save(
+                session,
+                update_fields=["first_response_at"],
+                first_response_at=now,
+            )
 
         self._audit_logger.record(
             AuditEntry(

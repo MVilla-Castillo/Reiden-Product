@@ -3,7 +3,7 @@
 ## 1. Requisitos Funcionales
 
 ### Módulo A: Ingesta y Creación de Sesión
-* **RF-01 Actualizado (Milisegundo Cero y Enrutamiento Finito):** El sistema procesa el webhook y busca al Lead mediante el `wa_id_hash`. Si el Lead existe, evalúa su última ChatSession. El sistema reanudará la sesión SOLO SI la sesión tiene menos de 24 horas Y su estado actual pertenece al grupo activo (status IN [BOT, PENDING_ASSIGNMENT, CON_VENDEDOR]). Si el estado es terminal (GANADO, PERDIDO_SISTEMA, ABANDONO_BOT), el sistema ignorará el TTL y creará obligatoriamente una nueva ChatSession.
+* **RF-01 Actualizado (Milisegundo Cero y Enrutamiento Finito):** El sistema procesa el webhook y busca al Lead mediante el `wa_id_hash`. Si el Lead existe, evalúa su última ChatSession. El sistema reanudará la sesión SOLO SI la sesión tiene menos de 24 horas Y su estado actual pertenece al grupo activo (status IN [BOT, PENDING_ASSIGNMENT, CON_VENDEDOR]). Si el estado es terminal (GANADO, PERDIDO, ABANDONO_BOT), el sistema ignorará el TTL y creará obligatoriamente una nueva ChatSession.
 * **RF-1.1 (Ingesta Universal y Arranque FSM Base):** El sistema procesará el primer mensaje del lead de forma agnóstica a su contenido textual. Ya sea un texto libre o un mensaje predefinido (wa.me / Click-to-WhatsApp), el sistema obligatoriamente creará la ChatSession e inicializará la máquina de estados (FSM) en su estado primario (Estado Cero), delegando al bot la recolección secuencial de datos. Si el payload de Twilio incluye el objeto nativo referral, este se extraerá en segundo plano únicamente para poblar la atribución publicitaria (RF-02), sin alterar ni saltar ningún paso del flujo conversacional.
 * **RF-1.2 / RF-XX (Ficha de Lead Instantánea):** Al finalizar la FSM o al ser asignado manualmente, el sistema debe compilar las respuestas del prospecto en un perfil unificado y presentarlo en el Dashboard del Vendedor de forma inmediata (vía HTTP Polling), eliminando la necesidad de que el vendedor repita preguntas de perfilamiento.
 * **RF-02 (Atribución por Sesión):** El origen publicitario (acquisition_source y utm_metadata) se guarda en la ChatSession, garantizando que compras futuras de un cliente antiguo no sobreescriban su historial de adquisición original.
@@ -42,13 +42,81 @@
         2. Win-Rate (Tasa de Cierre Real).
         3. FSM Drop-off (Fuga de Cualificación).
         4. Volumen Activo.
+
+### Módulo E2: Métricas de Negocio y Analytics
+* **RF-XX (Métricas de Embudo de Conversión):** El sistema debe calcular y exponer las siguientes métricas de embudo para evaluación estratégica:
+    * **Metodología de Obtención:** Queries agregadas sobre la tabla ChatSession filtradas por tenant y rango de fechas.
+    * **Métricas Definidas:**
+        1. `total_leads`: Cantidad total de sesiones creadas en el período.
+        2. `completed_fsm`: Sesiones que llegaron al estado PENDING_ASSIGNMENT (FSM completada).
+        3. `assigned_leads`: Sesiones asignadas a un vendedor (salesperson_id NOT NULL).
+        4. `won_sessions`: Sesiones en estado GANADO.
+        5. `lost_sessions`: Sesiones en estado PERDIDO (por inactividad o manual).
+        6. `abandoned_sessions`: Sesiones en estado ABANDONO_BOT.
+        7. `conversion_rate_fsm`: (completed_fsm / total_leads) × 100.
+        8. `conversion_rate_assignment`: (assigned_leads / completed_fsm) × 100.
+        9. `win_rate`: (won_sessions / (won_sessions + lost_sessions)) × 100.
+    * **Frecuencia de Actualización:** Tiempo real (on-demand) mediante endpoint REST.
+
+* **RF-XX (Métricas de Distribución FSM):** El sistema debe agregar las respuestas del JSON fsm_answers para identificar patrones de comportamiento:
+    * **Metodología de Obtención:** Agregación SQL sobre campo JSONB fsm_answers.
+    * **Métricas Definidas:**
+        1. `vehicle_type_distribution`: Conteo por tipo de vehículo (CITY_CAR, SUV, SEDAN).
+        2. `payment_method_distribution`: Conteo por método de pago (CONTADO, CREDITO, RETOMA).
+        3. `budget_range_distribution`: Conteo por rango de presupuesto (MENOS_6M, DE_7M_A_14M, MAS_15M).
+        4. `purchase_intent_distribution`: Conteo por intención de compra (HOY, ESTA_SEMANA, MES_O_MAS).
+    * **Utilidad Estratégica:** Permite a gerencia ajustar inventario y estrategias comerciales según demanda de perfiles.
+
+* **RF-XX (Métricas de Distribución de Urgencia):** El sistema debe exponer la distribución del urgency_score para optimizar recursos:
+    * **Metodología de Obtención:** Histograma sobre campo urgency_score (0-160).
+    * **Buckets Definidos:** 0-30 (Frío), 31-60 (Tibio), 61-100 (Cálido), 100+ (Caliente).
+    * **Utilidad Operativa:** Definir SLA diferenciados por bucket (ej. Score >80 responde en 15 min).
+
+* **RF-XX (Métricas de Velocidad - Speed to Lead):** El sistema debe calcular tiempos de respuesta críticos:
+    * **Metodología de Obtención:** Cálculo de deltas entre timestamps almacenados en ChatSession.
+    * **Métricas Definidas:**
+        1. `avg_time_to_complete_fsm`: Tiempo promedio entre creación de sesión y estado PENDING_ASSIGNMENT.
+        2. `avg_time_to_assign`: Tiempo promedio entre PENDING_ASSIGNMENT y asignación de vendedor.
+        3. `avg_time_to_first_response`: Tiempo promedio entre asignación y primer mensaje OUTBOUND del vendedor.
+        4. `avg_time_to_close`: Tiempo promedio entre asignación y cierre (GANADO/PERDIDO).
+    * **Almacenamiento:** Nuevos campos en ChatSession: `assigned_at`, `first_response_at`, `closed_at`.
+
+* **RF-XX (Performance por Vendedor):** El sistema debe calcular métricas individuales por cada vendedor:
+    * **Metodología de Obtención:** Agregación por salesperson_id con filtros de estado y fecha.
+    * **Métricas Definidas:**
+        1. `leads_assigned`: Cantidad de leads asignados en el período.
+        2. `wins`: Cantidad de GANADOS.
+        3. `losses`: Cantidad de PERDIDOS.
+        4. `win_rate`: (wins / (wins + losses)) × 100.
+        5. `avg_first_response_time`: Tiempo promedio de primera respuesta.
+        6. `budget_distribution`: Distribución de presupuestos de ventas cerradas.
+    * **Utilidad Estratégica:** Gamificación (RF-14.1) y evaluación de rendimiento.
+
+* **RF-XX (Endpoint de Métricas):** El sistema debe exponer un endpoint REST para consumo del frontend:
+    * **Endpoint:** `GET /api/dashboard/metrics/`
+    * **Parámetros:** `date_from`, `date_to` (ISO 8601), `salesperson_id` (opcional).
+    * **Respuesta:** JSON con estructura anidada conteniendo todas las métricas definidas en RF-XX anteriores.
+
+* **RF-XX (Campos de Tracking Temporal):** El sistema debe almacenar timestamps críticos para cálculo de métricas:
+    * **Nuevos Campos en ChatSession:**
+        1. `assigned_at`: DateTime - Momento en que se asignó a un vendedor.
+        2. `first_response_at`: DateTime - Momento del primer mensaje OUTBOUND del vendedor.
+        3. `closed_at`: DateTime - Momento en que la sesión cambió a estado terminal (GANADO/PERDIDO/ABANDONO_BOT).
+    * **Actualización:** Los campos se actualizan automáticamente en los use cases `assign_lead` y `change_session_status`.
+
+* **RF-XX (Índices para Métricas):** El sistema debe garantizar rendimiento en queries analíticas:
+    * **Índices Requeridos:**
+        1. `(tenant_id, status, assigned_at)` - Para métricas de assignment y tiempo.
+        2. `(tenant_id, status, closed_at)` - Para métricas de cierre y tiempo total.
+        3. `(tenant_id, created_at)` - Para métricas de embudo por período.
+    * **Consideración:** Crear migración sin locking usando patrón Add Column → Backfill → Drop Old.
 * **RF-14 (Dashboard Vendedor - Gamificación):** Cada vendedor tendrá un panel individual mostrando su Tasa de Cierre (Win-rate), comisiones estimadas y un ranking relativo (Leaderboard) respecto al equipo.
 * **RF-14.1 (Módulo de Gamificación y Leaderboard de Ventas):** El sistema desplegará un ranking en tiempo real ("Leaderboard") visible tanto en el Dashboard Gerencial como en la bandeja individual de cada vendedor, ordenados por leads en estado GANADO.
 * **RF-15 (Sincronización Reactiva de Bandeja):** La interfaz gráfica del vendedor debe reaccionar de forma cuasi-realtime a los eventos mediante **HTTP Polling** (ej. cada 2-3 segundos). El DOM debe actualizarse inyectando el nuevo payload sin requerir recargas de página completas.
 
 ### Módulo F: Auditoría
 * **RF-16 (Event Sourcing parcial):** El sistema debe mantener un registro inmutable (Append-Only Log) de todas las mutaciones críticas sobre las entidades ChatSession y Lead.
-* **RF-16.1 (Gestión de Expiración y Limpieza de Pipeline):** Tarea programada (GCP Cloud Scheduler) cada 60 minutos. Todo Lead en estado CON_VENDEDOR sin interacción en 48 horas se mueve a PERDIDO_SISTEMA.
+* **RF-16.1 (Gestión de Expiración y Limpieza de Pipeline):** Tarea programada (GCP Cloud Scheduler) cada 60 minutos. Todo Lead en estado CON_VENDEDOR sin interacción en 7 días se mueve a PERDIDO con lost_reason="Inactividad 7 dias". Los Leads en BOT/PENDING_ASSIGNMENT sin interacción en 7 días se marcan como ABANDONO_BOT.
 
 ### Módulo G: RBAC Multi-tenant
 * **RF-18 (RBAC Multi-tenant):** Aislamiento de acciones por Tenant (Automotora). Roles: SystemAdmin, TenantManager y Salesperson.

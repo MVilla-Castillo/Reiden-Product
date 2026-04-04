@@ -13,10 +13,11 @@ REGLAS SRE:
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from django.db import connection, models, transaction
+from django.db.models import Count, Q, Avg, F
 from django.utils import timezone
 
 from core.crypto import decrypt, encrypt
@@ -31,13 +32,6 @@ from crm.domain.ports import (
     UserRepository,
 )
 from crm.models import AppUser, AuditLog, ChatSession, Lead, Message, Tenant
-
-
-def _tenant_to_id(tenant: Any) -> Any:
-    """Acepta UUID, Tenant model, o tenant_id directo."""
-    if hasattr(tenant, "id"):
-        return tenant.id
-    return tenant
 
 
 def _lead_to_entity(model: Lead) -> LeadEntity:
@@ -64,6 +58,9 @@ def _session_to_entity(model: ChatSession) -> SessionEntity:
         last_client_message_at=model.last_client_message_at,
         last_message_timestamp=model.last_message_timestamp,
         lost_reason=model.lost_reason,
+        assigned_at=model.assigned_at,
+        first_response_at=model.first_response_at,
+        closed_at=model.closed_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
         is_deleted=model.is_deleted,
@@ -80,12 +77,14 @@ def _message_to_entity(model: Message) -> MessageEntity:
         message_type=model.message_type,
         body=model.body,
         created_at=model.created_at,
+        is_deleted=model.is_deleted,
     )
 
 
 class DjangoLeadRepository(LeadRepository):
-    def find_by_wa_id_hash(self, tenant: Any, wa_id_hash: str) -> LeadEntity | None:
-        tenant_id = _tenant_to_id(tenant)
+    def find_by_wa_id_hash(
+        self, tenant_id: uuid.UUID, wa_id_hash: str
+    ) -> LeadEntity | None:
         try:
             model = Lead.objects.get(
                 tenant_id=tenant_id,
@@ -97,7 +96,7 @@ class DjangoLeadRepository(LeadRepository):
             return None
 
     def upsert(
-        self, tenant: Any, wa_id_hash: str, defaults: dict[str, Any]
+        self, tenant_id: uuid.UUID, wa_id_hash: str, defaults: dict[str, Any]
     ) -> LeadEntity:
         """
         Upsert atómico seguro contra race conditions.
@@ -106,7 +105,6 @@ class DjangoLeadRepository(LeadRepository):
         para evitar el gap entre SELECT e INSERT de update_or_create.
         El wa_id se cifra antes de persistir (PII compliance).
         """
-        tenant_id = _tenant_to_id(tenant)
         first_name = defaults.get("first_name")
         wa_id_plain = defaults.get("wa_id", "")
         wa_id_encrypted = encrypt(wa_id_plain) if wa_id_plain else ""
@@ -143,8 +141,7 @@ class DjangoLeadRepository(LeadRepository):
             last_interaction=row[5],
         )
 
-    def for_tenant(self, tenant: Any) -> list[LeadEntity]:
-        tenant_id = _tenant_to_id(tenant)
+    def for_tenant(self, tenant_id: uuid.UUID) -> list[LeadEntity]:
         return [
             _lead_to_entity(m)
             for m in Lead.objects.filter(tenant_id=tenant_id, is_deleted=False)
@@ -169,8 +166,9 @@ class DjangoSessionRepository(SessionRepository):
         ChatSession.Status.CON_VENDEDOR,
     ]
 
-    def find_active(self, tenant: Any, lead_id: Any) -> SessionEntity | None:
-        tenant_id = _tenant_to_id(tenant)
+    def find_active(
+        self, tenant_id: uuid.UUID, lead_id: uuid.UUID
+    ) -> SessionEntity | None:
         model = (
             ChatSession.objects.select_related("lead")
             .filter(
@@ -186,8 +184,9 @@ class DjangoSessionRepository(SessionRepository):
             return None
         return _session_to_entity(model)
 
-    def find_by_id(self, session_id: uuid.UUID, tenant: Any) -> SessionEntity | None:
-        tenant_id = _tenant_to_id(tenant)
+    def find_by_id(
+        self, session_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> SessionEntity | None:
         try:
             model = ChatSession.objects.select_related("lead").get(
                 id=session_id, tenant_id=tenant_id, is_deleted=False
@@ -196,13 +195,14 @@ class DjangoSessionRepository(SessionRepository):
         except ChatSession.DoesNotExist:
             return None
 
-    def find_active_for_update(self, tenant: Any, lead_id: Any) -> SessionEntity | None:
+    def find_active_for_update(
+        self, tenant_id: uuid.UUID, lead_id: uuid.UUID
+    ) -> SessionEntity | None:
         """
         Busca sesión activa con bloqueo de fila (SELECT FOR UPDATE).
         Previene race conditions cuando dos webhooks del mismo lead llegan simultáneamente.
         Incluye select_related('lead') para evitar N+1 al acceder a lead.id.
         """
-        tenant_id = _tenant_to_id(tenant)
         model = (
             ChatSession.objects.select_for_update()
             .select_related("lead")
@@ -219,8 +219,9 @@ class DjangoSessionRepository(SessionRepository):
             return None
         return _session_to_entity(model)
 
-    def create(self, tenant: Any, lead_id: Any, status: str = "BOT") -> SessionEntity:
-        tenant_id = _tenant_to_id(tenant)
+    def create(
+        self, tenant_id: uuid.UUID, lead_id: uuid.UUID, status: str = "BOT"
+    ) -> SessionEntity:
         model = ChatSession.objects.create(
             tenant_id=tenant_id,
             lead_id=lead_id,
@@ -229,7 +230,10 @@ class DjangoSessionRepository(SessionRepository):
         return _session_to_entity(model)
 
     def save(
-        self, session: SessionEntity, update_fields: list[str] | None = None
+        self,
+        session: SessionEntity,
+        update_fields: list[str] | None = None,
+        **extra_fields: Any,
     ) -> SessionEntity:
         """
         Persiste cambios usando UPDATE directo (sin SELECT previo).
@@ -256,12 +260,22 @@ class DjangoSessionRepository(SessionRepository):
         fields_to_update.append("lost_reason")
         update_data["salesperson_id"] = session.salesperson_id
         fields_to_update.append("salesperson_id")
+        update_data["assigned_at"] = session.assigned_at
+        fields_to_update.append("assigned_at")
+        update_data["first_response_at"] = session.first_response_at
+        fields_to_update.append("first_response_at")
+        update_data["closed_at"] = session.closed_at
+        fields_to_update.append("closed_at")
         update_data["is_deleted"] = session.is_deleted
         fields_to_update.append("is_deleted")
 
         if update_fields:
             fields_to_update = [f for f in update_fields if f in fields_to_update]
             update_data = {k: v for k, v in update_data.items() if k in update_fields}
+
+        if extra_fields:
+            update_data.update(extra_fields)
+            fields_to_update.extend(extra_fields.keys())
 
         if not fields_to_update:
             return session
@@ -274,10 +288,10 @@ class DjangoSessionRepository(SessionRepository):
     def assign_salesperson(
         self,
         session_id: uuid.UUID,
-        tenant: Any,
+        tenant_id: uuid.UUID,
         salesperson_id: uuid.UUID | None,
     ) -> SessionEntity | None:
-        tenant_id = _tenant_to_id(tenant)
+        now = timezone.now()
         with transaction.atomic():
             ChatSession.objects.filter(
                 id=session_id, tenant_id=tenant_id, is_deleted=False
@@ -288,6 +302,7 @@ class DjangoSessionRepository(SessionRepository):
                     if salesperson_id
                     else ChatSession.Status.PENDING_ASSIGNMENT
                 ),
+                assigned_at=now if salesperson_id else None,
             )
             model = (
                 ChatSession.objects.select_related("lead").filter(id=session_id).first()
@@ -297,13 +312,21 @@ class DjangoSessionRepository(SessionRepository):
             return _session_to_entity(model)
 
     def change_status(
-        self, session_id: uuid.UUID, tenant: Any, new_status: str
+        self, session_id: uuid.UUID, tenant_id: uuid.UUID, new_status: str
     ) -> SessionEntity | None:
-        tenant_id = _tenant_to_id(tenant)
+        now = timezone.now()
+        terminal_statuses = {
+            ChatSession.Status.GANADO,
+            ChatSession.Status.PERDIDO,
+            ChatSession.Status.ABANDONO_BOT,
+        }
         with transaction.atomic():
+            update_fields = {"status": new_status}
+            if new_status in terminal_statuses:
+                update_fields["closed_at"] = now
             ChatSession.objects.filter(
                 id=session_id, tenant_id=tenant_id, is_deleted=False
-            ).update(status=new_status)
+            ).update(**update_fields)
             model = (
                 ChatSession.objects.select_related("lead").filter(id=session_id).first()
             )
@@ -312,19 +335,55 @@ class DjangoSessionRepository(SessionRepository):
             return _session_to_entity(model)
 
     def get_dashboard_sessions(
-        self, tenant: Any, limit: int = 50
+        self,
+        tenant_id: uuid.UUID,
+        limit: int = 50,
+        filters: dict[str, Any] | None = None,
     ) -> list[SessionEntity]:
-        tenant_id = _tenant_to_id(tenant)
-        models = (
-            ChatSession.tenant_objects.for_tenant(tenant_id)
-            .order_by("-urgency_score", "-updated_at")
-            .select_related("lead")[:limit]
-        )
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id)
+
+        if filters:
+            date_from = filters.get("date_from")
+            date_to = filters.get("date_to")
+
+            if date_from:
+                qs = qs.filter(created_at__date__gte=date_from)
+            if date_to:
+                qs = qs.filter(created_at__date__lte=date_to)
+
+            if status := filters.get("status"):
+                qs = qs.filter(status=status)
+
+            if vehicle_type := filters.get("vehicle_type"):
+                qs = qs.filter(fsm_answers__vehicle_type=vehicle_type)
+
+            if payment_method := filters.get("payment_method"):
+                qs = qs.filter(fsm_answers__payment_method=payment_method)
+
+            if budget_range := filters.get("budget_range"):
+                qs = qs.filter(fsm_answers__budget_range=budget_range)
+
+            if purchase_intent := filters.get("purchase_intent"):
+                qs = qs.filter(fsm_answers__purchase_intent=purchase_intent)
+
+            if salesperson_id := filters.get("salesperson_id"):
+                qs = qs.filter(salesperson_id=salesperson_id)
+
+            if min_urgency := filters.get("min_urgency"):
+                qs = qs.filter(urgency_score__gte=min_urgency)
+
+            if max_urgency := filters.get("max_urgency"):
+                qs = qs.filter(urgency_score__lte=max_urgency)
+
+        models = qs.order_by("-urgency_score", "-updated_at").select_related("lead")[
+            :limit
+        ]
         return [_session_to_entity(m) for m in models]
 
-    def get_pending_sessions(self, tenant: Any, limit: int = 50) -> list[SessionEntity]:
+    def get_pending_sessions(
+        self, tenant_id: uuid.UUID, limit: int = 50
+    ) -> list[SessionEntity]:
         """Retorna sesiones pendientes de asignación (status=BOT o PENDING_ASSIGNMENT)."""
-        tenant_id = _tenant_to_id(tenant)
         models = (
             ChatSession.tenant_objects.for_tenant(tenant_id)
             .filter(
@@ -340,36 +399,52 @@ class DjangoSessionRepository(SessionRepository):
 
     def expire_if_inactive(
         self,
-        tenant: Any,
-        lead_id: Any,
-        hours: int = 24,
+        tenant_id: uuid.UUID,
+        lead_id: uuid.UUID,
+        hours: int = 168,
     ) -> SessionEntity | None:
         """
-        Si la sesión activa lleva más de `hours` sin actividad, la marca como ABANDONO_BOT.
-        Retorna None si la sesión fue expirada (caller debe crear una nueva).
+        Si la sesión activa lleva más de `hours` sin ningún mensaje, la marca como PERDIDO.
+        Si está en BOT/PENDING_ASSIGNMENT, la marca como ABANDONO_BOT.
         Usa select_for_update() para evitar race conditions con otros workers.
         """
-        tenant_id = _tenant_to_id(tenant)
-        model = (
-            ChatSession.objects.select_for_update()
-            .filter(
-                lead_id=lead_id,
-                tenant_id=tenant_id,
-                status__in=self.ACTIVE_STATUSES,
-                is_deleted=False,
+        with transaction.atomic():
+            model = (
+                ChatSession.objects.select_for_update()
+                .filter(
+                    lead_id=lead_id,
+                    tenant_id=tenant_id,
+                    status__in=self.ACTIVE_STATUSES,
+                    is_deleted=False,
+                )
+                .order_by("-created_at")
+                .first()
             )
-            .order_by("-created_at")
-            .first()
-        )
-        if model is None:
-            return None
+            if model is None:
+                return None
 
-        if model.updated_at < timezone.now() - timedelta(hours=hours):
-            model.status = ChatSession.Status.ABANDONO_BOT
-            model.save(update_fields=["status", "updated_at"])
-            return None
+            last_activity = model.last_client_message_at
+            if last_activity is None:
+                last_activity = model.created_at
 
-        return _session_to_entity(model)
+            if last_activity < timezone.now() - timedelta(hours=hours):
+                if model.status in [
+                    ChatSession.Status.BOT,
+                    ChatSession.Status.PENDING_ASSIGNMENT,
+                ]:
+                    model.status = ChatSession.Status.ABANDONO_BOT
+                    model.lost_reason = "Abandono en FSM"
+                else:
+                    model.status = ChatSession.Status.PERDIDO
+                    model.lost_reason = "Inactividad 7 dias"
+                    model.closed_at = timezone.now()
+
+                model.save(
+                    update_fields=["status", "lost_reason", "closed_at", "updated_at"]
+                )
+                return None
+
+            return _session_to_entity(model)
 
     def check_session_expired(
         self,
@@ -389,10 +464,229 @@ class DjangoSessionRepository(SessionRepository):
             return False
         return model.updated_at < timezone.now() - timedelta(hours=hours)
 
-    def mark_as_abandoned(self, session_id: uuid.UUID) -> None:
-        ChatSession.objects.filter(id=session_id).update(
-            status=ChatSession.Status.ABANDONO_BOT
+    def mark_as_abandoned(self, session_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+        now = timezone.now()
+        ChatSession.objects.filter(id=session_id, tenant_id=tenant_id).update(
+            status=ChatSession.Status.ABANDONO_BOT,
+            closed_at=now,
         )
+
+    def get_funnel_metrics(
+        self, tenant_id: uuid.UUID, date_from: date, date_to: date
+    ) -> dict[str, Any]:
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
+            created_at__date__gte=date_from,
+            created_at__date__lte=date_to,
+        )
+
+        total_leads = qs.count()
+        completed_fsm = qs.filter(
+            status__in=[
+                ChatSession.Status.PENDING_ASSIGNMENT,
+                ChatSession.Status.CON_VENDEDOR,
+                ChatSession.Status.GANADO,
+                ChatSession.Status.PERDIDO,
+                ChatSession.Status.ABANDONO_BOT,
+            ]
+        ).count()
+        assigned_leads = qs.exclude(salesperson_id__isnull=True).count()
+        won_sessions = qs.filter(status=ChatSession.Status.GANADO).count()
+        lost_sessions = qs.filter(status__in=[ChatSession.Status.PERDIDO]).count()
+        abandoned_sessions = qs.filter(status=ChatSession.Status.ABANDONO_BOT).count()
+
+        conversion_rate_fsm = (
+            (completed_fsm / total_leads * 100) if total_leads > 0 else 0
+        )
+        conversion_rate_assignment = (
+            (assigned_leads / completed_fsm * 100) if completed_fsm > 0 else 0
+        )
+        win_rate = (
+            (won_sessions / (won_sessions + lost_sessions) * 100)
+            if (won_sessions + lost_sessions) > 0
+            else 0
+        )
+
+        return {
+            "total_leads": total_leads,
+            "completed_fsm": completed_fsm,
+            "assigned_leads": assigned_leads,
+            "won_sessions": won_sessions,
+            "lost_sessions": lost_sessions,
+            "abandoned_sessions": abandoned_sessions,
+            "conversion_rate_fsm": round(conversion_rate_fsm, 2),
+            "conversion_rate_assignment": round(conversion_rate_assignment, 2),
+            "win_rate": round(win_rate, 2),
+        }
+
+    def get_fsm_distribution(
+        self, tenant_id: uuid.UUID, date_from: date, date_to: date
+    ) -> dict[str, Any]:
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
+            created_at__date__gte=date_from,
+            created_at__date__lte=date_to,
+            status__in=[
+                ChatSession.Status.PENDING_ASSIGNMENT,
+                ChatSession.Status.CON_VENDEDOR,
+                ChatSession.Status.GANADO,
+                ChatSession.Status.PERDIDO,
+            ],
+        )
+
+        def _json_agg(field: str) -> dict[str, int]:
+            result = qs.values(f"fsm_answers__{field}").annotate(count=Count("id"))
+            dist = {}
+            for r in result:
+                key = r.get(f"fsm_answers__{field}")
+                if key:
+                    dist[key] = r["count"]
+            return dist
+
+        return {
+            "vehicle_type": _json_agg("vehicle_type"),
+            "payment_method": _json_agg("payment_method"),
+            "budget_range": _json_agg("budget_range"),
+            "purchase_intent": _json_agg("purchase_intent"),
+        }
+
+    def get_urgency_distribution(
+        self,
+        tenant_id: uuid.UUID,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> dict[str, int]:
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id)
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        buckets = {"0-30": 0, "31-60": 0, "61-100": 0, "100+": 0}
+        for session in qs.only("urgency_score"):
+            score = session.urgency_score
+            if score <= 30:
+                buckets["0-30"] += 1
+            elif score <= 60:
+                buckets["31-60"] += 1
+            elif score <= 100:
+                buckets["61-100"] += 1
+            else:
+                buckets["100+"] += 1
+        return buckets
+
+    def get_time_metrics(
+        self, tenant_id: uuid.UUID, date_from: date, date_to: date
+    ) -> dict[str, float]:
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
+            created_at__date__gte=date_from,
+            created_at__date__lte=date_to,
+        )
+
+        completed = qs.filter(
+            status__in=[
+                ChatSession.Status.PENDING_ASSIGNMENT,
+                ChatSession.Status.CON_VENDEDOR,
+            ],
+            assigned_at__isnull=False,
+        )
+
+        avg_time_to_complete_fsm = completed.aggregate(
+            avg=Avg(F("assigned_at") - F("created_at"))
+        )["avg"]
+        avg_time_to_assign = completed.aggregate(
+            avg=Avg(F("assigned_at") - F("created_at"))
+        )["avg"]
+
+        with_response = qs.filter(
+            status__in=[
+                ChatSession.Status.CON_VENDEDOR,
+                ChatSession.Status.GANADO,
+                ChatSession.Status.PERDIDO,
+            ],
+            first_response_at__isnull=False,
+        )
+        avg_time_to_first_response = with_response.aggregate(
+            avg=Avg(F("first_response_at") - F("assigned_at"))
+        )["avg"]
+
+        closed = qs.filter(
+            status__in=[
+                ChatSession.Status.GANADO,
+                ChatSession.Status.PERDIDO,
+            ],
+            closed_at__isnull=False,
+        )
+        avg_time_to_close = closed.aggregate(
+            avg=Avg(F("closed_at") - F("assigned_at"))
+        )["avg"]
+
+        def _to_minutes(td: timedelta | None) -> float:
+            if td is None:
+                return 0.0
+            return round(td.total_seconds() / 60, 2)
+
+        def _to_days(td: timedelta | None) -> float:
+            if td is None:
+                return 0.0
+            return round(td.total_seconds() / 86400, 2)
+
+        return {
+            "avg_time_to_complete_fsm": _to_minutes(avg_time_to_complete_fsm),
+            "avg_time_to_assign": _to_minutes(avg_time_to_assign),
+            "avg_time_to_first_response": _to_minutes(avg_time_to_first_response),
+            "avg_time_to_close": _to_days(avg_time_to_close),
+        }
+
+    def get_salesperson_performance(
+        self, tenant_id: uuid.UUID, date_from: date, date_to: date
+    ) -> list[dict[str, Any]]:
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
+            created_at__date__gte=date_from,
+            created_at__date__lte=date_to,
+            salesperson_id__isnull=False,
+        )
+
+        salespeople = (
+            qs.values("salesperson_id")
+            .annotate(
+                leads_assigned=Count("id"),
+                wins=Count("id", filter=Q(status=ChatSession.Status.GANADO)),
+                losses=Count(
+                    "id",
+                    filter=Q(
+                        status__in=[
+                            ChatSession.Status.PERDIDO,
+                        ]
+                    ),
+                ),
+                avg_first_response=Avg(
+                    F("first_response_at") - F("assigned_at"),
+                    filter=Q(first_response_at__isnull=False),
+                ),
+            )
+            .order_by("-wins")
+        )
+
+        results = []
+        for sp in salespeople:
+            wins = sp["wins"]
+            losses = sp["losses"]
+            win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
+
+            results.append(
+                {
+                    "salesperson_id": str(sp["salesperson_id"]),
+                    "leads_assigned": sp["leads_assigned"],
+                    "wins": wins,
+                    "losses": losses,
+                    "win_rate": round(win_rate, 2),
+                    "avg_first_response_minutes": (
+                        round(sp["avg_first_response"].total_seconds() / 60, 2)
+                        if sp["avg_first_response"]
+                        else 0.0
+                    ),
+                }
+            )
+        return results
 
 
 class DjangoMessageRepository(MessageRepository):
@@ -409,14 +703,13 @@ class DjangoMessageRepository(MessageRepository):
 
     def create(
         self,
-        tenant: Any,
-        session_id: Any,
+        tenant_id: uuid.UUID,
+        session_id: uuid.UUID,
         provider_message_id: str,
         direction: str,
         message_type: str,
         body: str,
     ) -> MessageEntity:
-        tenant_id = _tenant_to_id(tenant)
         model = Message.objects.create(
             tenant_id=tenant_id,
             session_id=session_id,
@@ -430,11 +723,10 @@ class DjangoMessageRepository(MessageRepository):
     def find_by_session(
         self,
         session_id: uuid.UUID,
-        tenant: Any,
+        tenant_id: uuid.UUID,
         limit: int = 50,
         offset: int = 0,
     ) -> list[MessageEntity]:
-        tenant_id = _tenant_to_id(tenant)
         models = (
             Message.objects.filter(
                 session_id=session_id,

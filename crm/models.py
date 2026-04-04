@@ -170,7 +170,6 @@ class ChatSession(models.Model):
         GANADO = "GANADO", "Ganado"
         PERDIDO = "PERDIDO", "Perdido"
         ABANDONO_BOT = "ABANDONO_BOT", "Abandono Bot"
-        PERDIDO_SISTEMA = "PERDIDO_SISTEMA", "Perdido Sistema"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(
@@ -198,6 +197,17 @@ class ChatSession(models.Model):
         help_text="Timestamp nativo de Twilio del último mensaje procesado (RNF-03)",
     )
     lost_reason = models.CharField(max_length=255, blank=True, null=True)
+    assigned_at = models.DateTimeField(
+        blank=True, null=True, help_text="Timestamp de asignación a vendedor"
+    )
+    first_response_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp del primer mensaje OUTBOUND del vendedor",
+    )
+    closed_at = models.DateTimeField(
+        blank=True, null=True, help_text="Timestamp de cierre (GANADO/PERDIDO/ABANDONO)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
@@ -213,13 +223,23 @@ class ChatSession(models.Model):
                 fields=["tenant", "lead", "is_deleted", "status"],
                 name="idx_chat_sess_active",
             ),
+            models.Index(
+                fields=["tenant", "status", "assigned_at"],
+                name="idx_chat_sess_assigned",
+            ),
+            models.Index(
+                fields=["tenant", "status", "closed_at"],
+                name="idx_chat_sess_closed",
+            ),
+            models.Index(
+                fields=["tenant", "created_at"],
+                name="idx_chat_sess_created",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["tenant", "lead"],
-                condition=~models.Q(
-                    status__in=["GANADO", "PERDIDO", "PERDIDO_SISTEMA", "ABANDONO_BOT"]
-                )
+                condition=~models.Q(status__in=["GANADO", "PERDIDO", "ABANDONO_BOT"])
                 & models.Q(is_deleted=False),
                 name="unique_active_session_per_lead",
             )
@@ -262,7 +282,7 @@ class Message(models.Model):
 
     objects = models.Manager()
     active_objects = ActiveManager()
-    tenant_objects = TenantManager()
+    tenant_objects = ActiveTenantManager()
 
     class Meta:
         # RNF-44: Optimización de carga inicial de mensajes (O(log n))

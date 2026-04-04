@@ -18,12 +18,29 @@ El JWT debe contener el `sub` de Google previamente registrado en la plataforma.
 
 #### Request
 
-Solo headers. Sin body, sin query params.
+Headers obligatorios. Query params opcionales para filtrado y paginación.
 
 ```http
-GET /api/dashboard/leads/ HTTP/1.1
+GET /api/dashboard/leads/?limit=50&date_filter=week&status=BOT&min_urgency=50 HTTP/1.1
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+**Query Params opcionales:**
+
+| Param | Tipo | Default | Descripción |
+|---|---|---|---|
+| `limit` | int | 50 | Máximo de resultados (max 100) |
+| `date_filter` | string | — | Filtro rápido: `today`, `week`, `month`, `year`, `all` |
+| `date_from` | date (ISO 8601) | — | Fecha inicio personalizada |
+| `date_to` | date (ISO 8601) | — | Fecha fin personalizada |
+| `status` | string | — | Filtrar por estado: `BOT`, `PENDING_ASSIGNMENT`, `CON_VENDEDOR`, `GANADO`, `PERDIDO`, `ABANDONO_BOT` |
+| `vehicle_type` | string | — | `City Car`, `SUV`, `Sedan` |
+| `payment_method` | string | — | `Contado`, `Credito`, `Retoma` |
+| `budget_range` | string | — | `<6M`, `7-14M`, `>15M` |
+| `purchase_intent` | string | — | `HOY`, `ESTA_SEMANA`, `MES_O_MAS` |
+| `salesperson_id` | UUID | — | Filtrar por vendedor asignado |
+| `min_urgency` | int | — | Urgencia mínima (0-160) |
+| `max_urgency` | int | — | Urgencia máxima (0-160) |
 
 #### Response 200 — OK
 
@@ -36,21 +53,18 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
       "status": "BOT",
       "urgency_score": 160,
       "fsm_step": "VEHICLE_TYPE",
-      "intent": "HOY",
+      "vehicle_type": "SUV",
+      "payment_method": "Credito",
+      "budget_range": "7-14M",
+      "purchase_intent": "HOY",
+      "salesperson_id": null,
+      "assigned_at": null,
+      "closed_at": null,
       "created_at": "2026-04-01T10:30:00Z",
       "updated_at": "2026-04-01T10:35:00Z"
-    },
-    {
-      "session_id": "b2c3d4e5-f6g7-8901-bcde-fg2345678901",
-      "lead_phone_hash": "f6g7h8i9-j0k1-2345-lmno-pq6789012345",
-      "status": "PENDING_ASSIGNMENT",
-      "urgency_score": 120,
-      "fsm_step": "QUALIFIED",
-      "intent": "ESTA_SEMANA",
-      "created_at": "2026-04-01T09:00:00Z",
-      "updated_at": "2026-04-01T09:15:00Z"
     }
-  ]
+  ],
+  "count": 1
 }
 ```
 
@@ -424,9 +438,8 @@ Solo retorna usuarios con rol `SALESPERSON` del mismo tenant. `active_sessions_c
 | `PENDING_ASSIGNMENT` | Calificado, esperando vendedor | Amarillo |
 | `CON_VENDEDOR` | Asignado a un vendedor | Verde |
 | `GANADO` | Cerrado exitosamente | Verde oscuro |
-| `PERDIDO` | Cerrado sin venta | Rojo |
-| `ABANDONO_BOT` | Inactivo más de 24 horas | Gris |
-| `PERDIDO_SISTEMA` | Error técnico | Rojo oscuro |
+| `PERDIDO` | Cerrado sin venta (manual o inactividad) | Rojo |
+| `ABANDONO_BOT` | Abandono durante FSM | Gris |
 
 ### 3.2 `fsm_step` — Paso Actual del Bot
 
@@ -503,17 +516,15 @@ Estos endpoints existen pero son **infraestructura interna**. El frontend NO los
 
 ---
 
-## 6. Lo que NO Existe Aún (Sin Contrato Definido)
+## 6. Endpoints Adicionales (Implementados)
 
-Estas funcionalidades **no tienen endpoint ni contrato definido**. Si el frontend las necesita, hay que solicitarlas:
-
-| Necesidad | Estado | Prioridad |
-|-----------|--------|-----------|
-| Cambiar estado manualmente (GANADO, PERDIDO) | Sin contrato | Media |
-| Filtrar leads por estado | Sin contrato | Media |
-| Filtrar leads por fecha | Sin contrato | Baja |
-| Paginación del dashboard | Sin contrato (hardcodeado a 50) | Baja |
-| Notificaciones en tiempo real | Sin contrato (usar HTTP Polling) | Media |
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `GET /api/dashboard/leads/pending/` | GET | Cola de leads pendientes de asignación |
+| `GET /api/dashboard/metrics/` | GET | Métricas agregadas (embudo, FSM, urgencia, performance) |
+| `GET /api/dashboard/salespeople/` | GET | Listar vendedores disponibles |
+| `PATCH /api/dashboard/leads/<id>/status/` | PATCH | Cambiar estado (GANADO/PERDIDO/ABANDONO_BOT) |
+| `PATCH /api/dashboard/leads/<id>/reassign/` | PATCH | Reasignar o desasignar lead |
 
 ---
 

@@ -43,6 +43,9 @@ class SessionEntity:
     last_client_message_at: datetime | None = None
     last_message_timestamp: str | None = None
     lost_reason: str | None = None
+    assigned_at: datetime | None = None
+    first_response_at: datetime | None = None
+    closed_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     is_deleted: bool = False
@@ -60,3 +63,4 @@ class MessageEntity:
     message_type: str
     body: str
     created_at: datetime | None = None
+    is_deleted: bool = False
