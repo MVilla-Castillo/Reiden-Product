@@ -32,6 +32,7 @@ from crm.domain.ports import (
     MessageRepository,
     SendMessageRequest,
     SendMessageResult,
+    SessionExpirationInfo,
     SessionRepository,
     TenantRepository,
 )
@@ -176,13 +177,27 @@ class ProcessMessageUseCase:
 
             if existing is None:
                 # Expirar sesión inactiva (también usa select_for_update internamente)
-                not_expired = self._session_repo.expire_if_inactive(
+                expiration_result = self._session_repo.expire_if_inactive(
                     tenant_id=tenant_id,
                     lead_id=lead.id,
                     hours=24,
                 )
 
-                if not_expired is None:
+                if isinstance(expiration_result, SessionExpirationInfo):
+                    self._audit_logger.record(
+                        AuditEntry(
+                            session_id=expiration_result.session_id,
+                            tenant_id=expiration_result.tenant_id,
+                            action="SESSION_EXPIRED",
+                            old_value={"status": expiration_result.old_status},
+                            new_value={
+                                "status": expiration_result.new_status,
+                                "lost_reason": expiration_result.lost_reason,
+                            },
+                        )
+                    )
+
+                if expiration_result is None:
                     # Crear nueva sesión (puede fallar por race condition con otro thread)
                     try:
                         with transaction.atomic():
@@ -199,6 +214,22 @@ class ProcessMessageUseCase:
                         )
                         if session is None:
                             raise
+
+                    # UC-A04: Persistir atribución UTM/Referral en nueva sesión
+                    _referral_source = payload.get("ReferralSourceType")
+                    _referral_url = payload.get("ReferralSourceUrl")
+                    if _referral_source or _referral_url:
+                        _utm_meta = {
+                            "source_type": _referral_source,
+                            "source_url": _referral_url,
+                        }
+                        self._session_repo.save(
+                            replace(
+                                session,
+                                acquisition_source=_referral_source,
+                                utm_metadata=_utm_meta,
+                            )
+                        )
 
                     if session is not None and not is_new_session:
                         is_new_session = (
@@ -220,7 +251,7 @@ class ProcessMessageUseCase:
                                 )
                             )
                 else:
-                    session = not_expired
+                    session = expiration_result
             else:
                 is_expired = self._session_repo.check_session_expired(
                     session_id=existing.id,
@@ -228,9 +259,23 @@ class ProcessMessageUseCase:
                 )
 
                 if is_expired:
-                    self._session_repo.mark_as_abandoned(
+                    abandon_result = self._session_repo.mark_as_abandoned(
                         existing.id, tenant_id=tenant_id
                     )
+
+                    if abandon_result is not None:
+                        self._audit_logger.record(
+                            AuditEntry(
+                                session_id=abandon_result.session_id,
+                                tenant_id=abandon_result.tenant_id,
+                                action="SESSION_EXPIRED",
+                                old_value={"status": abandon_result.old_status},
+                                new_value={
+                                    "status": abandon_result.new_status,
+                                    "lost_reason": abandon_result.lost_reason,
+                                },
+                            )
+                        )
 
                     try:
                         with transaction.atomic():
@@ -282,6 +327,13 @@ class ProcessMessageUseCase:
                 or payload.get("MediaUrl0", "")
             )
 
+            # UC-B02: Ignorar timestamps de Twilio - procesar todo en orden de llegada a BD
+            # Los timestamps de Twilio pueden generar problemas de out-of-order que atascan la FSM
+            # El orden de llegada a la BD es la fuente de verdad
+
+            _incoming_timestamp = payload.get("Timestamp", "")
+
+            # Persistir mensaje siempre y ejecutar FSM
             try:
                 with transaction.atomic():
                     self._message_repo.create(
@@ -308,63 +360,85 @@ class ProcessMessageUseCase:
                             },
                         )
                     )
+
+                    # Ejecutar FSM siempre
+                    old_fsm_state = (
+                        dict(session.fsm_answers) if session.fsm_answers else {}
+                    )
+                    old_status = session.status
+
+                    fsm_context = FSMContext(
+                        current_step=session.fsm_answers.get("current_step"),
+                        fsm_answers=session.fsm_answers,
+                        status=session.status,
+                        error_count=session.fsm_answers.get("error_count", 0),
+                    )
+
+                    reply_result = advance_fsm(fsm_context, _body, _message_type)
+
+                    # Aplicar cambios de FSM a la entidad (inmutable via replace)
+                    updated_session = session
+                    if reply_result.updated_fsm_answers != session.fsm_answers:
+                        updated_session = replace(
+                            updated_session,
+                            fsm_answers=reply_result.updated_fsm_answers,
+                        )
+                    if (
+                        reply_result.new_status
+                        and reply_result.new_status != session.status
+                    ):
+                        updated_session = replace(
+                            updated_session, status=reply_result.new_status
+                        )
+                    if (
+                        reply_result.urgency_score
+                        and reply_result.urgency_score != session.urgency_score
+                    ):
+                        updated_session = replace(
+                            updated_session, urgency_score=reply_result.urgency_score
+                        )
+
+                    new_fsm_state = (
+                        dict(updated_session.fsm_answers)
+                        if updated_session.fsm_answers
+                        else {}
+                    )
+                    new_status = updated_session.status
+
+                    if (
+                        old_fsm_state.get("current_step")
+                        != new_fsm_state.get("current_step")
+                        or old_status != new_status
+                    ):
+                        self._audit_logger.record(
+                            AuditEntry(
+                                session_id=updated_session.id,
+                                tenant_id=tenant_id,
+                                action="FSM_TRANSITION",
+                                old_value={
+                                    "status": old_status,
+                                    "fsm_answers": old_fsm_state,
+                                },
+                                new_value={
+                                    "status": new_status,
+                                    "fsm_answers": new_fsm_state,
+                                },
+                            )
+                        )
+
+                    # Persistir cambios de sesión con last_message_timestamp actualizado
+                    updated_session = replace(
+                        updated_session,
+                        last_message_timestamp=_incoming_timestamp
+                        or session.last_message_timestamp,
+                    )
+                    self._session_repo.save(updated_session)
+
             except IntegrityError:
                 # Otro thread ya persistió este mensaje (race condition en idempotencia).
                 # Continuamos procesando la FSM normalmente.
                 message_created = False
-
-            # Ejecutar FSM
-            old_fsm_state = dict(session.fsm_answers) if session.fsm_answers else {}
-            old_status = session.status
-
-            fsm_context = FSMContext(
-                current_step=session.fsm_answers.get("current_step"),
-                fsm_answers=session.fsm_answers,
-                status=session.status,
-                error_count=session.fsm_answers.get("error_count", 0),
-            )
-
-            reply_result = advance_fsm(fsm_context, _body, _message_type)
-
-            # Aplicar cambios de FSM a la entidad (inmutable via replace)
-            updated_session = session
-            if reply_result.updated_fsm_answers != session.fsm_answers:
-                updated_session = replace(
-                    updated_session, fsm_answers=reply_result.updated_fsm_answers
-                )
-            if reply_result.new_status and reply_result.new_status != session.status:
-                updated_session = replace(
-                    updated_session, status=reply_result.new_status
-                )
-            if (
-                reply_result.urgency_score
-                and reply_result.urgency_score != session.urgency_score
-            ):
-                updated_session = replace(
-                    updated_session, urgency_score=reply_result.urgency_score
-                )
-
-            new_fsm_state = (
-                dict(updated_session.fsm_answers) if updated_session.fsm_answers else {}
-            )
-            new_status = updated_session.status
-
-            if (
-                old_fsm_state.get("current_step") != new_fsm_state.get("current_step")
-                or old_status != new_status
-            ):
-                self._audit_logger.record(
-                    AuditEntry(
-                        session_id=updated_session.id,
-                        tenant_id=tenant_id,
-                        action="FSM_TRANSITION",
-                        old_value={"status": old_status, "fsm_answers": old_fsm_state},
-                        new_value={"status": new_status, "fsm_answers": new_fsm_state},
-                    )
-                )
-
-            # Persistir cambios de sesión
-            self._session_repo.save(updated_session)
+                reply_result = None
 
         stage_end(
             "db_transaction",

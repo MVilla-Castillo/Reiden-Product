@@ -53,19 +53,26 @@ class REDMetricsMiddleware:
             ):
                 path_pattern = self._resolve_path_pattern(request)
 
-                logger.info(
-                    "RED Metric",
-                    extra={
-                        "metric_type": "RED",
-                        "http_method": request.method,
-                        "path_pattern": path_pattern,
-                        "path_raw": request.path,
-                        "status_code": status_code,
-                        "duration_ms": round(duration_ms, 2),
-                        "tenant_id": tenant_id_var.get(),
-                        "component_name": "red_metrics_middleware",
-                    },
-                )
+                is_error = status_code >= 400
+                is_slow = duration_ms > 1000
+                is_health = request.path.startswith("/health/")
+
+                if is_error or is_slow:
+                    logger.info(
+                        "RED Metric",
+                        extra={
+                            "metric_type": "RED",
+                            "http_method": request.method,
+                            "path_pattern": path_pattern,
+                            "path_raw": request.path,
+                            "status_code": status_code,
+                            "duration_ms": round(duration_ms, 2),
+                            "tenant_id": tenant_id_var.get(),
+                            "component_name": "red_metrics_middleware",
+                            "is_error": is_error,
+                            "is_slow": is_slow,
+                        },
+                    )
 
     @staticmethod
     def _resolve_path_pattern(request: HttpRequest) -> str:

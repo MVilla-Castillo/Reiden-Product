@@ -27,6 +27,7 @@ from crm.domain.ports import (
     AuditLogger,
     LeadRepository,
     MessageRepository,
+    SessionExpirationInfo,
     SessionRepository,
     TenantRepository,
     UserRepository,
@@ -61,6 +62,8 @@ def _session_to_entity(model: ChatSession) -> SessionEntity:
         assigned_at=model.assigned_at,
         first_response_at=model.first_response_at,
         closed_at=model.closed_at,
+        acquisition_source=model.acquisition_source,
+        utm_metadata=dict(model.utm_metadata) if model.utm_metadata else {},
         created_at=model.created_at,
         updated_at=model.updated_at,
         is_deleted=model.is_deleted,
@@ -268,6 +271,10 @@ class DjangoSessionRepository(SessionRepository):
         fields_to_update.append("closed_at")
         update_data["is_deleted"] = session.is_deleted
         fields_to_update.append("is_deleted")
+        update_data["acquisition_source"] = session.acquisition_source
+        fields_to_update.append("acquisition_source")
+        update_data["utm_metadata"] = session.utm_metadata
+        fields_to_update.append("utm_metadata")
 
         if update_fields:
             fields_to_update = [f for f in update_fields if f in fields_to_update]
@@ -312,7 +319,11 @@ class DjangoSessionRepository(SessionRepository):
             return _session_to_entity(model)
 
     def change_status(
-        self, session_id: uuid.UUID, tenant_id: uuid.UUID, new_status: str
+        self,
+        session_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        new_status: str,
+        lost_reason: str | None = None,
     ) -> SessionEntity | None:
         now = timezone.now()
         terminal_statuses = {
@@ -324,6 +335,8 @@ class DjangoSessionRepository(SessionRepository):
             update_fields = {"status": new_status}
             if new_status in terminal_statuses:
                 update_fields["closed_at"] = now
+            if lost_reason is not None:
+                update_fields["lost_reason"] = lost_reason
             ChatSession.objects.filter(
                 id=session_id, tenant_id=tenant_id, is_deleted=False
             ).update(**update_fields)
@@ -401,12 +414,13 @@ class DjangoSessionRepository(SessionRepository):
         self,
         tenant_id: uuid.UUID,
         lead_id: uuid.UUID,
-        hours: int = 168,
-    ) -> SessionEntity | None:
+        hours: int = 24,
+    ) -> SessionEntity | SessionExpirationInfo | None:
         """
         Si la sesión activa lleva más de `hours` sin ningún mensaje, la marca como PERDIDO.
         Si está en BOT/PENDING_ASSIGNMENT, la marca como ABANDONO_BOT.
         Usa select_for_update() para evitar race conditions con otros workers.
+        Retorna SessionEntity si está activa, SessionExpirationInfo si fue expirada, None si no existe.
         """
         with transaction.atomic():
             model = (
@@ -428,21 +442,30 @@ class DjangoSessionRepository(SessionRepository):
                 last_activity = model.created_at
 
             if last_activity < timezone.now() - timedelta(hours=hours):
+                old_status = model.status
                 if model.status in [
                     ChatSession.Status.BOT,
                     ChatSession.Status.PENDING_ASSIGNMENT,
                 ]:
-                    model.status = ChatSession.Status.ABANDONO_BOT
-                    model.lost_reason = "Abandono en FSM"
+                    new_status = ChatSession.Status.ABANDONO_BOT
+                    lost_reason = "Abandono en FSM"
                 else:
-                    model.status = ChatSession.Status.PERDIDO
-                    model.lost_reason = "Inactividad 7 dias"
+                    new_status = ChatSession.Status.PERDIDO
+                    lost_reason = "Inactividad 7 dias"
                     model.closed_at = timezone.now()
 
+                model.status = new_status
+                model.lost_reason = lost_reason
                 model.save(
                     update_fields=["status", "lost_reason", "closed_at", "updated_at"]
                 )
-                return None
+                return SessionExpirationInfo(
+                    session_id=model.id,
+                    tenant_id=tenant_id,
+                    old_status=old_status,
+                    new_status=new_status,
+                    lost_reason=lost_reason,
+                )
 
             return _session_to_entity(model)
 
@@ -452,23 +475,37 @@ class DjangoSessionRepository(SessionRepository):
         hours: int = 24,
     ) -> bool:
         model = (
-            ChatSession.objects.select_for_update()
-            .filter(
+            ChatSession.objects.filter(
                 id=session_id,
                 status__in=self.ACTIVE_STATUSES,
                 is_deleted=False,
             )
+            .only("updated_at")
             .first()
         )
         if model is None:
             return False
         return model.updated_at < timezone.now() - timedelta(hours=hours)
 
-    def mark_as_abandoned(self, session_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+    def mark_as_abandoned(
+        self, session_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> SessionExpirationInfo | None:
+        """Marca una sesión como ABANDONO_BOT dentro de un tenant. Retorna info para AuditLog."""
         now = timezone.now()
-        ChatSession.objects.filter(id=session_id, tenant_id=tenant_id).update(
+        updated = ChatSession.objects.filter(
+            id=session_id, tenant_id=tenant_id, is_deleted=False
+        ).update(
             status=ChatSession.Status.ABANDONO_BOT,
             closed_at=now,
+        )
+        if not updated:
+            return None
+        return SessionExpirationInfo(
+            session_id=session_id,
+            tenant_id=tenant_id,
+            old_status="UNKNOWN",
+            new_status=ChatSession.Status.ABANDONO_BOT,
+            lost_reason="Sesión abandonada durante procesamiento",
         )
 
     def get_funnel_metrics(
@@ -560,18 +597,18 @@ class DjangoSessionRepository(SessionRepository):
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
 
-        buckets = {"0-30": 0, "31-60": 0, "61-100": 0, "100+": 0}
-        for session in qs.only("urgency_score"):
-            score = session.urgency_score
-            if score <= 30:
-                buckets["0-30"] += 1
-            elif score <= 60:
-                buckets["31-60"] += 1
-            elif score <= 100:
-                buckets["61-100"] += 1
-            else:
-                buckets["100+"] += 1
-        return buckets
+        result = qs.aggregate(
+            low=Count("id", filter=Q(urgency_score__lte=30)),
+            medium=Count("id", filter=Q(urgency_score__gt=30, urgency_score__lte=60)),
+            high=Count("id", filter=Q(urgency_score__gt=60, urgency_score__lte=100)),
+            critical=Count("id", filter=Q(urgency_score__gt=100)),
+        )
+        return {
+            "0-30": result["low"],
+            "31-60": result["medium"],
+            "61-100": result["high"],
+            "100+": result["critical"],
+        }
 
     def get_time_metrics(
         self, tenant_id: uuid.UUID, date_from: date, date_to: date
@@ -686,7 +723,68 @@ class DjangoSessionRepository(SessionRepository):
                     ),
                 }
             )
+
+        # UC-E03: Agregar posición en ranking
+        for idx, result in enumerate(results, start=1):
+            result["ranking_position"] = idx
+
         return results
+
+    def get_expired_sessions(
+        self, tenant_id: uuid.UUID, hours: int = 168, status_filter: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Retorna sesiones inactivas por más de `hours` para limpieza programada.
+        Usa last_client_message_at o created_at como referencia de actividad.
+
+        Args:
+            status_filter: Si se provee, filtra solo por ese estado (ej: 'BOT', 'CON_VENDEDOR').
+                          Si es None, busca en todos los estados no terminales.
+        """
+        cutoff = timezone.now() - timedelta(hours=hours)
+
+        if status_filter:
+            statuses = [status_filter]
+        else:
+            statuses = [
+                ChatSession.Status.BOT,
+                ChatSession.Status.PENDING_ASSIGNMENT,
+                ChatSession.Status.CON_VENDEDOR,
+            ]
+
+        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
+            status__in=statuses,
+            is_deleted=False,
+        )
+
+        expired = []
+        for session in qs:
+            last_activity = session.last_client_message_at or session.created_at
+            if last_activity and last_activity < cutoff:
+                expired.append(
+                    {
+                        "id": session.id,
+                        "status": session.status,
+                        "salesperson_id": session.salesperson_id,
+                    }
+                )
+        return expired
+
+    def get_sessions_near_ttl_expiry(self, hours: int = 166) -> list[dict[str, Any]]:
+        """
+        Retorna sesiones CON_VENDEDOR donde last_client_message_at está
+        entre `hours` y `hours+2` horas atrás (ventana de alerta antes de los 7 días).
+        """
+        from_cutoff = timezone.now() - timedelta(hours=hours)
+        to_cutoff = timezone.now() - timedelta(hours=hours - 2)
+
+        models = ChatSession.objects.filter(
+            status=ChatSession.Status.CON_VENDEDOR,
+            last_client_message_at__gte=from_cutoff,
+            last_client_message_at__lte=to_cutoff,
+            is_deleted=False,
+        ).values("id", "salesperson_id", "tenant_id", "lead_id")
+        return list(models)
 
 
 class DjangoMessageRepository(MessageRepository):
@@ -769,6 +867,12 @@ class DjangoTenantRepository(TenantRepository):
         if tenant:
             tenant["routing_mode"] = str(tenant["routing_mode"])
         return tenant
+
+    def update_routing_mode(self, tenant_id: uuid.UUID, routing_mode: str) -> bool:
+        if routing_mode not in ("MANUAL", "AUTO"):
+            return False
+        affected = Tenant.objects.filter(id=tenant_id).update(routing_mode=routing_mode)
+        return affected > 0
 
 
 class DjangoUserRepository(UserRepository):

@@ -39,8 +39,9 @@ MSG_PAYMENT_METHOD_QUESTION = "¿Cómo prefieres pagarlo?"
 MSG_BUDGET_RANGE_QUESTION = "¿Cuál es tu presupuesto estimado?"
 MSG_PURCHASE_INTENT_QUESTION = "¿Para cuándo tienes planificada tu compra?"
 MSG_QUALIFIED = (
-    "¡Perfecto! Un asesor de ventas te contactará a la brevedad "
-    "con las mejores opciones."
+    "¡Perfecto! Hemos recopilado toda tu información. "
+    "Te estamos asignando con un asesor de ventas que te atenderá "
+    "a la brevedad en este mismo chat. ¡Gracias por tu interés!"
 )
 
 # ─────────────────────────────────────────────────────────
@@ -268,7 +269,13 @@ def advance_fsm(
             fsm_answers["purchase_intent"] = PurchaseIntent.HOY
         elif t in ("pi_semana", "esta semana"):
             fsm_answers["purchase_intent"] = PurchaseIntent.ESTA_SEMANA
-        elif t in ("pi_mes", "mes o más", "mes o mas", "este mes o más", "este mes o mas"):
+        elif t in (
+            "pi_mes",
+            "mes o más",
+            "mes o mas",
+            "este mes o más",
+            "este mes o mas",
+        ):
             fsm_answers["purchase_intent"] = PurchaseIntent.MES_O_MAS
         else:
             return _invalid_input(fsm_answers, error_count, current_step)

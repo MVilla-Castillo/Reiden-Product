@@ -141,3 +141,81 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
     data = [_serialize_session(s) for s in sessions]
 
     return JsonResponse({"pending_leads": data}, status=200)
+
+
+def tenant_settings_api(request: HttpRequest) -> JsonResponse:
+    """
+    API para obtener y actualizar configuración del tenant.
+    GET: Retorna configuración actual (incluyendo routing_mode).
+    PATCH: Actualiza el modo de asignación (MANUAL/AUTO).
+    """
+    tenant = getattr(request, "tenant", None)
+    if not tenant:
+        return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    tenant_repo = DIContainer.instance().tenant_repo
+
+    if request.method == "GET":
+        tenant_data = tenant_repo.find_by_id(tenant.id)
+        if not tenant_data:
+            return JsonResponse({"error": "Tenant no encontrado."}, status=404)
+
+        return JsonResponse(
+            {
+                "tenant_id": str(tenant_data["id"]),
+                "nombre_legal": tenant_data["nombre_legal"],
+                "routing_mode": tenant_data["routing_mode"],
+                "is_verified": tenant_data["is_verified"],
+            },
+            status=200,
+        )
+
+    if request.method == "PATCH":
+        from crm.models import AppUser
+
+        user = getattr(request, "user", None)
+        if not user:
+            return JsonResponse({"error": "Usuario no autenticado."}, status=401)
+
+        if user.role != AppUser.Role.MANAGER:
+            return JsonResponse(
+                {"error": "Solo administradores pueden cambiar la configuración."},
+                status=403,
+            )
+
+        import json
+
+        try:
+            body = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido."}, status=400)
+
+        new_routing_mode = body.get("routing_mode")
+        if new_routing_mode is None:
+            return JsonResponse(
+                {"error": "routing_mode es requerido."},
+                status=400,
+            )
+
+        if new_routing_mode not in ("MANUAL", "AUTO"):
+            return JsonResponse(
+                {"error": "routing_mode debe ser MANUAL o AUTO."},
+                status=400,
+            )
+
+        success = tenant_repo.update_routing_mode(tenant.id, new_routing_mode)
+        if not success:
+            return JsonResponse(
+                {"error": "Error al actualizar routing_mode."},
+                status=500,
+            )
+
+        return JsonResponse(
+            {
+                "message": f"Modo de asignación cambiado a {new_routing_mode}",
+                "routing_mode": new_routing_mode,
+            },
+            status=200,
+        )
+
+    return JsonResponse({"error": "Method Not Allowed"}, status=405)

@@ -46,6 +46,8 @@ class SessionEntity:
     assigned_at: datetime | None = None
     first_response_at: datetime | None = None
     closed_at: datetime | None = None
+    acquisition_source: str | None = None
+    utm_metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime | None = None
     updated_at: datetime | None = None
     is_deleted: bool = False

@@ -42,11 +42,15 @@ class ChangeSessionStatusUseCase:
         session_id: UUID,
         tenant_id: UUID,
         new_status: str,
+        lost_reason: str | None = None,
     ) -> ChangeSessionStatusResult | None:
         if new_status not in VALID_CLOSE_STATUSES:
             raise ValueError(
                 f"Estado no válido: '{new_status}'. Solo se permiten: {VALID_CLOSE_STATUSES}"
             )
+
+        if new_status == "PERDIDO" and not lost_reason:
+            raise ValueError("lost_reason es obligatorio para estado PERDIDO")
 
         old_session = self._session_repo.find_by_id(session_id, tenant_id)
         if old_session is None:
@@ -55,7 +59,9 @@ class ChangeSessionStatusUseCase:
         old_status = old_session.status
 
         with transaction.atomic():
-            result = self._session_repo.change_status(session_id, tenant_id, new_status)
+            result = self._session_repo.change_status(
+                session_id, tenant_id, new_status, lost_reason=lost_reason
+            )
             if result is None:
                 return None
 
@@ -65,7 +71,10 @@ class ChangeSessionStatusUseCase:
                     tenant_id=tenant_id,
                     action="STATUS_CHANGED",
                     old_value={"status": old_status},
-                    new_value={"status": new_status},
+                    new_value={
+                        "status": new_status,
+                        "lost_reason": lost_reason,
+                    },
                 )
             )
 

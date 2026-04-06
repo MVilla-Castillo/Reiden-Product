@@ -24,6 +24,7 @@ from crm.adapters.database.repositories import (
     DjangoUserRepository,
 )
 from crm.adapters.messaging.twilio_adapter import TwilioMessageProvider
+from crm.adapters.push import NoOpPushAdapter
 from crm.adapters.task_queue.gcp_tasks_adapter import (
     GcpCloudTasksQueue,
     HttpDispatchQueue,
@@ -38,6 +39,7 @@ from crm.domain.ports import (
     LeadRepository,
     MessageProvider,
     MessageRepository,
+    PushAdapter,
     SessionRepository,
     TaskQueue,
     TenantRepository,
@@ -65,6 +67,7 @@ class DIContainer:
     _send_outbound_message_use_case: SendOutboundMessageUseCase | None = None
     _assign_lead_use_case: AssignLeadUseCase | None = None
     _change_session_status_use_case: ChangeSessionStatusUseCase | None = None
+    _push_adapter: PushAdapter | None = None
 
     @classmethod
     def instance(cls) -> DIContainer:
@@ -209,6 +212,15 @@ class DIContainer:
                 audit_logger=self.audit_logger,
             )
         return self._change_session_status_use_case
+
+    @property
+    def push_adapter(self) -> PushAdapter:
+        if self._push_adapter is None:
+            self._push_adapter = NoOpPushAdapter()
+        return self._push_adapter
+
+    def set_push_adapter(self, adapter: PushAdapter) -> None:
+        self._push_adapter = adapter
 
     def _get_tenant_phone_number_from_settings(self) -> str:
         """

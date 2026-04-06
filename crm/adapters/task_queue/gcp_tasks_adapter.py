@@ -38,6 +38,14 @@ class TaskQueueError(Exception):
 class GcpCloudTasksQueue(TaskQueue):
     """Adapter de producción: encola payloads en GCP Cloud Tasks."""
 
+    _client: tasks_v2.CloudTasksClient | None = None
+
+    @property
+    def client(self) -> tasks_v2.CloudTasksClient:
+        if self._client is None:
+            self._client = tasks_v2.CloudTasksClient()
+        return self._client
+
     def enqueue(self, request: EnqueueRequest) -> EnqueueResult:
         project: str = settings.GCP_PROJECT_ID
         location: str = settings.GCP_LOCATION
@@ -49,8 +57,7 @@ class GcpCloudTasksQueue(TaskQueue):
         )
 
         try:
-            client = tasks_v2.CloudTasksClient()
-            parent = client.queue_path(project, location, queue)
+            parent = self.client.queue_path(project, location, queue)
         except Exception as exc:
             if settings.DEBUG:
                 fallback = HttpDispatchQueue()
@@ -82,7 +89,7 @@ class GcpCloudTasksQueue(TaskQueue):
             }
 
         try:
-            task: Task = client.create_task(
+            task: Task = self.client.create_task(
                 request={"parent": parent, "task": task_config}
             )
             logger.info(

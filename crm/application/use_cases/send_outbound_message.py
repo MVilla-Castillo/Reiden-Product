@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+import sentry_sdk
 from django.utils import timezone
 
 from crm.domain.ports import (
@@ -107,6 +108,14 @@ class SendOutboundMessageUseCase:
                     "component_name": "send_outbound_message_use_case",
                     "session_id": str(session_id),
                 },
+            )
+            sentry_sdk.capture_exception(
+                extra={
+                    "component_name": "send_outbound_message_use_case",
+                    "session_id": str(session_id),
+                    "tenant_id": str(tenant_id),
+                    "failed_provider_message_id": send_result.provider_message_id,
+                }
             )
             raise MessageDeliveryError("Fallo al enviar mensaje por Twilio")
 

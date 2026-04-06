@@ -28,10 +28,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env(
-    "SECRET_KEY",
-    default="django-insecure-cm#!)y6@9f_^)twirr^%1ti*_^x3-)yuq5axgviejec&g+t&px",
-)
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
@@ -53,6 +50,30 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 
+# CORS Configuration (Angular Frontend — SRE Hardening)
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-trace-id",
+]
+
+# Cache Backend (JWKS caching for OIDC — LocMemCache for single-instance Cloud Run)
+# For multi-instance deployments, switch to Redis/Memcached.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "ccrm-jwks-cache",
+        "TIMEOUT": 86400,  # 24h — aligns with JWKS refresh interval
+    }
+}
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -62,6 +83,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     # Local Apps
     "crm",
     # PostgreSQL-specific features (GinIndex for JSONB)
@@ -72,6 +94,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "core.log_utils.TraceIDMiddleware",
     "core.metrics.REDMetricsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -250,16 +273,15 @@ LOGGING = {
 
 # Sentry Integration (Observability & Error Tracking)
 import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
+        integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        # Set profiles_sample_rate to 1.0 to profile 100%
-        # of sampled transactions.
         profiles_sample_rate=1.0,
         environment="production" if not DEBUG else "development",
+        send_default_pii=False,
     )

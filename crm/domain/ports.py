@@ -31,6 +31,7 @@ __all__ = [
     "UserRepository",
     "AuditLogger",
     "TenantRepository",
+    "PushAdapter",
 ]
 
 
@@ -100,6 +101,17 @@ class AuditEntry:
     old_value: dict[str, Any]
     new_value: dict[str, Any]
     actor_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class SessionExpirationInfo:
+    """DTO con información de expiración de sesión para AuditLog."""
+
+    session_id: UUID
+    tenant_id: UUID
+    old_status: str
+    new_status: str
+    lost_reason: str
 
 
 # ─────────────────────────────────────────────────────────
@@ -187,7 +199,11 @@ class SessionRepository(Protocol):
         ...
 
     def change_status(
-        self, session_id: UUID, tenant_id: UUID, new_status: str
+        self,
+        session_id: UUID,
+        tenant_id: UUID,
+        new_status: str,
+        lost_reason: str | None = None,
     ) -> SessionEntity | None:
         """Cambia el estado de una sesión. Retorna None si no existe."""
         ...
@@ -212,16 +228,14 @@ class SessionRepository(Protocol):
 
     def expire_if_inactive(
         self, tenant_id: UUID, lead_id: UUID, hours: int = 24
-    ) -> SessionEntity | None:
-        """Marca como ABANDONO_BOT si inactiva >hours. Retorna None si expiró."""
+    ) -> SessionEntity | SessionExpirationInfo | None:
+        """Marca como ABANDONO_BOT/PERDIDO si inactiva >hours. Retorna SessionEntity si activa, SessionExpirationInfo si expiró, None si no existe."""
         ...
 
-    def check_session_expired(self, session_id: UUID, hours: int = 24) -> bool:
-        """Verifica si una sesión activa ha expirado por inactividad."""
-        ...
-
-    def mark_as_abandoned(self, session_id: UUID, tenant_id: UUID) -> None:
-        """Marca una sesión como ABANDONO_BOT dentro de un tenant."""
+    def mark_as_abandoned(
+        self, session_id: UUID, tenant_id: UUID
+    ) -> SessionExpirationInfo | None:
+        """Marca una sesión como ABANDONO_BOT dentro de un tenant. Retorna info para AuditLog o None si no existe."""
         ...
 
     def get_funnel_metrics(
@@ -263,7 +277,23 @@ class SessionRepository(Protocol):
         self, tenant_id: UUID, date_from: date, date_to: date
     ) -> list[dict[str, Any]]:
         """
-        Retorna performance por vendedor.
+        Retorna performance por vendedor con ranking_position.
+        """
+        ...
+
+    def get_expired_sessions(
+        self, tenant_id: UUID, hours: int = 168, status_filter: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Retorna sesiones inactivas por más de `hours` para limpieza programada.
+        status_filter: filtra por estado específico (ej: 'BOT', 'CON_VENDEDOR').
+        """
+        ...
+
+    def get_sessions_near_ttl_expiry(self, hours: int = 166) -> list[dict[str, Any]]:
+        """
+        Retorna sesiones CON_VENDEDOR cerca de expirar TTL de 7 días (168h).
+        hours: umbral inferior de la ventana de alerta (default 166h = 7d - 2h).
         """
         ...
 
@@ -331,4 +361,33 @@ class TenantRepository(Protocol):
 
     def find_by_id(self, tenant_id: UUID) -> dict[str, Any] | None:
         """Busca un Tenant por su ID y retorna sus datos."""
+        ...
+
+    def update_routing_mode(self, tenant_id: UUID, routing_mode: str) -> bool:
+        """Actualiza el modo de asignación de leads (MANUAL/AUTO)."""
+        ...
+
+
+class PushAdapter(Protocol):
+    """Puerto para notificaciones push (FCM, APNs, etc.)."""
+
+    def send_assignment_notification(
+        self,
+        user_id: UUID,
+        session_id: UUID,
+        tenant_id: UUID,
+        lead_id: UUID,
+    ) -> bool:
+        """Notifica al vendedor que se le asignó un nuevo lead."""
+        ...
+
+    def send_ttl_warning(
+        self,
+        user_id: UUID,
+        session_id: UUID,
+        tenant_id: UUID,
+        lead_id: UUID,
+        hours_remaining: int,
+    ) -> bool:
+        """Advierte al vendedor que el TTL de 24h está por expirar."""
         ...

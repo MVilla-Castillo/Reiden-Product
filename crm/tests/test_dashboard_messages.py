@@ -357,7 +357,7 @@ def test_change_status_to_perdido(
     with OVERM:
         response = client.patch(
             f"/api/dashboard/leads/{con_vendedor_session.id}/status/",
-            data=json.dumps({"status": "PERDIDO"}),
+            data=json.dumps({"status": "PERDIDO", "lost_reason": "No responde"}),
             content_type="application/json",
         )
 

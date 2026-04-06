@@ -329,6 +329,8 @@ def test_session_expire_if_inactive_expired(
     from datetime import timedelta
     from django.utils import timezone
 
+    from crm.domain.ports import SessionExpirationInfo
+
     session = ChatSession.objects.create(
         tenant=tenant, lead=lead, status=ChatSession.Status.BOT
     )
@@ -339,7 +341,11 @@ def test_session_expire_if_inactive_expired(
 
     result = session_repo.expire_if_inactive(tenant.id, lead.id, hours=24)
 
-    assert result is None
+    assert isinstance(result, SessionExpirationInfo)
+    assert result.session_id == session.id
+    assert result.old_status == "BOT"
+    assert result.new_status == "ABANDONO_BOT"
+    assert result.lost_reason == "Abandono en FSM"
     session.refresh_from_db()
     assert session.status == "ABANDONO_BOT"
 

@@ -3,6 +3,7 @@ crm/views/metrics.py — Endpoint de Métricas para Dashboard Gerencial.
 
 Expone datos agregados para análisis de embudo, distribución FSM,
 métricas de tiempo y performance por vendedor.
+Protegido con rate limiting (30 req/min por tenant).
 """
 
 from datetime import date
@@ -10,6 +11,7 @@ from datetime import date
 from django.http import HttpRequest, JsonResponse
 
 from core.date_utils import get_date_range_from_filter, parse_date_param
+from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 
 
@@ -21,6 +23,13 @@ def metrics_api(request: HttpRequest) -> JsonResponse:
     tenant = getattr(request, "tenant", None)
     if not tenant:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    rate_key = f"metrics:{tenant.id}"
+    if not check_rate_limit(rate_key, max_requests=30, window=60):
+        return JsonResponse(
+            {"error": "Demasiadas peticiones a métricas. Intenta en 1 minuto."},
+            status=429,
+        )
 
     date_filter = request.GET.get("date_filter")
     date_from_param = request.GET.get("date_from")

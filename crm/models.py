@@ -208,6 +208,17 @@ class ChatSession(models.Model):
     closed_at = models.DateTimeField(
         blank=True, null=True, help_text="Timestamp de cierre (GANADO/PERDIDO/ABANDONO)"
     )
+    acquisition_source = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Fuente de adquisición (ad, referral, organic)",
+    )
+    utm_metadata = JSONField(
+        default=dict,
+        blank=True,
+        help_text="Metadatos UTM del referral (utm_source, utm_medium, etc.)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
@@ -332,3 +343,39 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} on {self.session_id}"
+
+
+class WebhookRateLimit(models.Model):
+    """Rate limiting DB-based para el webhook de Twilio (sin Redis)."""
+
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name="webhook_rate_limits"
+    )
+    wa_id_hash = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="SHA-256 hash del WaId para agrupar por remitente",
+    )
+    window_start = models.DateTimeField(
+        db_index=True,
+        help_text="Inicio de la ventana de rate limit",
+    )
+    request_count = models.IntegerField(
+        default=1,
+        help_text="Cantidad de requests en la ventana actual",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["tenant", "wa_id_hash", "window_start"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "wa_id_hash", "window_start"],
+                name="unique_rate_limit_per_window",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"RateLimit-{self.wa_id_hash[:8]} count={self.request_count}"

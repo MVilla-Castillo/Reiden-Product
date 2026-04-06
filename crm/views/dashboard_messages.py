@@ -233,10 +233,18 @@ def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonRes
     if not new_status:
         return JsonResponse({"error": "status es requerido"}, status=400)
 
+    lost_reason = body.get("lost_reason")
+    if new_status == "PERDIDO" and not lost_reason:
+        return JsonResponse(
+            {"error": "lost_reason es obligatorio para estado PERDIDO"}, status=400
+        )
+
     use_case = DIContainer.instance().change_session_status_use_case
 
     try:
-        result = use_case.execute(session_id, request.tenant.id, new_status)
+        result = use_case.execute(
+            session_id, request.tenant.id, new_status, lost_reason=lost_reason
+        )
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
 

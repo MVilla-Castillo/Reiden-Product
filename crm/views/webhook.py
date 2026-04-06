@@ -3,10 +3,11 @@ crm/views/webhook.py — Vista delgada: valida firma, filtra tipo y encola via T
 
 Responsabilidades únicas:
 1. Validar firma Twilio via MessageProvider port
-2. Rechazar multimedia temprano (solo texto soportado)
-3. Construir payload limpio con limites por campo
-4. Encolar via TaskQueue port
-5. Responder a Twilio
+2. Rate limiting DB-based por tenant + wa_id_hash
+3. Rechazar multimedia temprano (solo texto soportado)
+4. Construir payload limpio con limites por campo
+5. Encolar via TaskQueue port
+6. Responder a Twilio
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from crm.domain.ports import (
     SendMessageRequest,
     SignatureValidationRequest,
 )
+from crm.services.rate_limiter import RateLimitExceeded, check_rate_limit
 from core.log_utils import trace_id_var
 
 logger = logging.getLogger(__name__)
@@ -115,6 +117,42 @@ def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
             extra={"component_name": "twilio_webhook_view"},
         )
         return JsonResponse({"error": "Bad Request: MessageSid requerido"}, status=400)
+
+    # Rate limiting DB-based por tenant + wa_id_hash
+    _to_raw = request.POST.get("To", "").replace("whatsapp:", "").lstrip("+")
+    _wa_id_raw = request.POST.get("WaId", "") or request.POST.get("From", "").replace(
+        "whatsapp:", ""
+    ).lstrip("+")
+    if _to_raw and _wa_id_raw:
+        from crm.models import Tenant
+
+        _tenant_id = (
+            Tenant.objects.filter(phone_number_id=_to_raw, is_verified=True)
+            .values_list("id", flat=True)
+            .first()
+        )
+        if _tenant_id is not None:
+            try:
+                check_rate_limit(
+                    tenant_id=_tenant_id,
+                    wa_id_raw=_wa_id_raw,
+                    max_requests=30,
+                    window_seconds=60,
+                )
+            except RateLimitExceeded as e:
+                logger.warning(
+                    "Webhook: Rate limit excedido.",
+                    extra={
+                        "component_name": "twilio_webhook_view",
+                        "message_sid": message_sid,
+                        "retry_after": e.retry_after,
+                    },
+                )
+                return JsonResponse(
+                    {"error": "Rate limit exceeded", "retry_after": e.retry_after},
+                    status=429,
+                    headers={"Retry-After": str(e.retry_after)},
+                )
 
     # Filtrar tipo de mensaje: solo texto permitido
     raw_type = request.POST.get("MessageType", "text").lower()

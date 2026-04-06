@@ -14,7 +14,7 @@ _TEST_ENCRYPTION_KEY = Fernet.generate_key().decode()
 os.environ["WA_ID_ENCRYPTION_KEY"] = _TEST_ENCRYPTION_KEY
 
 import pytest
-from crm.models import Tenant, Lead, ChatSession
+from crm.models import Tenant, Lead, ChatSession, AppUser
 import hashlib
 from core.crypto import encrypt, reset_fernet
 
@@ -60,4 +60,16 @@ def active_session(db, tenant: Tenant, lead: Lead) -> ChatSession:
         tenant=tenant,
         lead=lead,
         status=ChatSession.Status.BOT,
+    )
+
+
+@pytest.fixture
+def salesperson(db, tenant: Tenant) -> AppUser:
+    """Fixture: Vendedor de prueba para asignar a sesiones."""
+    return AppUser.objects.create(
+        tenant=tenant,
+        email="vendedor@test.com",
+        role=AppUser.Role.SALESPERSON,
+        oidc_sub="test-salesperson-sub",
+        oidc_issuer="accounts.google.com",
     )
