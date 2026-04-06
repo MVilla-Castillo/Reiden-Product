@@ -1,0 +1,148 @@
+============================================
+ DOCUMENTACIÓN DE ENDPOINTS CRM
+============================================
+
+Este documento describe la estructura de los Endpoints de Django expuestos para el Frontend. 
+Base URL: http://localhost:8000/api
+
+--------------------------------------------
+1. DASHBOARD GERENCIAL
+--------------------------------------------
+
+1.1 Obtener Métricas Generales
+[GET] /dashboard/metrics/
+Auth: Requerida (Bearer Token)
+Req Body: n/a
+Res Body (JSON):
+{
+  "responseTime": { "value": "2 min", "trend": "-81.3%" },
+  "closeRate": { "value": "28%", "trend": "+28%" },
+  "activeLeads": { "value": 50, "trend": "-1.4%" },
+  "pendingAssignments": { "value": 75, "trend": "-3.1%" }
+}
+
+1.2 Obtener/Cambiar Enrutamiento Global
+[GET] /dashboard/settings/
+[PATCH] /dashboard/settings/
+Auth: Requerida (Rol Admin)
+Req Body (Para PATCH):
+{
+  "routingMode": "Auto" | "Manual"
+}
+Res Body (JSON):
+{
+  "routingMode": "Auto",
+  "updatedAt": "2026-04-06T15:00:00Z"
+}
+
+1.3 Listar Leads Pendientes de Asignación
+[GET] /dashboard/leads/pending/
+Auth: Requerida
+Req Body: n/a
+Res Body (JSON):
+[
+  {
+    "id": "uuid",
+    "name": "Julián Castro",
+    "vehicle": "Ford F-150",
+    "source": "Web",
+    "received": "12:45 pm",
+    "status": "Normal",
+    "urgency": "hito" | "medium" | "normal"
+  }
+]
+
+1.4 Listar Clasificación de Vendedores (Sales Ranking)
+[GET] /dashboard/salespeople/
+Auth: Requerida
+Req Body: n/a
+Res Body (JSON):
+[
+  {
+    "id": "uuid",
+    "rank": 1,
+    "name": "Javier Reidenbach",
+    "score": 15,
+    "avatar": "https://url.to/avatar.jpg"
+  }
+]
+
+--------------------------------------------
+2. PANEL VENDEDOR (CHAT INTERFAZ)
+--------------------------------------------
+
+2.1 Listar Chats Asignados
+[GET] /dashboard/leads/
+Auth: Requerida (Tokens de Vendedor)
+Req Body: n/a
+Res Body (JSON):
+[
+  {
+    "id": "session_uuid",
+    "name": "Sarah Jones",
+    "avatar": "https://url.to/avatar.jpg",
+    "vehicle": "Ford Mustang Mach-E",
+    "lastMessage": "Estaba pensando en color rojo...",
+    "time": "7:00 AM",
+    "status": "Activo" | "En espera",
+    "profile": {
+        "paymentMethod": "Financiamiento",
+        "budget": "$7M a $14M",
+        "urgency": "Alta",
+        "phone": "(813) 215-1378",
+        "email": "sarah@gmail.com"
+    }
+  }
+]
+
+2.2 Obtener Historial de Mensajes de un Chat
+[GET] /dashboard/leads/<session_uuid>/messages/
+Auth: Requerida
+Req Body: n/a
+Res Body (JSON):
+[
+  {
+    "sender": "cliente" | "vendedor",
+    "avatar": "https://url.to/avatar.jpg",
+    "text": "mensaje de prueba",
+    "timestamp": "2026-04-06T15:00:00Z"
+  }
+]
+
+2.3 Enviar Mensaje a un Chat
+[POST] /dashboard/leads/<session_uuid>/messages/send/
+Auth: Requerida
+Req Body (JSON):
+{
+  "text": "El precio estimado es de..."
+}
+Res Body (JSON):
+{
+  "status": "success",
+  "messageObg": {
+    "sender": "vendedor",
+    "text": "El precio estimado es de..."
+  }
+}
+
+2.4 Auto-Asignarse un Chat (Manual)
+[POST] /dashboard/leads/<session_uuid>/assign/
+Auth: Requerida
+Req Body: n/a
+Res Body (JSON):
+{
+  "status": "assigned",
+  "agent_id": "uuid_vendedor"
+}
+
+2.5 Dar por Terminado / Cambiar Estado del Oportunidad
+[PATCH] /dashboard/leads/<session_uuid>/status/
+Auth: Requerida
+Req Body (JSON):
+{
+  "status": "GANADO" | "PERDIDO"
+}
+Res Body (JSON):
+{
+  "status": "GANADO"
+}

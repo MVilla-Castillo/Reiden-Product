@@ -1,0 +1,64 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.sidebar-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #e0e4e8;
+}
+
+.app-logo img {
+  height: 32px;
+  object-fit: contain;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  color: #495057;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+  background-color: #f1f3f5;
+  color: #212529;
+}
+
+.nav-item.active {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-left-color: #212529;
+  font-weight: 600;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.nav-item.active .nav-icon {
+  stroke-width: 2.5;
+}
