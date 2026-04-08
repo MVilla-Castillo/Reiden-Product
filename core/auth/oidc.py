@@ -33,6 +33,7 @@ class OIDCStatelessMiddleware:
             "/api/webhooks/twilio/",
             "/api/workers/process-message/",
             "/api/schedulers/",  # Cloud Scheduler usa X-Internal-Secret
+            "/api/auth/dev/",  # Dev bypass endpoints
         )
         if any(request.path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return self.get_response(request)

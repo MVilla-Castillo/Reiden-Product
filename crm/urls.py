@@ -37,10 +37,18 @@ from crm.views.scheduler import (
     scheduler_cleanup_rate_limits_view,
     scheduler_ttl_warning_view,
 )
+from crm.views.dev_auth import dev_login_manager, dev_login_salesperson
 
 urlpatterns = [
     # Sprint 3: Endpoint de Ingesta de Webhooks Twilio (público, validado por firma HMAC)
     path("api/webhooks/twilio/", twilio_webhook_view, name="twilio_webhook"),
+    # Dev bypass para testing local
+    path("api/auth/dev/login/manager/", dev_login_manager, name="dev_login_manager"),
+    path(
+        "api/auth/dev/login/salesperson/",
+        dev_login_salesperson,
+        name="dev_login_salesperson",
+    ),
     # Sprint 3: Worker de Procesamiento (privado, validado por X-Internal-Secret)
     path(
         "api/workers/process-message/",

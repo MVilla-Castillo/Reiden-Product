@@ -1,5 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { interval, Subscription } from 'rxjs';
 import { CrmApiService } from '../../../core/services/crm-api.service';
 
 interface ChatPreview {
@@ -32,28 +34,50 @@ interface ClientProfile {
 @Component({
   selector: 'app-agent-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './agent-dashboard.component.html',
   styleUrl: './agent-dashboard.component.css'
 })
-export class AgentDashboardComponent implements OnInit {
+export class AgentDashboardComponent implements OnInit, OnDestroy {
   chats: ChatPreview[] = [];
   selectedChatId: string | null = null;
   messages: Message[] = [];
   profile: ClientProfile | null = null;
+  newMessage: string = '';
+
+  private pollingSubscription?: Subscription;
 
   constructor(private crmService: CrmApiService) {}
 
   ngOnInit() {
     this.fetchChats();
+    this.startPolling();
+  }
+
+  ngOnDestroy() {
+    this.stopPolling();
+  }
+
+  startPolling() {
+    this.pollingSubscription = interval(10000).subscribe(() => {
+      this.fetchChats();
+    });
+  }
+
+  stopPolling() {
+    this.pollingSubscription?.unsubscribe();
   }
 
   fetchChats() {
     this.crmService.getAssignedChats().subscribe({
-      next: (data) => {
-        if (data && data.length > 0) {
-          this.chats = data;
-          // Automatically select the first chat
+      next: (response) => {
+        const leads = response?.leads || [];
+        const activeChats = leads.filter((l: any) => 
+          l.status === 'CON_VENDEDOR' || l.status === 'PENDING_ASSIGNMENT'
+        );
+        this.chats = activeChats.map((lead: any) => this.mapChat(lead));
+        
+        if (this.chats.length > 0 && !this.selectedChatId) {
           this.selectChat(this.chats[0].id);
         }
       },
@@ -61,51 +85,72 @@ export class AgentDashboardComponent implements OnInit {
     });
   }
 
+  private mapChat(lead: any): ChatPreview {
+    const vehicleMap: Record<string, string> = {
+      'CITY_CAR': 'Auto City',
+      'SUV': 'SUV',
+      'SEDAN': 'Sedán',
+      'PICKUP': 'Pickup',
+    };
+    return {
+      id: lead.session_id,
+      name: lead.lead_phone_hash?.substring(0, 8) || 'Lead',
+      avatar: 'assets/logo-pagina-r.svg',
+      vehicle: vehicleMap[lead.vehicle_type] || lead.vehicle_type || '--',
+      lastMessage: lead.fsm_step || '',
+      time: this.formatDate(lead.updated_at),
+      status: lead.status === 'CON_VENDEDOR' ? 'Activo' : 'En espera',
+    };
+  }
+
+  private formatDate(dateStr: string): string {
+    if (!dateStr) return '--';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-CL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   selectChat(id: string) {
     this.selectedChatId = id;
-    this.messages = []; // clear current UI
-    
-    // Attempt to load profile embedded in chat list if any
-    const selected = this.chats.find(c => c.id === id);
-    if (selected && selected.profile) {
-      this.profile = selected.profile;
-    } else {
-      this.profile = null;
-    }
+    this.messages = [];
+    this.profile = null;
 
-    // Fetch messages for this session
     this.crmService.getChatMessages(id).subscribe({
       next: (data) => {
-        if (data) {
-          this.messages = data;
-        }
+        const msgs = data?.messages || [];
+        this.messages = msgs.map((m: any) => ({
+          sender: m.direction === 'OUTGOING' ? 'vendedor' : 'cliente',
+          avatar: 'assets/logo-pagina-r.svg',
+          text: m.text || m.body || '',
+          timestamp: m.created_at
+        }));
       },
       error: (err) => console.error(`Error loading messages for session ${id}`, err)
     });
   }
 
-  sendMessageAction(text: string) {
-    if (!this.selectedChatId || !text.trim()) return;
+  sendMessage() {
+    if (!this.selectedChatId || !this.newMessage.trim()) return;
 
-    this.crmService.sendMessage(this.selectedChatId, text).subscribe({
-      next: (res) => {
-        // Optimistically push the message to UI (or rely on response)
+    this.crmService.sendMessage(this.selectedChatId, this.newMessage).subscribe({
+      next: () => {
         this.messages.push({
           sender: 'vendedor',
-          avatar: '/assets/logo-pagina-r.png',
-          text: text
+          avatar: 'assets/logo-pagina-r.svg',
+          text: this.newMessage,
+          timestamp: new Date().toISOString()
         });
+        this.newMessage = '';
       },
       error: (err) => console.error('Error sending message', err)
     });
   }
 
-  updateLeadStatusAction(status: string) {
+  updateLeadStatus(status: string) {
     if (!this.selectedChatId) return;
 
     this.crmService.updateLeadStatus(this.selectedChatId, status).subscribe({
-      next: (res) => {
-         console.log('Status updated to', status);
+      next: () => {
+        this.fetchChats();
       },
       error: (err) => console.error('Error updating status', err)
     });

@@ -104,7 +104,7 @@
                     <span class="urgency-badge" [ngClass]="lead.urgency">{{lead.urgency}}</span>
                   </td>
                   <td class="action-cell">
-                    <button class="take-lead-btn" (click)="takeLead('mock-uuid-1234')">
+                    <button class="take-lead-btn" (click)="takeLead(lead.sessionId)">
                       Tomar Lead
                     </button>
                   </td>
@@ -122,7 +122,7 @@
             <div class="ranking-list">
               <div class="ranking-item" *ngFor="let agent of salesRanking">
                 <span class="rank-number">{{agent.rank}}</span>
-                <img src="/assets/logo-pagina-r.png" alt="Avatar" class="agent-avatar"> <!-- mock avatar -->
+                <img src="assets/logo-pagina-r.svg" alt="Avatar" class="agent-avatar">
                 <div class="agent-info">
                   <div class="agent-name">{{agent.name}}</div>
                   <div class="progress-bar-container">
