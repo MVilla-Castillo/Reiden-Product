@@ -1,0 +1,45 @@
+<div class="dashboard">
+  <header class="dashboard-header">
+    <h1>Panel de {{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
+    <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
+  </header>
+
+  @if (isManager()) {
+    <section class="kpi-section">
+      <app-kpi-card 
+        icon="🤖" 
+        [value]="metrics().leadsInBotFlow" 
+        label="Leads en Flujo Bot">
+      </app-kpi-card>
+      <app-kpi-card 
+        icon="⚠️" 
+        [value]="metrics().pendingAssignment" 
+        label="Pendientes de Asignación"
+        [critical]="metrics().pendingAssignment > 0">
+      </app-kpi-card>
+      <app-kpi-card 
+        icon="👔" 
+        [value]="metrics().leadsInCommercialManagement" 
+        label="En Gestión Comercial">
+      </app-kpi-card>
+      <app-kpi-card 
+        icon="🎯" 
+        [value]="metrics().conversions" 
+        label="Conversiones (Ganados)">
+      </app-kpi-card>
+    </section>
+  }
+
+  <section class="leads-section">
+    <div class="section-header">
+      <h2>{{ isManager() ? 'Gestión de Leads' : 'Mis Leads' }}</h2>
+      <span class="lead-count">{{ leads().length }} registros</span>
+    </div>
+    <app-leads-grid 
+      [leads]="leads()" 
+      [salesPersons]="salesPersons()"
+      [canAssign]="isManager()"
+      (assign)="onAssignLead($event)">
+    </app-leads-grid>
+  </section>
+</div>

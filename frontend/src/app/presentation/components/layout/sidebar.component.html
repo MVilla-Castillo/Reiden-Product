@@ -1,0 +1,54 @@
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">CC</div>
+    <span class="logo-text">CCRM</span>
+  </div>
+
+  <div class="role-toggle">
+    <div class="toggle-label">Cambiar Rol (Bypass)</div>
+    <div class="toggle-switch">
+      <button 
+        [class.active]="session.currentRole() === 'manager'"
+        (click)="setRole('manager')">
+        Gerente
+      </button>
+      <button 
+        [class.active]="session.currentRole() === 'sales'"
+        (click)="setRole('sales')">
+        Vendedor
+      </button>
+    </div>
+  </div>
+
+  <nav class="nav-section">
+    <div class="nav-title">Principal</div>
+    @for (item of navItems; track item.route) {
+      <a class="nav-item" [class.active]="item.active">
+        <span class="nav-icon">{{ item.icon }}</span>
+        {{ item.label }}
+      </a>
+    }
+  </nav>
+
+  <nav class="nav-section">
+    <div class="nav-title">Configuración</div>
+    <a class="nav-item">
+      <span class="nav-icon">⚙️</span>
+      Ajustes
+    </a>
+    <a class="nav-item">
+      <span class="nav-icon">👤</span>
+      Perfil
+    </a>
+  </nav>
+
+  <div class="nav-divider"></div>
+
+  <div class="user-profile">
+    <div class="avatar">JD</div>
+    <div class="user-info">
+      <div class="user-name">Juan Demo</div>
+      <div class="user-role">{{ session.currentRole() === 'manager' ? 'Gerente' : 'Vendedor' }}</div>
+    </div>
+  </div>
+</aside>

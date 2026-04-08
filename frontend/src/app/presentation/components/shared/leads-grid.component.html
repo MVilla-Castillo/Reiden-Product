@@ -1,0 +1,71 @@
+<div class="leads-table-container">
+  <table class="leads-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Empresa</th>
+        <th>Origen</th>
+        <th>Estado</th>
+        <th>Tiempo Espera</th>
+        <th>Vendedor</th>
+        @if (canAssign) {
+          <th>Acción</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @for (lead of leads; track lead.id) {
+        <tr>
+          <td class="cell-id">{{ lead.id }}</td>
+          <td class="cell-name">{{ lead.name }}</td>
+          <td>{{ lead.company }}</td>
+          <td>
+            <span class="source-badge" [attr.data-source]="lead.source">{{ lead.source }}</span>
+          </td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(lead.status)">
+              {{ getStatusLabel(lead.status) }}
+            </span>
+          </td>
+          <td>
+            @if (lead.waitingTime > 0) {
+              <span class="waiting-time">{{ lead.waitingTime }}h</span>
+            } @else {
+              <span class="waiting-time resolved">-</span>
+            }
+          </td>
+          <td>
+            <span [class.unassigned]="!lead.assignedTo">
+              {{ getSalesPersonName(lead.assignedTo) }}
+            </span>
+          </td>
+          @if (canAssign) {
+            <td class="cell-action">
+              <div class="dropdown-wrapper">
+                <button 
+                  class="assign-btn" 
+                  (click)="toggleDropdown(lead.id)"
+                  [class.active]="openDropdownId() === lead.id">
+                  Asignar
+                </button>
+                @if (openDropdownId() === lead.id) {
+                  <div class="dropdown-menu">
+                    @for (sp of salesPersons; track sp.id) {
+                      <button 
+                        class="dropdown-item"
+                        (click)="onAssign(lead.id, sp.id)">
+                        <span class="sp-name">{{ sp.name }}</span>
+                        <span class="sp-load">{{ sp.activeLeadsCount }} leads</span>
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

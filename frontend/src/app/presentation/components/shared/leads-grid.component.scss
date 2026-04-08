@@ -1,0 +1,210 @@
+.leads-table-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.leads-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Inter', sans-serif;
+  
+  thead {
+    background: #f9fafb;
+    
+    th {
+      padding: 1rem 1.25rem;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #e5e7eb;
+    }
+  }
+  
+  tbody {
+    tr {
+      border-bottom: 1px solid #f3f4f6;
+      transition: background 0.15s ease;
+      
+      &:hover {
+        background: #f9fafb;
+      }
+      
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+    
+    td {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #374151;
+      vertical-align: middle;
+    }
+  }
+}
+
+.cell-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.cell-name {
+  font-weight: 500;
+  color: #111827;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  
+  &[data-source="whatsapp"] {
+    background: #ecfdf5;
+    color: #059669;
+  }
+  
+  &[data-source="web"] {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+  
+  &[data-source="referral"] {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  
+  &[data-source="campaign"] {
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  &.status-bot {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+  
+  &.status-pending {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  
+  &.status-active {
+    background: #d1fae5;
+    color: #059669;
+  }
+  
+  &.status-won {
+    background: #dcfce7;
+    color: #16a34a;
+  }
+  
+  &.status-lost {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+}
+
+.waiting-time {
+  font-weight: 600;
+  color: #f59e0b;
+  
+  &.resolved {
+    color: #9ca3af;
+    font-weight: 400;
+  }
+}
+
+.unassigned {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.cell-action {
+  width: 120px;
+}
+
+.dropdown-wrapper {
+  position: relative;
+}
+
+.assign-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  
+  &:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+  
+  &.active {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #2563eb;
+  }
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  min-width: 200px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+  
+  &:hover {
+    background: #f3f4f6;
+  }
+  
+  .sp-name {
+    font-size: 0.875rem;
+    color: #111827;
+    font-weight: 500;
+  }
+  
+  .sp-load {
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+}
