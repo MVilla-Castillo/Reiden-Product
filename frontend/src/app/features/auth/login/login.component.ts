@@ -1,8 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -11,51 +9,26 @@ import { AuthService } from '../../../core/services/auth.service';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent {
   loginForm: FormGroup;
-  error: string | null = null;
 
-  constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router,
-    private route: ActivatedRoute
-  ) {
+  constructor(private fb: FormBuilder) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required]],
       password: ['', [Validators.required]]
     });
   }
 
-  ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
-      if (params['code']) {
-        this.handleOAuthCallback(params['code']);
-      }
-    });
-  }
-
   onSubmit() {
     if (this.loginForm.valid) {
-      this.error = 'Login manual no implementado. Use Google OAuth.';
+      console.log('Form Submitted', this.loginForm.value);
     } else {
+      // Mark all as touched to trigger validation messages if any
       this.loginForm.markAllAsTouched();
     }
   }
 
   loginWithGoogle() {
-    this.authService.loginWithGoogle();
-  }
-
-  loginAsManager() {
-    this.authService.loginAsManager();
-  }
-
-  loginAsSalesperson() {
-    this.authService.loginAsSalesperson();
-  }
-
-  private handleOAuthCallback(code: string) {
-    this.authService.handleOAuthCallback(code);
+    console.log('Google login triggered');
   }
 }

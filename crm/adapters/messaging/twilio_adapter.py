@@ -67,15 +67,14 @@ class TwilioMessageProvider(MessageProvider):
         )
 
         to_whatsapp = (
-            f"whatsapp:+{request.to_number.lstrip('+')}"
+            f"whatsapp:+{request.to_number}"
             if not request.to_number.startswith("whatsapp:")
-            else request.to_number.replace("whatsapp:+", "whatsapp:")
+            else request.to_number
         )
 
         from_number = request.from_number or "14155238886"
-        from_number = from_number.lstrip("+")
         from_whatsapp = (
-            f"whatsapp:{from_number}"
+            f"whatsapp:+{from_number}"
             if not from_number.startswith("whatsapp:")
             else from_number
         )
