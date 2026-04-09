@@ -22,10 +22,10 @@ export class ChatRepositoryService {
   private apiUrl = '/api/dashboard/leads';
 
   getMessages(sessionId: string, limit: number = 50, offset: number = 0): Observable<ChatSession> {
-    return this.http.get<ChatSession>(\`\${this.apiUrl}/\${sessionId}/messages/?limit=\${limit}&offset=\${offset}\`);
+    return this.http.get<ChatSession>(`${this.apiUrl}/${sessionId}/messages/?limit=${limit}&offset=${offset}`);
   }
 
   sendMessage(sessionId: string, body: string): Observable<any> {
-    return this.http.post<any>(\`\${this.apiUrl}/\${sessionId}/messages/send/\`, { body });
+    return this.http.post<any>(`${this.apiUrl}/${sessionId}/messages/send/`, { body });
   }
 }

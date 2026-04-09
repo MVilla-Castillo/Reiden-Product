@@ -9,10 +9,10 @@ export class LeadRepositoryService {
   private apiUrl = '/api/dashboard';
 
   getAll(): Observable<Lead[]> {
-    return this.http.get<{ leads: any[] }>(\`\${this.apiUrl}/leads/\`).pipe(
+    return this.http.get<{ leads: any[] }>(`${this.apiUrl}/leads/`).pipe(
       map(res => res.leads.map(l => ({
         id: l.session_id,
-        name: l.lead_phone_hash, // Use hash as name since we don't have it yet
+        name: l.lead_phone_hash,
         company: 'N/A',
         source: 'whatsapp',
         status: l.status as any,
@@ -24,13 +24,13 @@ export class LeadRepositoryService {
   }
 
   getSalesPersons(): Observable<SalesPerson[]> {
-    return this.http.get<{ salespeople: SalesPerson[] }>(\`\${this.apiUrl}/salespeople/\`).pipe(
+    return this.http.get<{ salespeople: SalesPerson[] }>(`${this.apiUrl}/salespeople/`).pipe(
       map(res => res.salespeople)
     );
   }
 
   assign(request: AssignLeadRequest): Observable<Lead> {
-    return this.http.post<any>(\`\${this.apiUrl}/leads/\${request.leadId}/assign/\`, {
+    return this.http.post<any>(`${this.apiUrl}/leads/${request.leadId}/assign/`, {
       salesperson_id: request.salesPersonId
     }).pipe(
       map(res => ({
@@ -47,8 +47,8 @@ export class LeadRepositoryService {
   }
 
   takeLead(leadId: string): Observable<Lead> {
-    return this.http.post<any>(\`\${this.apiUrl}/leads/\${leadId}/assign/\`, {
-      salesperson_id: 'AUTO' // Mock: using AUTO or a fixed manager ID for now
+    return this.http.post<any>(`${this.apiUrl}/leads/${leadId}/assign/`, {
+      salesperson_id: 'AUTO'
     }).pipe(
       map(res => ({
         id: res.session_id,
@@ -64,6 +64,6 @@ export class LeadRepositoryService {
   }
 
   getMetrics(): Observable<DashboardMetrics> {
-    return this.http.get<DashboardMetrics>(\`\${this.apiUrl}/metrics/\`);
+    return this.http.get<DashboardMetrics>(`${this.apiUrl}/metrics/`);
   }
 }

@@ -40,38 +40,13 @@ export class DashboardComponent implements OnInit {
   }
 
   setupPolling() {
-    // Poll every 10 seconds for updated lead data and metrics
     interval(10000).pipe(
       startWith(0),
       switchMap(() => {
-        // We can wrap multiple calls in a combined observable, but for simplicity:
         this.loadData();
-        return [null]; // trigger
+        return [null];
       })
     ).subscribe();
-  }
-
-  loadData() {
-    this.leadRepo.getAll().subscribe(leads => this.leads.set(leads));
-    this.leadRepo.getSalesPersons().subscribe(sp => this.salesPersons.set(sp));
-    this.leadRepo.getMetrics().subscribe(m => this.metrics.set(m));
-  }
-
-  onAssignLead(event: { leadId: string; salesPersonId: string }) {
-    this.leadRepo.assign(event).subscribe(() => {
-      this.loadData();
-    });
-  }
-
-  onTakeLead(leadId: string) {
-    this.leadRepo.takeLead(leadId).subscribe(() => {
-      this.loadData();
-    });
-  }
-}
-
-  ngOnInit() {
-    this.loadData();
   }
 
   loadData() {
