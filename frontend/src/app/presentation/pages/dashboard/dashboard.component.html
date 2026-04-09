@@ -35,11 +35,12 @@
       <h2>{{ isManager() ? 'Gestión de Leads' : 'Mis Leads' }}</h2>
       <span class="lead-count">{{ leads().length }} registros</span>
     </div>
-    <app-leads-grid 
-      [leads]="leads()" 
-      [salesPersons]="salesPersons()"
-      [canAssign]="isManager()"
-      (assign)="onAssignLead($event)">
-    </app-leads-grid>
+     <app-leads-grid 
+       [leads]="leads()" 
+       [salesPersons]="salesPersons()"
+       [canAssign]="isManager()"
+       (assign)="onAssignLead($event)"
+       (take)="onTakeLead($event)">
+     </app-leads-grid>
   </section>
 </div>

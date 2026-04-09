@@ -1,0 +1,25 @@
+<div class="login-container">
+  <div class="login-card">
+    <h2>Bienvenido a CCRM-SAAS</h2>
+    <p>Selecciona tu rol para ingresar al sistema</p>
+    
+    <div class="role-selection">
+      <button 
+        [class.active]="role === 'manager'" 
+        (click)="role = 'manager'" 
+        class="role-btn">
+        <span>👔</span> Gerente
+      </button>
+      <button 
+        [class.active]="role === 'sales'" 
+        (click)="role = 'sales'" 
+        class="role-btn">
+        <span>🎧</span> Vendedor
+      </button>
+    </div>
+
+    <button class="login-submit" (click)="login()">
+      Ingresar al Sistema
+    </button>
+  </div>
+</div>

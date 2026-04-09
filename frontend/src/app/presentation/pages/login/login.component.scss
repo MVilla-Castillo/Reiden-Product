@@ -1,0 +1,77 @@
+.login-container {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  font-family: 'Inter', sans-serif;
+}
+
+.login-card {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+h2 {
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+
+.role-selection {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.role-btn {
+  flex: 1;
+  padding: 20px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.role-btn span {
+  font-size: 1.5rem;
+}
+
+.role-btn.active {
+  border-color: #4f46e5;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 15px;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.login-submit:hover {
+  background: #4338ca;
+}

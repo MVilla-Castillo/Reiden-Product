@@ -11,8 +11,10 @@ facilitar i18n y evitar strings hardcodeados dispersos.
 
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from crm.services.fsm_types import (
     FSMStep,
@@ -112,6 +114,17 @@ def _clean_input(text: str) -> str:
     return text.strip().lower()
 
 
+def _match_input(text: str, patterns: list[str | Callable[[str], bool]]) -> bool:
+    """Verifica si el texto coincide con cualquiera de los patrones (string o función)."""
+    for pattern in patterns:
+        if isinstance(pattern, str):
+            if pattern == text or pattern in text:
+                return True
+        elif callable(pattern) and pattern(text):
+            return True
+    return False
+
+
 def _invalid_input(
     fsm_answers: dict[str, Any],
     error_count: int,
@@ -190,11 +203,11 @@ def advance_fsm(
     # VEHICLE_TYPE -> PAYMENT_METHOD
     if current_step == FSMStep.VEHICLE_TYPE:
         t = _clean_input(message_body)
-        if t in ("vt_citycar", "city car", "citycar"):
+        if _match_input(t, ["vt_citycar", "city car", "citycar", "urbano"]):
             fsm_answers["vehicle_type"] = VehicleType.CITY_CAR
-        elif t in ("vt_suv", "suv"):
+        elif _match_input(t, ["vt_suv", "suv", "camioneta"]):
             fsm_answers["vehicle_type"] = VehicleType.SUV
-        elif t in ("vt_sedan", "sedan", "sedán"):
+        elif _match_input(t, ["vt_sedan", "sedan", "sedán", "estándar"]):
             fsm_answers["vehicle_type"] = VehicleType.SEDAN
         else:
             fsm_answers["error_count"] = 0
@@ -217,11 +230,11 @@ def advance_fsm(
     # PAYMENT_METHOD -> BUDGET_RANGE
     if current_step == FSMStep.PAYMENT_METHOD:
         t = _clean_input(message_body)
-        if t in ("pm_contado", "contado"):
+        if _match_input(t, ["pm_contado", "contado", "efectivo"]):
             fsm_answers["payment_method"] = PaymentMethod.CONTADO
-        elif t in ("pm_credito", "crédito", "credito"):
+        elif _match_input(t, ["pm_credito", "crédito", "credito", "prestamo"]):
             fsm_answers["payment_method"] = PaymentMethod.CREDITO
-        elif t in ("pm_retoma", "retoma"):
+        elif _match_input(t, ["pm_retoma", "retoma", "canje"]):
             fsm_answers["payment_method"] = PaymentMethod.RETOMA
         else:
             return _invalid_input(fsm_answers, error_count, current_step)
@@ -238,17 +251,21 @@ def advance_fsm(
     # BUDGET_RANGE -> PURCHASE_INTENT
     if current_step == FSMStep.BUDGET_RANGE:
         t = _clean_input(message_body)
-        if t in ("br_7a14", "7m a 14m", "de 7 a 14 millones"):
+        if _match_input(t, ["br_7a14", "7m a 14m", "de 7 a 14 millones", "medio"]):
             fsm_answers["budget_range"] = BudgetRange.DE_7M_A_14M
-        elif t in (
-            "br_mas15",
-            "15m o más",
-            "15m o mas",
-            "más de 15 millones",
-            "mas de 15 millones",
+        elif _match_input(
+            t,
+            [
+                "br_mas15",
+                "15m o más",
+                "15m o mas",
+                "más de 15 millones",
+                "mas de 15 millones",
+                "alto",
+            ],
         ):
             fsm_answers["budget_range"] = BudgetRange.MAS_15M
-        elif t in ("br_menos6", "< 6m", "menos de 6 millones"):
+        elif _match_input(t, ["br_menos6", "< 6m", "menos de 6 millones", "bajo"]):
             fsm_answers["budget_range"] = BudgetRange.MENOS_6M
         else:
             return _invalid_input(fsm_answers, error_count, current_step)
@@ -265,16 +282,20 @@ def advance_fsm(
     # PURCHASE_INTENT -> QUALIFIED
     if current_step == FSMStep.PURCHASE_INTENT:
         t = _clean_input(message_body)
-        if t in ("pi_hoy", "hoy"):
+        if _match_input(t, ["pi_hoy", "hoy", "inmediato"]):
             fsm_answers["purchase_intent"] = PurchaseIntent.HOY
-        elif t in ("pi_semana", "esta semana"):
+        elif _match_input(t, ["pi_semana", "esta semana", "proxima semana"]):
             fsm_answers["purchase_intent"] = PurchaseIntent.ESTA_SEMANA
-        elif t in (
-            "pi_mes",
-            "mes o más",
-            "mes o mas",
-            "este mes o más",
-            "este mes o mas",
+        elif _match_input(
+            t,
+            [
+                "pi_mes",
+                "mes o más",
+                "mes o mas",
+                "este mes o más",
+                "este mes o mas",
+                "largo plazo",
+            ],
         ):
             fsm_answers["purchase_intent"] = PurchaseIntent.MES_O_MAS
         else:

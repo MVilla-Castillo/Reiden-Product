@@ -49,6 +49,11 @@
                   [class.active]="openDropdownId() === lead.id">
                   Asignar
                 </button>
+                @if (lead.status === 'pending_assignment') {
+                  <button class="take-btn" (click)="take.emit(lead.id)">
+                    Tomar
+                  </button>
+                }
                 @if (openDropdownId() === lead.id) {
                   <div class="dropdown-menu">
                     @for (sp of salesPersons; track sp.id) {

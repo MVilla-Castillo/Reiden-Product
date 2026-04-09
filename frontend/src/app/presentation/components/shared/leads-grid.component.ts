@@ -14,6 +14,7 @@ export class LeadsGridComponent {
   @Input() salesPersons: SalesPerson[] = [];
   @Input() canAssign = false;
   @Output() assign = new EventEmitter<{ leadId: string; salesPersonId: string }>();
+  @Output() take = new EventEmitter<string>();
 
   openDropdownId = signal<string | null>(null);
 
