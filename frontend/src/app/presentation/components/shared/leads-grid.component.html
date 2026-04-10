@@ -3,25 +3,25 @@
     <thead>
       <tr>
         <th>ID</th>
-        <th>Nombre</th>
+        <th>Contacto (Hash)</th>
         <th>Vehículo de Interés</th>
         <th>Origen</th>
         <th>Estado</th>
         <th>Recibido</th>
-        <th>Urgencia</th>
+        <th>Score (0-100)</th>
         @if (canAssign) {
           <th>Asignar A</th>
         }
       </tr>
     </thead>
     <tbody>
-      @for (lead of leads; track lead.id) {
+      @for (lead of leads; track lead.session_id) {
         <tr>
-          <td class="cell-id">{{ lead.id | slice:0:8 }}</td>
-          <td class="cell-name">{{ lead.name || 'Desconocido' }}</td>
-          <td>{{ lead.vehicle }}</td>
+          <td class="cell-id">{{ lead.session_id | slice:0:8 }}</td>
+          <td class="cell-name">{{ lead.lead_phone_hash | slice:0:12 }}...</td>
+          <td>{{ lead.vehicle_type || 'No especificado' }}</td>
           <td>
-            <span class="source-badge" [attr.data-source]="lead.source">{{ lead.source }}</span>
+            <span class="source-badge" data-source="FSM">Bot / FSM</span>
           </td>
           <td>
             <span class="status-badge status-{{ lead.status | lowercase }}">
@@ -29,19 +29,22 @@
             </span>
           </td>
           <td>
-            <span class="waiting-time">{{ lead.received }}</span>
+            <span class="waiting-time">{{ lead.created_at | date:'short' }}</span>
           </td>
           <td>
-            <span class="urgency-badge urgency-{{ lead.urgency | lowercase }}">
-              {{ lead.urgency | uppercase }}
+            <span class="urgency-badge" 
+                  [class.urgency-high]="lead.urgency_score > 60"
+                  [class.urgency-medium]="lead.urgency_score > 30 && lead.urgency_score <= 60"
+                  [class.urgency-normal]="lead.urgency_score <= 30">
+              {{ lead.urgency_score }} PTS
             </span>
           </td>
           @if (canAssign) {
             <td>
-              <select class="assign-select" (change)="onAssign(lead.id, $event)">
+              <select class="assign-select" (change)="onAssign(lead.session_id, $event)">
                 <option value="">Seleccionar Asesor...</option>
                 @for (sp of salesPersons; track sp.id) {
-                  <option value="{{ sp.id }}">{{ sp.name }} (Score: {{ sp.score }})</option>
+                  <option value="{{ sp.id }}">{{ sp.email }} (Activos: {{ sp.active_sessions_count }})</option>
                 }
               </select>
             </td>

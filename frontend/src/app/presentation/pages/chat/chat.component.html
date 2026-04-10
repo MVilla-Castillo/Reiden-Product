@@ -4,21 +4,22 @@
       <h2>Mis Chats Activos</h2>
     </div>
     <div class="chat-list">
-      @for (chat of chats(); track chat.id) {
+      @for (chat of chats(); track chat.session_id) {
         <div 
           class="chat-item" 
-          [class.active]="selectedSessionId() === chat.id"
+          [class.active]="selectedSessionId() === chat.session_id"
           (click)="selectLead(chat)">
           <div class="lead-info">
-            <span class="lead-name">{{ chat.name }}</span>
+            <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
             <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
           </div>
           <div class="lead-subinfo">
-            <small>{{ chat.vehicle }}</small>
+            <small>{{ chat.vehicle_type || 'Vehículo pdte.' }}</small>
           </div>
           <div class="lead-last-msg text-muted">
-            <small>{{ chat.lastMessage | slice:0:30 }}...</small>
-            <small class="time">{{ chat.time }}</small>
+             <!-- No backend field for last message preview exists, just showing time -->
+            <small>Últ. act:</small>
+            <small class="time">{{ chat.updated_at | date:'short' }}</small>
           </div>
         </div>
       }
@@ -32,8 +33,8 @@
     @if (selectedSession()) {
       <div class="chat-header">
         <div class="header-details">
-          <h3>Chat con {{ selectedSession()?.name }}</h3>
-          <span class="vehicle-badge">{{ selectedSession()?.vehicle }}</span>
+          <h3>Chat con Cliente {{ selectedSession()?.lead_phone_hash | slice:0:6 }}</h3>
+          <span class="vehicle-badge">{{ selectedSession()?.vehicle_type }}</span>
         </div>
         <div class="header-actions">
            <button class="btn btn-success mx-2" (click)="updateStatus('GANADO')">Venta Cerrada (Ganado)</button>
@@ -41,12 +42,12 @@
         </div>
       </div>
       <div class="messages-area">
-        @for (msg of messages(); track msg.timestamp) {
-          <div class="message" [ngClass]="msg.sender === 'vendedor' ? 'sent' : 'received'">
+        @for (msg of messages(); track msg.message_id) {
+          <div class="message" [ngClass]="msg.direction === 'OUTBOUND' ? 'sent' : 'received'">
             <div class="bubble">
-              {{ msg.text }}
+              {{ msg.body }}
             </div>
-            <span class="timestamp">{{ msg.timestamp }}</span>
+            <span class="timestamp">{{ msg.created_at | date:'shortTime' }}</span>
           </div>
         }
       </div>

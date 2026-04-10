@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Lead, Salesperson } from '../../../core/models/crm.models';
+import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
 
 @Component({
   selector: 'app-leads-grid',
@@ -10,8 +10,8 @@ import { Lead, Salesperson } from '../../../core/models/crm.models';
   styleUrl: './leads-grid.component.scss'
 })
 export class LeadsGridComponent {
-  @Input() leads: Lead[] = [];
-  @Input() salesPersons: Salesperson[] = [];
+  @Input() leads: SessionDto[] = [];
+  @Input() salesPersons: SalespersonDto[] = [];
   @Input() canAssign = false;
   
   @Output() assignLead = new EventEmitter<{leadId: string, agentId: string}>();

@@ -5,7 +5,7 @@ import { CrmApiService } from '../../../infrastructure/repositories/crm.api.serv
 import { SessionService } from '../../../core/services/session.service';
 import { KpiCardComponent } from '../../components/shared/kpi-card.component';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
-import { Lead, Salesperson, Metrics, TenantSettings } from '../../../core/models/crm.models';
+import { SessionDto, SalespersonDto, MetricsResponse, TenantSettings } from '../../../core/models/crm.models';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,15 +18,10 @@ export class DashboardComponent implements OnInit {
   crmApi = inject(CrmApiService);
   session = inject(SessionService);
 
-  leads = signal<Lead[]>([]);
-  salesPersons = signal<Salesperson[]>([]);
-  metrics = signal<Metrics>({
-    responseTime: { value: '0', trend: '0%' },
-    closeRate: { value: '0%', trend: '0%' },
-    activeLeads: { value: 0, trend: '0%' },
-    pendingAssignments: { value: 0, trend: '0%' }
-  });
-  tenantSettings = signal<TenantSettings>({ routingMode: 'Manual' });
+  leads = signal<SessionDto[]>([]);
+  salesPersons = signal<SalespersonDto[]>([]);
+  metrics = signal<MetricsResponse | null>(null);
+  tenantSettings = signal<TenantSettings | null>(null);
 
   isManager = signal(true);
 
@@ -58,7 +53,9 @@ export class DashboardComponent implements OnInit {
   }
 
   toggleRoutingMode() {
-    const newMode = this.tenantSettings().routingMode === 'Auto' ? 'Manual' : 'Auto';
-    this.crmApi.updateTenantSettings(newMode).subscribe(ts => this.tenantSettings.set(ts));
+    const ts = this.tenantSettings();
+    if (!ts) return;
+    const newMode = ts.routing_mode === 'AUTO' ? 'MANUAL' : 'AUTO';
+    this.crmApi.updateTenantSettings(newMode).subscribe(updated => this.tenantSettings.set(updated));
   }
 }

@@ -1,14 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
-import { ICrmRepository } from '../../core/ports/crm.repository';
 import {
   AssignLeadResponse,
-  ChatSession,
-  Lead,
-  Message,
-  Metrics,
-  Salesperson,
+  SessionDto,
+  BackendMessage,
+  MetricsResponse,
+  SalespersonDto,
   SendMessageResponse,
   TenantSettings
 } from '../../core/models/crm.models';
@@ -16,7 +14,7 @@ import {
 @Injectable({
   providedIn: 'root'
 })
-export class CrmApiService implements ICrmRepository {
+export class CrmApiService {
   private readonly baseUrl = 'http://localhost:8000/api';
   private readonly http = inject(HttpClient);
 
@@ -24,25 +22,37 @@ export class CrmApiService implements ICrmRepository {
   // DASHBOARD GERENCIAL
   // ==========================================
 
-  getMetrics(): Observable<Metrics> {
-    return this.http.get<Metrics>(`${this.baseUrl}/dashboard/metrics/`);
+  getMetrics(filters: any = {}): Observable<MetricsResponse> {
+    let queryStr = '';
+    if (filters.date_from && filters.date_to) {
+      queryStr = `?date_from=${filters.date_from}&date_to=${filters.date_to}`;
+    } else {
+      // Para evadir el error 400 del Backend con `date_filter=all`, enviamos fechas duras
+      const today = new Date();
+      const past = new Date();
+      past.setFullYear(today.getFullYear() - 1); // Traer el último año por defecto
+      
+      const toIso = (d: Date) => d.toISOString().split('T')[0];
+      queryStr = `?date_from=${toIso(past)}&date_to=${toIso(today)}`;
+    }
+    return this.http.get<MetricsResponse>(`${this.baseUrl}/dashboard/metrics/${queryStr}`);
   }
 
   getTenantSettings(): Observable<TenantSettings> {
     return this.http.get<TenantSettings>(`${this.baseUrl}/dashboard/settings/`);
   }
 
-  updateTenantSettings(routingMode: 'Auto' | 'Manual'): Observable<TenantSettings> {
-    return this.http.patch<TenantSettings>(`${this.baseUrl}/dashboard/settings/`, { routingMode });
+  updateTenantSettings(routingMode: 'AUTO' | 'MANUAL'): Observable<TenantSettings> {
+    return this.http.patch<TenantSettings>(`${this.baseUrl}/dashboard/settings/`, { routing_mode: routingMode });
   }
 
-  getPendingLeads(): Observable<Lead[]> {
-    return this.http.get<{pending_leads: Lead[]}>(`${this.baseUrl}/dashboard/leads/pending/`)
+  getPendingLeads(): Observable<SessionDto[]> {
+    return this.http.get<{pending_leads: SessionDto[]}>(`${this.baseUrl}/dashboard/leads/pending/`)
       .pipe(map(res => res.pending_leads));
   }
 
-  getSalespeople(): Observable<Salesperson[]> {
-    return this.http.get<{salespeople: Salesperson[]}>(`${this.baseUrl}/dashboard/salespeople/`)
+  getSalespeople(): Observable<SalespersonDto[]> {
+    return this.http.get<{salespeople: SalespersonDto[]}>(`${this.baseUrl}/dashboard/salespeople/`)
       .pipe(map(res => res.salespeople));
   }
 
@@ -50,31 +60,36 @@ export class CrmApiService implements ICrmRepository {
   // PANEL VENDEDOR (CHAT)
   // ==========================================
 
-  getMyChats(): Observable<ChatSession[]> {
-    return this.http.get<{leads: ChatSession[]}>(`${this.baseUrl}/dashboard/leads/`)
+  getMyChats(): Observable<SessionDto[]> {
+    return this.http.get<{leads: SessionDto[]}>(`${this.baseUrl}/dashboard/leads/`)
       .pipe(map(res => res.leads));
   }
 
-  getMessages(sessionId: string): Observable<Message[]> {
-    return this.http.get<Message[]>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/`);
+  getMessages(sessionId: string, limit: number = 50): Observable<BackendMessage[]> {
+    return this.http.get<{messages: BackendMessage[]}>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/?limit=${limit}`)
+      .pipe(map(res => res.messages));
   }
 
   sendMessage(sessionId: string, text: string): Observable<SendMessageResponse> {
-    return this.http.post<SendMessageResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/send/`, { text });
+    return this.http.post<SendMessageResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/send/`, { body: text });
   }
 
-  assignLead(sessionId: string): Observable<AssignLeadResponse> {
-    return this.http.post<AssignLeadResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/assign/`, {});
+  assignLead(sessionId: string, salespersonId?: string): Observable<AssignLeadResponse> {
+    const payload = salespersonId ? { salesperson_id: salespersonId } : {};
+    return this.http.post<AssignLeadResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/assign/`, payload);
   }
 
-  reassignLead(sessionId: string, newSalespersonId: string): Observable<any> {
-    return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/reassign/`, {
-      action: 'reassign',
-      new_salesperson_id: newSalespersonId
+  reassignLead(sessionId: string, newSalespersonId: string | null): Observable<AssignLeadResponse> {
+    return this.http.patch<AssignLeadResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/reassign/`, {
+      salesperson_id: newSalespersonId
     });
   }
 
-  updateSessionStatus(sessionId: string, status: 'GANADO' | 'PERDIDO'): Observable<any> {
-    return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/status/`, { status });
+  updateSessionStatus(sessionId: string, status: 'GANADO' | 'PERDIDO', lostReason?: string): Observable<any> {
+    const payload: any = { status };
+    if (status === 'PERDIDO' && lostReason) {
+      payload.lost_reason = lostReason;
+    }
+    return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/status/`, payload);
   }
 }

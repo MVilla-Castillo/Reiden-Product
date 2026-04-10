@@ -2,7 +2,7 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
-import { Lead, Salesperson } from '../../../core/models/crm.models';
+import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
 import { interval, Subscription } from 'rxjs';
 
 @Component({
@@ -22,12 +22,12 @@ import { interval, Subscription } from 'rxjs';
           <label>Modo de Asignación Global:</label>
           <div class="toggle-switch">
              <button 
-                [class.active]="routingMode() === 'Manual'"
+                [class.active]="routingMode() === 'MANUAL'"
                 (click)="toggleRoutingMode()">
                 Enrutamiento Manual
              </button>
              <button 
-                [class.active]="routingMode() === 'Auto'"
+                [class.active]="routingMode() === 'AUTO'"
                 (click)="toggleRoutingMode()">
                 Automático (Round Robin)
              </button>
@@ -39,7 +39,7 @@ import { interval, Subscription } from 'rxjs';
         <app-leads-grid 
           [leads]="leads()" 
           [salesPersons]="salesPersons()"
-          [canAssign]="routingMode() === 'Manual'"
+          [canAssign]="routingMode() === 'MANUAL'"
           (assignLead)="handleAssignment($event)">
         </app-leads-grid>
       </div>
@@ -100,9 +100,9 @@ import { interval, Subscription } from 'rxjs';
 export class LeadsComponent implements OnInit, OnDestroy {
   crmApi = inject(CrmApiService);
   
-  leads = signal<Lead[]>([]);
-  salesPersons = signal<Salesperson[]>([]);
-  routingMode = signal<'Auto' | 'Manual'>('Manual');
+  leads = signal<SessionDto[]>([]);
+  salesPersons = signal<SalespersonDto[]>([]);
+  routingMode = signal<'AUTO' | 'MANUAL'>('MANUAL');
   toastMessage = signal<string | null>(null);
   private pollingSub?: Subscription;
 
@@ -111,7 +111,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
     this.crmApi.getSalespeople().subscribe(sp => this.salesPersons.set(sp));
     
     this.crmApi.getTenantSettings().subscribe(settings => {
-      this.routingMode.set(settings.routingMode);
+      this.routingMode.set(settings.routing_mode);
     });
 
     // Start 3 second polling interval for fresh leads
@@ -129,21 +129,25 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   toggleRoutingMode() {
-    const newMode = this.routingMode() === 'Auto' ? 'Manual' : 'Auto';
-    this.routingMode.set(newMode);
+    const newMode = this.routingMode() === 'AUTO' ? 'MANUAL' : 'AUTO';
     this.crmApi.updateTenantSettings(newMode).subscribe((res: any) => {
+      this.routingMode.set(newMode);
       this.toastMessage.set('El motor fue cambiado a Enrutamiento ' + newMode);
       setTimeout(() => this.toastMessage.set(null), 3000);
     });
   }
 
   handleAssignment(event: {leadId: string, agentId: string}) {
-    // In a real scenario we'd do: this.crmApi.assignLead(event.leadId, event.agentId).subscribe(...)
-    this.toastMessage.set('Has asignado correctamente el Lead ' + event.leadId.substring(0,6) + ' a este Vendedor.');
-    
-    // Remove it optimistically from the pending view
-    this.leads.update(current => current.filter(l => l.id !== event.leadId));
-    
-    setTimeout(() => this.toastMessage.set(null), 3000);
+    this.crmApi.assignLead(event.leadId, event.agentId).subscribe({
+      next: () => {
+        this.toastMessage.set('Has asignado correctamente el Lead ' + event.leadId.substring(0,6) + ' a este Vendedor.');
+        this.leads.update(current => current.filter(l => l.session_id !== event.leadId));
+        setTimeout(() => this.toastMessage.set(null), 3000);
+      },
+      error: (err) => {
+        this.toastMessage.set('Error: ' + (err.error?.error || 'Falló la asignación'));
+        setTimeout(() => this.toastMessage.set(null), 3000);
+      }
+    });
   }
 }

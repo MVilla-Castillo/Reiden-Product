@@ -3,37 +3,37 @@
     <h1>Panel de {{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
     <div class="header-actions">
       <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
-      @if (isManager()) {
+      @if (isManager() && tenantSettings()) {
         <button class="toggle-routing" (click)="toggleRoutingMode()">
-          Routing: <strong>{{ tenantSettings().routingMode }}</strong>
+          Routing: <strong>{{ tenantSettings()!.routing_mode }}</strong>
         </button>
       }
     </div>
   </header>
 
-  @if (isManager()) {
+  @if (isManager() && metrics()) {
     <section class="kpi-section">
       <app-kpi-card 
         icon="⚡" 
-        [value]="metrics().responseTime.value"
-        [trend]="metrics().responseTime.trend"
+        [value]="metrics()!.time_metrics.avg_time_to_first_response + 'm'"
+        trend="+0%"
         label="T. Respuesta Promedio">
       </app-kpi-card>
       <app-kpi-card 
         icon="⚠️" 
-        [value]="metrics().pendingAssignments.value.toString()" 
+        [value]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads).toString()" 
         label="Pendientes de Asignación"
-        [critical]="metrics().pendingAssignments.value > 0">
+        [critical]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads) > 0">
       </app-kpi-card>
       <app-kpi-card 
         icon="👔" 
-        [value]="metrics().activeLeads.value.toString()" 
-        label="Leads Activos (Vendedores)">
+        [value]="metrics()!.funnel.assigned_leads.toString()" 
+        label="Leads Asignados (Vendedores)">
       </app-kpi-card>
       <app-kpi-card 
         icon="🎯" 
-        [value]="metrics().closeRate.value" 
-        [trend]="metrics().closeRate.trend"
+        [value]="metrics()!.funnel.win_rate + '%'" 
+        trend="+0%"
         label="Tasa de Cierre">
       </app-kpi-card>
     </section>
