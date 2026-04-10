@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ICrmRepository } from '../../core/ports/crm.repository';
 import {
   AssignLeadResponse,
@@ -37,11 +37,13 @@ export class CrmApiService implements ICrmRepository {
   }
 
   getPendingLeads(): Observable<Lead[]> {
-    return this.http.get<Lead[]>(`${this.baseUrl}/dashboard/leads/pending/`);
+    return this.http.get<{pending_leads: Lead[]}>(`${this.baseUrl}/dashboard/leads/pending/`)
+      .pipe(map(res => res.pending_leads));
   }
 
   getSalespeople(): Observable<Salesperson[]> {
-    return this.http.get<Salesperson[]>(`${this.baseUrl}/dashboard/salespeople/`);
+    return this.http.get<{salespeople: Salesperson[]}>(`${this.baseUrl}/dashboard/salespeople/`)
+      .pipe(map(res => res.salespeople));
   }
 
   // ==========================================
@@ -49,7 +51,8 @@ export class CrmApiService implements ICrmRepository {
   // ==========================================
 
   getMyChats(): Observable<ChatSession[]> {
-    return this.http.get<ChatSession[]>(`${this.baseUrl}/dashboard/leads/`);
+    return this.http.get<{leads: ChatSession[]}>(`${this.baseUrl}/dashboard/leads/`)
+      .pipe(map(res => res.leads));
   }
 
   getMessages(sessionId: string): Observable<Message[]> {

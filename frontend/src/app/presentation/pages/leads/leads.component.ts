@@ -1,10 +1,12 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
 import { Lead, Salesperson } from '../../../core/models/crm.models';
+import { interval, Subscription } from 'rxjs';
 
 @Component({
+// ... (Keeping decorator matching)
   selector: 'app-leads',
   standalone: true,
   imports: [CommonModule, LeadsGridComponent],
@@ -95,13 +97,14 @@ import { Lead, Salesperson } from '../../../core/models/crm.models';
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   `]
 })
-export class LeadsComponent implements OnInit {
+export class LeadsComponent implements OnInit, OnDestroy {
   crmApi = inject(CrmApiService);
   
   leads = signal<Lead[]>([]);
   salesPersons = signal<Salesperson[]>([]);
   routingMode = signal<'Auto' | 'Manual'>('Manual');
   toastMessage = signal<string | null>(null);
+  private pollingSub?: Subscription;
 
   ngOnInit() {
     this.refreshLeads();
@@ -110,6 +113,15 @@ export class LeadsComponent implements OnInit {
     this.crmApi.getTenantSettings().subscribe(settings => {
       this.routingMode.set(settings.routingMode);
     });
+
+    // Start 3 second polling interval for fresh leads
+    this.pollingSub = interval(3000).subscribe(() => this.refreshLeads());
+  }
+
+  ngOnDestroy() {
+    if (this.pollingSub) {
+      this.pollingSub.unsubscribe();
+    }
   }
 
   refreshLeads() {
