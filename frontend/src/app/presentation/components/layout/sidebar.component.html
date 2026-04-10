@@ -23,20 +23,22 @@
   <nav class="nav-section">
     <div class="nav-title">Principal</div>
     @for (item of navItems; track item.route) {
-      <a class="nav-item" [class.active]="item.active">
-        <span class="nav-icon">{{ item.icon }}</span>
-        {{ item.label }}
-      </a>
+      @if (item.roles.includes(session.currentRole())) {
+        <a class="nav-item" [routerLink]="item.route" routerLinkActive="active">
+          <span class="nav-icon">{{ item.icon }}</span>
+          {{ item.label }}
+        </a>
+      }
     }
   </nav>
 
   <nav class="nav-section">
     <div class="nav-title">Configuración</div>
-    <a class="nav-item">
+    <a class="nav-item" routerLink="/settings" routerLinkActive="active">
       <span class="nav-icon">⚙️</span>
       Ajustes
     </a>
-    <a class="nav-item">
+    <a class="nav-item" routerLink="/profile" routerLinkActive="active">
       <span class="nav-icon">👤</span>
       Perfil
     </a>

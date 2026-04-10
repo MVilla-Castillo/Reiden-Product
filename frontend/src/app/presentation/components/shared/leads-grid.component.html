@@ -4,71 +4,53 @@
       <tr>
         <th>ID</th>
         <th>Nombre</th>
-        <th>Empresa</th>
+        <th>Vehículo de Interés</th>
         <th>Origen</th>
         <th>Estado</th>
-        <th>Tiempo Espera</th>
-        <th>Vendedor</th>
+        <th>Recibido</th>
+        <th>Urgencia</th>
         @if (canAssign) {
-          <th>Acción</th>
+          <th>Asignar A</th>
         }
       </tr>
     </thead>
     <tbody>
       @for (lead of leads; track lead.id) {
         <tr>
-          <td class="cell-id">{{ lead.id }}</td>
-          <td class="cell-name">{{ lead.name }}</td>
-          <td>{{ lead.company }}</td>
+          <td class="cell-id">{{ lead.id | slice:0:8 }}</td>
+          <td class="cell-name">{{ lead.name || 'Desconocido' }}</td>
+          <td>{{ lead.vehicle }}</td>
           <td>
             <span class="source-badge" [attr.data-source]="lead.source">{{ lead.source }}</span>
           </td>
           <td>
-            <span class="status-badge" [ngClass]="getStatusClass(lead.status)">
-              {{ getStatusLabel(lead.status) }}
+            <span class="status-badge status-{{ lead.status | lowercase }}">
+              {{ lead.status }}
             </span>
           </td>
           <td>
-            @if (lead.waitingTime > 0) {
-              <span class="waiting-time">{{ lead.waitingTime }}h</span>
-            } @else {
-              <span class="waiting-time resolved">-</span>
-            }
+            <span class="waiting-time">{{ lead.received }}</span>
           </td>
           <td>
-            <span [class.unassigned]="!lead.assignedTo">
-              {{ getSalesPersonName(lead.assignedTo) }}
+            <span class="urgency-badge urgency-{{ lead.urgency | lowercase }}">
+              {{ lead.urgency | uppercase }}
             </span>
           </td>
           @if (canAssign) {
-            <td class="cell-action">
-              <div class="dropdown-wrapper">
-                <button 
-                  class="assign-btn" 
-                  (click)="toggleDropdown(lead.id)"
-                  [class.active]="openDropdownId() === lead.id">
-                  Asignar
-                </button>
-                @if (lead.status === 'pending_assignment') {
-                  <button class="take-btn" (click)="take.emit(lead.id)">
-                    Tomar
-                  </button>
+            <td>
+              <select class="assign-select" (change)="onAssign(lead.id, $event)">
+                <option value="">Seleccionar Asesor...</option>
+                @for (sp of salesPersons; track sp.id) {
+                  <option value="{{ sp.id }}">{{ sp.name }} (Score: {{ sp.score }})</option>
                 }
-                @if (openDropdownId() === lead.id) {
-                  <div class="dropdown-menu">
-                    @for (sp of salesPersons; track sp.id) {
-                      <button 
-                        class="dropdown-item"
-                        (click)="onAssign(lead.id, sp.id)">
-                        <span class="sp-name">{{ sp.name }}</span>
-                        <span class="sp-load">{{ sp.activeLeadsCount }} leads</span>
-                      </button>
-                    }
-                  </div>
-                }
-              </div>
+              </select>
             </td>
           }
+        </tr>
+      }
+      @if (leads.length === 0) {
+        <tr>
+          <td [attr.colspan]="canAssign ? 8 : 7" class="text-center py-4">No hay leads pendientes en la fila de espera.</td>
         </tr>
       }
     </tbody>

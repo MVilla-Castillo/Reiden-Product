@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { SessionService, UserRole } from '../../core/services/session.service';
+import { SessionService, UserRole } from '../../../core/services/session.service';
 
 @Component({
   selector: 'app-login',
@@ -20,7 +20,7 @@ export class LoginComponent {
   login() {
     this.session.setRole(this.role);
     this.session.setToken('simulated-oidc-token');
-    
+
     if (this.role === 'manager') {
       this.router.navigate(['/dashboard']);
     } else {

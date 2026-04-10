@@ -1,25 +1,49 @@
-<div class="login-container">
-  <div class="login-card">
-    <h2>Bienvenido a CCRM-SAAS</h2>
-    <p>Selecciona tu rol para ingresar al sistema</p>
+<div class="login-wrapper">
+  
+  <div class="animated-background">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="glass-card">
+    <div class="card-header">
+      <div class="logo-circle">
+        <span class="logo-text">CC</span>
+      </div>
+      <h2>Bienvenido a CCRM</h2>
+      <p>Plataforma de Relación Conversacional</p>
+    </div>
     
     <div class="role-selection">
       <button 
         [class.active]="role === 'manager'" 
         (click)="role = 'manager'" 
         class="role-btn">
-        <span>👔</span> Gerente
+        <div class="role-icon">👔</div>
+        <div class="role-text">
+          <span class="role-title">Gerente</span>
+          <span class="role-desc">Dashboard & Métricas</span>
+        </div>
+        <div class="active-indicator"></div>
       </button>
+
       <button 
         [class.active]="role === 'sales'" 
         (click)="role = 'sales'" 
         class="role-btn">
-        <span>🎧</span> Vendedor
+        <div class="role-icon">🎧</div>
+        <div class="role-text">
+          <span class="role-title">Vendedor</span>
+          <span class="role-desc">Ventas & WhatsApp</span>
+        </div>
+        <div class="active-indicator"></div>
       </button>
     </div>
 
     <button class="login-submit" (click)="login()">
       Ingresar al Sistema
+      <span class="arrow-icon">→</span>
     </button>
   </div>
 </div>

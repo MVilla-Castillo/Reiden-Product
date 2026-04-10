@@ -1,42 +1,41 @@
 # syntax=docker/dockerfile:1
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+# Determinismo total para el path
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
 COPY . /app
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
-# ─────────────────────────────────────────────────────────
-# Runtime stage
 # ─────────────────────────────────────────────────────────
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 1000 appuser \
-    && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+    # Agregamos el path al inicio
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-COPY --from=builder --chown=appuser:appuser /app /app
-COPY --from=builder --chown=appuser:appuser /root/.local /root/.local
-ENV PATH="/root/.local/bin:$PATH"
+# Crear usuario sin privilegios
+RUN addgroup --system appuser && adduser --system --group appuser
 
+# Copiamos el venv y el código con los permisos correctos
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app /app
+
+# Mover al usuario seguro
 USER appuser
 
-EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/liveness')" || exit 1
-
-CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+# Usamos el path absoluto para máxima resiliencia
+CMD ["/app/.venv/bin/uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

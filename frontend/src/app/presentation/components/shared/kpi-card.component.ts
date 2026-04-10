@@ -9,7 +9,14 @@ import { CommonModule } from '@angular/common';
     <div class="kpi-card" [class.critical]="critical">
       <div class="kpi-icon">{{ icon }}</div>
       <div class="kpi-content">
-        <div class="kpi-value">{{ value }}</div>
+        <div class="kpi-value-row">
+          <div class="kpi-value">{{ value }}</div>
+          @if (trend) {
+            <div class="kpi-trend" [class.positive]="trend.startsWith('+')" [class.negative]="trend.startsWith('-')">
+              {{ trend }}
+            </div>
+          }
+        </div>
         <div class="kpi-label">{{ label }}</div>
       </div>
     </div>
@@ -60,11 +67,34 @@ import { CommonModule } from '@angular/common';
       flex: 1;
     }
     
+    .kpi-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
     .kpi-value {
       font-size: 2rem;
       font-weight: 700;
       color: #111827;
       line-height: 1;
+    }
+
+    .kpi-trend {
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+    .kpi-trend.positive {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .kpi-trend.negative {
+      background: #fef2f2;
+      color: #991b1b;
     }
     
     .kpi-label {
@@ -76,7 +106,8 @@ import { CommonModule } from '@angular/common';
 })
 export class KpiCardComponent {
   @Input() icon = '';
-  @Input() value = 0;
+  @Input() value: number | string = 0;
+  @Input() trend?: string = '';
   @Input() label = '';
   @Input() critical = false;
 }

@@ -35,6 +35,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+ccrm_postman_collection.json
 
 # MacOS
 .DS_Store
@@ -47,3 +48,7 @@ share/python-wheels/
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+
+# Documentation
+endpoints.txt
+learning.txt

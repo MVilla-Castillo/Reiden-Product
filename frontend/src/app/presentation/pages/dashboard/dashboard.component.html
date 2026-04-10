@@ -1,46 +1,53 @@
 <div class="dashboard">
   <header class="dashboard-header">
     <h1>Panel de {{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
-    <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
+    <div class="header-actions">
+      <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
+      @if (isManager()) {
+        <button class="toggle-routing" (click)="toggleRoutingMode()">
+          Routing: <strong>{{ tenantSettings().routingMode }}</strong>
+        </button>
+      }
+    </div>
   </header>
 
   @if (isManager()) {
     <section class="kpi-section">
       <app-kpi-card 
-        icon="🤖" 
-        [value]="metrics().leadsInBotFlow" 
-        label="Leads en Flujo Bot">
+        icon="⚡" 
+        [value]="metrics().responseTime.value"
+        [trend]="metrics().responseTime.trend"
+        label="T. Respuesta Promedio">
       </app-kpi-card>
       <app-kpi-card 
         icon="⚠️" 
-        [value]="metrics().pendingAssignment" 
+        [value]="metrics().pendingAssignments.value.toString()" 
         label="Pendientes de Asignación"
-        [critical]="metrics().pendingAssignment > 0">
+        [critical]="metrics().pendingAssignments.value > 0">
       </app-kpi-card>
       <app-kpi-card 
         icon="👔" 
-        [value]="metrics().leadsInCommercialManagement" 
-        label="En Gestión Comercial">
+        [value]="metrics().activeLeads.value.toString()" 
+        label="Leads Activos (Vendedores)">
       </app-kpi-card>
       <app-kpi-card 
         icon="🎯" 
-        [value]="metrics().conversions" 
-        label="Conversiones (Ganados)">
+        [value]="metrics().closeRate.value" 
+        [trend]="metrics().closeRate.trend"
+        label="Tasa de Cierre">
       </app-kpi-card>
     </section>
   }
 
   <section class="leads-section">
     <div class="section-header">
-      <h2>{{ isManager() ? 'Gestión de Leads' : 'Mis Leads' }}</h2>
-      <span class="lead-count">{{ leads().length }} registros</span>
+      <h2>{{ isManager() ? 'Leads Pendientes' : 'Mis Leads' }}</h2>
+      <span class="lead-count">{{ leads().length }} registros pendientes</span>
     </div>
      <app-leads-grid 
        [leads]="leads()" 
        [salesPersons]="salesPersons()"
-       [canAssign]="isManager()"
-       (assign)="onAssignLead($event)"
-       (take)="onTakeLead($event)">
+       [canAssign]="isManager()">
      </app-leads-grid>
   </section>
 </div>

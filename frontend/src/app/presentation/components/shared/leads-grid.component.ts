@@ -1,6 +1,6 @@
-import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Lead, SalesPerson } from '../../../core/models/lead.model';
+import { Lead, Salesperson } from '../../../core/models/crm.models';
 
 @Component({
   selector: 'app-leads-grid',
@@ -11,51 +11,18 @@ import { Lead, SalesPerson } from '../../../core/models/lead.model';
 })
 export class LeadsGridComponent {
   @Input() leads: Lead[] = [];
-  @Input() salesPersons: SalesPerson[] = [];
+  @Input() salesPersons: Salesperson[] = [];
   @Input() canAssign = false;
-  @Output() assign = new EventEmitter<{ leadId: string; salesPersonId: string }>();
-  @Output() take = new EventEmitter<string>();
+  
+  @Output() assignLead = new EventEmitter<{leadId: string, agentId: string}>();
 
-  openDropdownId = signal<string | null>(null);
-
-  toggleDropdown(leadId: string) {
-    this.openDropdownId.set(this.openDropdownId() === leadId ? null : leadId);
-  }
-
-  onAssign(leadId: string, salesPersonId: string) {
-    this.assign.emit({ leadId, salesPersonId });
-    this.openDropdownId.set(null);
-  }
-
-  getSalesPersonName(id: string | null): string {
-    if (!id) return 'Sin asignar';
-    const sp = this.salesPersons.find(s => s.id === id);
-    return sp ? sp.name : 'Sin asignar';
-  }
-
-  getStatusLabel(status: Lead['status']): string {
-    const labels: Record<Lead['status'], string> = {
-      'bot_flow': 'Flujo Bot',
-      'pending_assignment': 'Pendiente',
-      'in_commercial_management': 'En Gestión',
-      'won': 'Ganado',
-      'lost': 'Perdido'
-    };
-    return labels[status];
-  }
-
-  getStatusClass(status: Lead['status']): string {
-    const classes: Record<Lead['status'], string> = {
-      'bot_flow': 'status-bot',
-      'pending_assignment': 'status-pending',
-      'in_commercial_management': 'status-active',
-      'won': 'status-won',
-      'lost': 'status-lost'
-    };
-    return classes[status];
-  }
-
-  closeDropdown() {
-    this.openDropdownId.set(null);
+  onAssign(leadId: string, event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const agentId = target.value;
+    if (agentId) {
+      this.assignLead.emit({ leadId, agentId });
+      // Reset dropdown dynamically if you want it to behave like a transient action
+      target.value = '';
+    }
   }
 }

@@ -1,35 +1,52 @@
 <div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
-      <h2>Mis Chats</h2>
+      <h2>Mis Chats Activos</h2>
     </div>
     <div class="chat-list">
-      @for (lead of leads(); track lead.id) {
+      @for (chat of chats(); track chat.id) {
         <div 
           class="chat-item" 
-          [class.active]="selectedSessionId() === lead.id"
-          (click)="selectLead(lead.id)">
+          [class.active]="selectedSessionId() === chat.id"
+          (click)="selectLead(chat)">
           <div class="lead-info">
-            <span class="lead-name">{{ lead.name }}</span>
-            <span class="lead-status">{{ lead.status }}</span>
+            <span class="lead-name">{{ chat.name }}</span>
+            <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
+          </div>
+          <div class="lead-subinfo">
+            <small>{{ chat.vehicle }}</small>
+          </div>
+          <div class="lead-last-msg text-muted">
+            <small>{{ chat.lastMessage | slice:0:30 }}...</small>
+            <small class="time">{{ chat.time }}</small>
           </div>
         </div>
+      }
+      @if (chats().length === 0) {
+        <div class="p-4 text-center text-muted"><p>No tienes chats asignados.</p></div>
       }
     </div>
   </aside>
 
   <main class="chat-window">
-    @if (selectedSessionId()) {
+    @if (selectedSession()) {
       <div class="chat-header">
-        <h3>Chat con {{ selectedSessionId() }}</h3>
+        <div class="header-details">
+          <h3>Chat con {{ selectedSession()?.name }}</h3>
+          <span class="vehicle-badge">{{ selectedSession()?.vehicle }}</span>
+        </div>
+        <div class="header-actions">
+           <button class="btn btn-success mx-2" (click)="updateStatus('GANADO')">Venta Cerrada (Ganado)</button>
+           <button class="btn btn-danger" (click)="updateStatus('PERDIDO')">Descartar (Perdido)</button>
+        </div>
       </div>
       <div class="messages-area">
-        @for (msg of messages(); track msg.id) {
-          <div class="message" [ngClass]="msg.direction === 'OUTBOUND' ? 'sent' : 'received'">
+        @for (msg of messages(); track msg.timestamp) {
+          <div class="message" [ngClass]="msg.sender === 'vendedor' ? 'sent' : 'received'">
             <div class="bubble">
-              {{ msg.body }}
+              {{ msg.text }}
             </div>
-            <span class="timestamp">{{ msg.created_at }}</span>
+            <span class="timestamp">{{ msg.timestamp }}</span>
           </div>
         }
       </div>
@@ -37,12 +54,12 @@
         <input 
           [(ngModel)]="newMessage" 
           (keyup.enter)="send()" 
-          placeholder="Escribe un mensaje...">
+          placeholder="Escribe un mensaje por WhatsApp...">
         <button (click)="send()">Enviar</button>
       </div>
     } @else {
       <div class="empty-state">
-        <p>Selecciona un chat para comenzar</p>
+        <p>Selecciona un prospecto en la barra lateral para chatear</p>
       </div>
     }
   </main>
