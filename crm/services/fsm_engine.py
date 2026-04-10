@@ -189,15 +189,17 @@ def advance_fsm(
             updated_fsm_answers=fsm_answers,
         )
 
-    # Inicialización: cualquier texto inicia el Paso 1
+    # Inicialización: Provisorio para saltar FSM e ir directo al Chat
     if not current_step or current_step == FSMStep.INITIAL:
-        fsm_answers["current_step"] = FSMStep.VEHICLE_TYPE
+        fsm_answers["current_step"] = FSMStep.QUALIFIED
         fsm_answers["error_count"] = 0
         return FSMResult(
-            text=MSG_VEHICLE_TYPE_QUESTION,
-            interactive=BTN_VEHICLE_TYPE,
-            next_step=FSMStep.VEHICLE_TYPE,
+            text="¡Hola! Hemos recibido tu solicitud. Te estamos asignando con un asesor de ventas que te atenderá a la brevedad en este mismo chat.",
+            next_step=FSMStep.QUALIFIED,
             updated_fsm_answers=fsm_answers,
+            new_status="PENDING_ASSIGNMENT",
+            urgency_score=100,
+            is_terminal=True,
         )
 
     # VEHICLE_TYPE -> PAYMENT_METHOD

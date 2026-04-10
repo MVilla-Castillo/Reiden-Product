@@ -54,7 +54,7 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
             {"status": result.status, "created": result.message_created},
             status=200,
         )
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Worker: Error no controlado.",
             extra={
@@ -62,7 +62,7 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
                 "message_sid": message_sid,
             },
         )
-        return JsonResponse({"error": "internal_error"}, status=500)
+        return JsonResponse({"error": f"internal_error: {repr(e)}"}, status=500)
     finally:
         trace_id_var.reset(trace_id_token)
         tenant_id_var.reset(tenant_token)

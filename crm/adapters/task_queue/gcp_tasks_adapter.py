@@ -162,7 +162,7 @@ class HttpDispatchQueue(TaskQueue):
 
         if response.status_code >= 500:
             logger.error(
-                "MODO LOCAL: Worker respondió con error 5xx.",
+                f"MODO LOCAL: Worker respondió con error 5xx: {response.text}",
                 extra={
                     "component_name": "http_dispatch_queue",
                     "task_id": task_id,
@@ -170,7 +170,7 @@ class HttpDispatchQueue(TaskQueue):
                 },
             )
             raise TaskQueueError(
-                message=f"Worker local retornó {response.status_code}",
+                message=f"Worker local retornó {response.status_code} - {response.text}",
             )
 
         logger.info(
