@@ -52,6 +52,12 @@ if not DEBUG:
 
 # CORS Configuration (Angular Frontend — SRE Hardening)
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+if DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:4200",
+        "http://localhost:8080",
+        "http://127.0.0.1:4200",
+    ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 CORS_ALLOW_HEADERS = [
@@ -62,6 +68,7 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "x-trace-id",
+    "x-user-id",
 ]
 
 # Cache Backend (JWKS caching for OIDC — LocMemCache for single-instance Cloud Run)

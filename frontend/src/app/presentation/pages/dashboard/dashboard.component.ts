@@ -28,7 +28,7 @@ export class DashboardComponent implements OnInit {
   constructor() {
     effect(() => {
       this.isManager.set(this.session.currentRole() === 'manager');
-    });
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit() {

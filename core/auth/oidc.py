@@ -67,7 +67,7 @@ class OIDCStatelessMiddleware:
                 if user_id_header:
                     try:
                         request.user = User.objects.get(
-                            id=user_id_header, tenant=tenant
+                            email=user_id_header, tenant=tenant
                         )
                     except User.DoesNotExist:
                         request.user = User.objects.filter(tenant=tenant).first()
