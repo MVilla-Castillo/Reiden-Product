@@ -227,7 +227,17 @@ class DIContainer:
         Obtiene el phone_number_id desde settings, no desde la DB.
         En producción se inyecta vía TENANT_PHONE_NUMBER_ID env var.
         """
-        return getattr(settings, "TENANT_PHONE_NUMBER_ID", "")
+        from_settings = getattr(settings, "TENANT_PHONE_NUMBER_ID", "")
+        if from_settings:
+            return from_settings
+
+        from crm.models import Tenant
+
+        tenant = Tenant.objects.order_by("created_at").first()
+        if tenant and tenant.phone_number_id:
+            return tenant.phone_number_id
+
+        return ""
 
 
 def get_use_case() -> ProcessMessageUseCase:
