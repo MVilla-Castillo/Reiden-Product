@@ -36,6 +36,15 @@ import { interval, Subscription } from 'rxjs';
       </header>
       
       <div class="grid-wrapper">
+        @if (routingMode() === 'AUTO') {
+          <div class="auto-assign-banner">
+            <span class="banner-icon">🤖</span>
+            <span class="banner-text">Modo Automático activo - Los leads se asignarán automáticamente al vendedor con menor carga</span>
+            <button class="btn-auto-assign" (click)="assignAllPendingAuto()">
+              Asignar Pendientes Ahora
+            </button>
+          </div>
+        }
         <app-leads-grid 
           [leads]="leads()" 
           [salesPersons]="salesPersons()"
@@ -95,6 +104,16 @@ import { interval, Subscription } from 'rxjs';
     }
     .toast-notification.success { background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; }
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    .auto-assign-banner {
+      display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 12px; margin-bottom: 20px; border: 1px solid #f59e0b;
+    }
+    .banner-icon { font-size: 1.5rem; }
+    .banner-text { flex: 1; color: #92400e; font-weight: 500; font-size: 0.95rem; }
+    .btn-auto-assign {
+      padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-auto-assign:hover { background: #d97706; transform: translateY(-1px); }
   `]
 })
 export class LeadsComponent implements OnInit, OnDestroy {
@@ -125,14 +144,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   refreshLeads() {
-    console.log('[Leads] Refreshing...');
-    this.crmApi.getPendingLeads().subscribe({
-      next: leads => {
-        console.log('[Leads] Got leads:', leads.length, leads.map(l => l.status));
-        this.leads.set(leads);
-      },
-      error: e => console.error('[Leads] Error:', e)
-    });
+    this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
   }
 
   toggleRoutingMode() {
@@ -141,6 +153,38 @@ export class LeadsComponent implements OnInit, OnDestroy {
       this.routingMode.set(newMode);
       this.toastMessage.set('El motor fue cambiado a Enrutamiento ' + newMode);
       setTimeout(() => this.toastMessage.set(null), 3000);
+    });
+  }
+
+  assignAllPendingAuto() {
+    const pendingLeads = this.leads();
+    if (pendingLeads.length === 0) {
+      this.toastMessage.set('No hay leads pendientes por asignar');
+      setTimeout(() => this.toastMessage.set(null), 3000);
+      return;
+    }
+
+    let completed = 0;
+    let errors = 0;
+
+    pendingLeads.forEach(lead => {
+      this.crmApi.assignLead(lead.session_id, 'AUTO').subscribe({
+        next: () => {
+          completed++;
+          this.leads.update(current => current.filter(l => l.session_id !== lead.session_id));
+          if (completed + errors === pendingLeads.length) {
+            this.toastMessage.set(`Se asignaron ${completed} lead(s) automáticamente`);
+            setTimeout(() => this.toastMessage.set(null), 3000);
+          }
+        },
+        error: () => {
+          errors++;
+          if (completed + errors === pendingLeads.length) {
+            this.toastMessage.set(`Asignados ${completed}, errores: ${errors}`);
+            setTimeout(() => this.toastMessage.set(null), 3000);
+          }
+        }
+      });
     });
   }
 
