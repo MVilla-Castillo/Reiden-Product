@@ -20,7 +20,7 @@ export class LoginComponent {
   login() {
     if (!this.selectedUserId) return;
     
-    const isManager = this.selectedUserId.includes('admin') || this.selectedUserId.includes('gerente');
+    const isManager = this.selectedUserId === 'admin@dev.local';
     const role: UserRole = isManager ? 'manager' : 'sales';
     
     this.session.setRole(role);

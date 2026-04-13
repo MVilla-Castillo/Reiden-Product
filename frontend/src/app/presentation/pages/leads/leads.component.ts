@@ -125,7 +125,14 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   refreshLeads() {
-    this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
+    console.log('[Leads] Refreshing...');
+    this.crmApi.getPendingLeads().subscribe({
+      next: leads => {
+        console.log('[Leads] Got leads:', leads.length, leads.map(l => l.status));
+        this.leads.set(leads);
+      },
+      error: e => console.error('[Leads] Error:', e)
+    });
   }
 
   toggleRoutingMode() {
