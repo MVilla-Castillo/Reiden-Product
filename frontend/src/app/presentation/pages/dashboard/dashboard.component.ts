@@ -36,7 +36,7 @@ export class DashboardComponent implements OnInit {
   }
 
   setupPolling() {
-    interval(30000).pipe(
+    interval(5000).pipe(
       startWith(0),
       switchMap(() => {
         this.loadData();
@@ -45,9 +45,18 @@ export class DashboardComponent implements OnInit {
     ).subscribe();
   }
 
-  loadData() {
-    this.crmApi.getMetrics().subscribe(m => this.metrics.set(m));
-    this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
+loadData() {
+    this.crmApi.getMetrics().subscribe({ 
+      next: m => this.metrics.set(m),
+      error: e => console.error('Metrics error:', e)
+    });
+    this.crmApi.getPendingLeads().subscribe({ 
+      next: leads => {
+        console.log('Leads loaded:', leads.length, leads.map(l => l.status));
+        this.leads.set(leads);
+      },
+      error: e => console.error('Pending leads error:', e)
+    });
     this.crmApi.getSalespeople().subscribe(sp => this.salesPersons.set(sp));
     this.crmApi.getTenantSettings().subscribe(ts => this.tenantSettings.set(ts));
   }

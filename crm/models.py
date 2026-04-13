@@ -73,12 +73,21 @@ class Tenant(models.Model):
         AUTO = "AUTO", "Auto"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nombre_legal = models.CharField(max_length=255)
-    rut_empresa = models.CharField(max_length=50, unique=True)
-    phone_number_id = models.CharField(max_length=100, unique=True)
-    waba_id = models.CharField(max_length=100, unique=True, db_index=True)
+    nombre_legal = models.CharField(max_length=255, verbose_name="Nombre legal")
+    rut_empresa = models.CharField(
+        max_length=50, unique=True, verbose_name="RUT empresa"
+    )
+    phone_number_id = models.CharField(
+        max_length=100, unique=True, verbose_name="Phone Number ID"
+    )
+    waba_id = models.CharField(
+        max_length=100, unique=True, db_index=True, verbose_name="WABA ID"
+    )
     routing_mode = models.CharField(
-        max_length=10, choices=RoutingMode.choices, default=RoutingMode.MANUAL
+        max_length=10,
+        choices=RoutingMode.choices,
+        default=RoutingMode.MANUAL,
+        verbose_name="Modo de enrutamiento",
     )
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -96,7 +105,7 @@ class AppUser(AbstractBaseUser, PermissionsMixin):
         SALESPERSON = "SALESPERSON", "Salesperson"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # Aceptamos null=True temoporalmente si usamos createsuperuser, pero en OIDC no será nulo.
+    # Aceptamos null=True temporalmente si usamos createsuperuser, pero en OIDC no será nulo.
     tenant = models.ForeignKey(
         Tenant, on_delete=models.CASCADE, related_name="users", null=True, blank=True
     )
@@ -148,13 +157,15 @@ class Lead(models.Model):
         max_length=255,
         help_text="ID de WhatsApp cifrado con AES-256 (privacidad PII)",
     )
-    first_name = models.CharField(max_length=255, blank=True, null=True)
+    first_name = models.CharField(
+        max_length=255, blank=True, null=True, verbose_name="Nombre"
+    )
     last_interaction = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
 
     objects = models.Manager()
     active_objects = ActiveManager()
-    tenant_objects = ActiveTenantManager()
+    tenant_objects = TenantManager()
 
     def __str__(self) -> str:
         return f"Lead-{self.id.hex[:8]}"
@@ -184,8 +195,11 @@ class ChatSession(models.Model):
         null=True,
         blank=True,
         related_name="assigned_sessions",
+        verbose_name="Vendedor",
     )
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.BOT)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.BOT, verbose_name="Estado"
+    )
     fsm_answers = JSONField(default=dict, help_text="Ficha del Cliente (respuestas)")
     urgency_score = models.IntegerField(default=0, db_index=True)
     last_fsm_step = models.CharField(max_length=100, blank=True, null=True)
@@ -300,6 +314,7 @@ class Message(models.Model):
         indexes = [
             models.Index(fields=["session", "-created_at"]),
         ]
+        constraints = []
 
     def __str__(self) -> str:
         return str(self.provider_message_id)
