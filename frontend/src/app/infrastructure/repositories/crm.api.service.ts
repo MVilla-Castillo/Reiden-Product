@@ -24,16 +24,12 @@ export class CrmApiService {
 
   getMetrics(filters: any = {}): Observable<MetricsResponse> {
     let queryStr = '';
-    if (filters.date_from && filters.date_to) {
+    if (filters.date_filter) {
+      queryStr = `?date_filter=${filters.date_filter}`;
+    } else if (filters.date_from && filters.date_to) {
       queryStr = `?date_from=${filters.date_from}&date_to=${filters.date_to}`;
     } else {
-      // Para evadir el error 400 del Backend con `date_filter=all`, enviamos fechas duras
-      const today = new Date();
-      const past = new Date();
-      past.setFullYear(today.getFullYear() - 1); // Traer el último año por defecto
-      
-      const toIso = (d: Date) => d.toISOString().split('T')[0];
-      queryStr = `?date_from=${toIso(past)}&date_to=${toIso(today)}`;
+      queryStr = `?date_filter=all`;
     }
     return this.http.get<MetricsResponse>(`${this.baseUrl}/dashboard/metrics/${queryStr}`);
   }

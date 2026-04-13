@@ -37,6 +37,6 @@ def get_date_range_from_filter(
         start = date(today.year, 1, 1)
         return (start, today)
     elif date_filter == "all":
-        return None
+        return (date(1970, 1, 1), date.today())
 
     return None
