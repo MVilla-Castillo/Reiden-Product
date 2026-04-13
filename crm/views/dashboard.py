@@ -13,6 +13,7 @@ from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.domain.entities import SessionEntity
+from crm.models import AppUser
 
 
 def _serialize_session(s: SessionEntity) -> dict:
@@ -115,6 +116,10 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
         limit = 50
 
     filters = _build_filters(request)
+
+    user = getattr(request, "user", None)
+    if user and user.role != AppUser.Role.MANAGER and user.role != AppUser.Role.ADMIN:
+        filters["salesperson_id"] = str(user.id)
 
     session_repo = DIContainer.instance().session_repo
     sessions = session_repo.get_dashboard_sessions(

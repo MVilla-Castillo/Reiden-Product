@@ -120,6 +120,48 @@
     }
   }
 
+  .user-selection {
+    margin-bottom: 32px;
+    text-align: left;
+
+    label {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .user-select {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #f8fafc;
+      font-size: 1rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+      }
+
+      option {
+        background: #1e293b;
+        color: #f8fafc;
+      }
+    }
+  }
+
   .role-selection {
     display: flex;
     flex-direction: column;

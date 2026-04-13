@@ -15,13 +15,19 @@ export class LoginComponent {
   private session = inject(SessionService);
   private router = inject(Router);
 
-  role: UserRole = 'manager';
+  selectedUserId = 'admin@dev.local';
 
   login() {
-    this.session.setRole(this.role);
+    if (!this.selectedUserId) return;
+    
+    const isManager = this.selectedUserId.includes('admin') || this.selectedUserId.includes('gerente');
+    const role: UserRole = isManager ? 'manager' : 'sales';
+    
+    this.session.setRole(role);
+    this.session.setUserId(this.selectedUserId);
     this.session.setToken('simulated-oidc-token');
 
-    if (this.role === 'manager') {
+    if (role === 'manager') {
       this.router.navigate(['/dashboard']);
     } else {
       this.router.navigate(['/chat']);

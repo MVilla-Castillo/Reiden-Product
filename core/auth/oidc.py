@@ -62,7 +62,18 @@ class OIDCStatelessMiddleware:
             tenant = Tenant.objects.order_by("created_at").first()
             if tenant:
                 request.tenant = tenant
-                request.user = User.objects.filter(tenant=tenant).first()
+
+                user_id_header = request.headers.get("X-User-ID")
+                if user_id_header:
+                    try:
+                        request.user = User.objects.get(
+                            id=user_id_header, tenant=tenant
+                        )
+                    except User.DoesNotExist:
+                        request.user = User.objects.filter(tenant=tenant).first()
+                else:
+                    request.user = User.objects.filter(tenant=tenant).first()
+
                 request.oidc_bypass = True
 
                 from core.log_utils import tenant_id_var

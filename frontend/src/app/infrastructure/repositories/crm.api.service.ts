@@ -43,15 +43,8 @@ export class CrmApiService {
   }
 
   getPendingLeads(): Observable<SessionDto[]> {
-    const url = `${this.baseUrl}/dashboard/leads/pending/`;
-    console.log('[API] Calling:', url);
-    return this.http.get<{pending_leads: SessionDto[]}>(url)
-      .pipe(
-        map(res => {
-          console.log('[API] Got pending leads:', res.pending_leads.length);
-          return res.pending_leads;
-        })
-      );
+    return this.http.get<{pending_leads: SessionDto[]}>(`${this.baseUrl}/dashboard/leads/pending/`)
+      .pipe(map(res => res.pending_leads));
   }
 
   getSalespeople(): Observable<SalespersonDto[]> {

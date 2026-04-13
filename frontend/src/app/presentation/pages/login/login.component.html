@@ -15,30 +15,16 @@
       <p>Plataforma de Relación Conversacional</p>
     </div>
     
-    <div class="role-selection">
-      <button 
-        [class.active]="role === 'manager'" 
-        (click)="role = 'manager'" 
-        class="role-btn">
-        <div class="role-icon">👔</div>
-        <div class="role-text">
-          <span class="role-title">Gerente</span>
-          <span class="role-desc">Dashboard & Métricas</span>
-        </div>
-        <div class="active-indicator"></div>
-      </button>
-
-      <button 
-        [class.active]="role === 'sales'" 
-        (click)="role = 'sales'" 
-        class="role-btn">
-        <div class="role-icon">🎧</div>
-        <div class="role-text">
-          <span class="role-title">Vendedor</span>
-          <span class="role-desc">Ventas & WhatsApp</span>
-        </div>
-        <div class="active-indicator"></div>
-      </button>
+    <div class="user-selection">
+      <label>Seleccionar Usuario:</label>
+      <select [(ngModel)]="selectedUserId" class="user-select">
+        <option value="admin@dev.local">Admin / Gerente (admin@dev.local)</option>
+        <option value="gerente@test.com">Gerente (gerente@test.com)</option>
+        <option value="vendedor1@dev.local">Vendedor 1 (vendedor1@dev.local)</option>
+        <option value="vendedor2@dev.local">Vendedor 2 (vendedor2@dev.local)</option>
+        <option value="vendedor1@test.com">Vendedor 1 Test (vendedor1@test.com)</option>
+        <option value="vendedor2@test.com">Vendedor 2 Test (vendedor2@test.com)</option>
+      </select>
     </div>
 
     <button class="login-submit" (click)="login()">
