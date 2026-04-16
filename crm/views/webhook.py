@@ -24,7 +24,7 @@ from crm.adapters.messaging.twilio_adapter import (
     MessagingError,
     SignatureValidationError,
 )
-from crm.adapters.task_queue.gcp_tasks_adapter import TaskQueueError
+from crm.adapters.task_queue.railway_task_queue import TaskQueueError
 from crm.domain.ports import (
     EnqueueRequest,
     SendMessageRequest,

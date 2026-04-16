@@ -1,9 +1,8 @@
 import uuid
 import requests
-import json
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from crm.models import Tenant, Lead, ChatSession, Message
+from crm.models import Tenant, ChatSession, Message
 
 
 class Command(BaseCommand):
@@ -53,7 +52,7 @@ class Command(BaseCommand):
             payload = {
                 "MessageSid": f"SM_SIM_{uuid.uuid4().hex[:8]}",
                 "From": f"whatsapp:+{phone_lead}",
-                "To": f"whatsapp:+56912345678",
+                "To": "whatsapp:+56912345678",
                 "Body": body,
                 "WaId": phone_lead,
                 "MessageType": "text",

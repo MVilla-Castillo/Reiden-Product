@@ -163,7 +163,7 @@ class Lead(models.Model):
     last_interaction = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
 
-    objects = models.Manager()
+    objects = TenantManager()
     active_objects = ActiveManager()
     tenant_objects = TenantManager()
 

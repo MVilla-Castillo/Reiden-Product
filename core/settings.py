@@ -155,12 +155,8 @@ if (
         "sslrootcert": env("DATABASE_SSL_CA", default=""),
     }
 
-# GCP Cloud Tasks Configuration (Serverless Asynchronous Enqueuing)
-GCP_PROJECT_ID = env("GCP_PROJECT_ID", default="ccrm-saas-dev")
-GCP_LOCATION = env("GCP_LOCATION", default="us-central1")
-GCP_QUEUE_NAME = env("GCP_QUEUE_NAME", default="ccrm-webhook-tasks")
-# The base URL where Cloud Tasks will send the HTTP push request back to our Django Worker
-GCP_OIDC_SERVICE_ACCOUNT_EMAIL = env("GCP_OIDC_SERVICE_ACCOUNT_EMAIL", default="")
+# Railway Worker Configuration
+# The base URL where the worker process will receive HTTP requests
 WORKER_BASE_URL = env("WORKER_BASE_URL", default="https://api.ccrm.example.com")
 
 # Twilio (Sprint 3 - Webhook Ingestion)

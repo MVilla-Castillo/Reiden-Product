@@ -4,14 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0001_initial'),
+        ("crm", "0001_initial"),
     ]
 
     operations = [
         migrations.AddConstraint(
-            model_name='chatsession',
-            constraint=models.UniqueConstraint(condition=models.Q(models.Q(('status__in', ['GANADO', 'PERDIDO', 'PERDIDO_SISTEMA', 'ABANDONO_BOT']), _negated=True), ('is_deleted', False)), fields=('tenant', 'lead'), name='unique_active_session_per_lead'),
+            model_name="chatsession",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    models.Q(
+                        (
+                            "status__in",
+                            ["GANADO", "PERDIDO", "PERDIDO_SISTEMA", "ABANDONO_BOT"],
+                        ),
+                        _negated=True,
+                    ),
+                    ("is_deleted", False),
+                ),
+                fields=("tenant", "lead"),
+                name="unique_active_session_per_lead",
+            ),
         ),
     ]

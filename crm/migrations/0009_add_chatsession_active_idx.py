@@ -4,14 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0008_alter_appuser_oidc_issuer_alter_appuser_oidc_sub_and_more'),
+        ("crm", "0008_alter_appuser_oidc_issuer_alter_appuser_oidc_sub_and_more"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='chatsession',
-            index=models.Index(fields=['tenant', 'lead', 'is_deleted', 'status'], name='idx_chatsession_tenant_lead_active'),
+            model_name="chatsession",
+            index=models.Index(
+                fields=["tenant", "lead", "is_deleted", "status"],
+                name="idx_chatsession_tenant_lead_active",
+            ),
         ),
     ]

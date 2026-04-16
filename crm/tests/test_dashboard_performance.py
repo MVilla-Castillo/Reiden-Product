@@ -8,10 +8,7 @@ Filtro Anti-Junior: assertNumQueries(2) — 1 para obtener sesiones
 con JOIN a Lead via select_related, 0 adicionales al serializar.
 """
 
-import pytest
 from django.test import Client, override_settings, TestCase
-from django.db import connection, reset_queries
-from django.conf import settings
 
 from crm.models import AppUser, ChatSession, Lead, Tenant
 from core.crypto import encrypt

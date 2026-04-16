@@ -15,8 +15,8 @@ from crm.adapters.messaging.twilio_adapter import (
     MessagingError,
     InMemoryMessageProvider,
 )
-from crm.adapters.task_queue.gcp_tasks_adapter import (
-    GcpCloudTasksQueue,
+from crm.adapters.task_queue.railway_task_queue import (
+    RailwayTaskQueue,
     HttpDispatchQueue,
     TaskQueueError,
 )
@@ -84,22 +84,21 @@ def test_in_memory_provider_simulation():
 
 
 # ─────────────────────────────────────────────────────────
-# Task Queue Adapters (GCP & HTTP)
+# Task Queue Adapters (Railway & HTTP)
 # ─────────────────────────────────────────────────────────
 
 
-def test_gcp_cloud_tasks_enqueue_success():
-    # El patch debe apuntar a la importación dentro del módulo o al path absoluto del SDK
-    with patch("google.cloud.tasks_v2.CloudTasksClient") as mock_client_cls:
-        mock_instance = mock_client_cls.return_value
-        mock_instance.create_task.return_value = MagicMock(name="task_path")
+def test_railway_task_queue_enqueue_success():
+    adapter = RailwayTaskQueue()
+    req = EnqueueRequest(payload={"MessageSid": "SM_test_123"})
 
-        adapter = GcpCloudTasksQueue()
-        req = EnqueueRequest(payload={"id": 1})
+    with patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(status_code=200)
 
-        adapter.enqueue(req)
+        result = adapter.enqueue(req)
 
-        assert mock_instance.create_task.called
+        assert result.success is True
+        assert mock_post.called
 
 
 def test_http_dispatch_queue_connection_error():

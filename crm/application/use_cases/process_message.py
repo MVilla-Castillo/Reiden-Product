@@ -437,6 +437,16 @@ class ProcessMessageUseCase:
             except IntegrityError:
                 # Otro thread ya persistió este mensaje (race condition en idempotencia).
                 # Continuamos procesando la FSM normalmente.
+                logger.exception(
+                    "IntegrityError al persistir mensaje — race condition esperado en idempotencia, "
+                    "otro worker ya insertó este message_sid. No es un error real.",
+                    extra={
+                        "tenant_id": str(tenant_id),
+                        "lead_id": str(lead.id),
+                        "session_id": str(session.id) if session else None,
+                        "message_sid": message_sid,
+                    },
+                )
                 message_created = False
                 reply_result = None
 

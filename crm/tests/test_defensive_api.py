@@ -16,7 +16,7 @@ from django.test import Client, override_settings
 
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.messaging.twilio_adapter import InMemoryMessageProvider
-from crm.models import AppUser, ChatSession, Lead, Message, Tenant
+from crm.models import ChatSession, Lead, Message, Tenant
 from core.crypto import encrypt
 
 

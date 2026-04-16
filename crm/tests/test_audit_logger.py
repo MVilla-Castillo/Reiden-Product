@@ -1,7 +1,6 @@
 """Tests para DjangoAuditLogger."""
 
 import pytest
-from uuid import uuid4
 
 from crm.adapters.database.repositories import DjangoAuditLogger
 from crm.domain.ports import AuditEntry

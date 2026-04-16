@@ -1,5 +1,3 @@
-import json
-import logging
 import os
 import django
 
@@ -13,13 +11,14 @@ payload = {
     "WaId": "56965104236",
     "To": "whatsapp:+14155238886",
     "From": "whatsapp:+56965104236",
-    "Body": "Hola test crash"
+    "Body": "Hola test crash",
 }
 
 try:
     print("Executing UseCase...")
     result = get_use_case().execute(payload)
     print("Success:", result)
-except Exception as e:
+except Exception:
     import traceback
+
     traceback.print_exc()

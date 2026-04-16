@@ -12,7 +12,6 @@ Autenticación: X-Internal-Secret (mismo secreto que el worker).
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from django.db import transaction
 from django.http import HttpRequest, JsonResponse

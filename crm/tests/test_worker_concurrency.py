@@ -13,14 +13,12 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import pytest
 from django.test import TransactionTestCase
 from django.conf import settings
 
-from core.crypto import encrypt
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.messaging.twilio_adapter import InMemoryMessageProvider
-from crm.models import Lead, Message, ChatSession, Tenant
+from crm.models import Lead, Message, Tenant
 
 
 def _make_payload(message_sid: str = "SMconcurrent000000000000001") -> dict:

@@ -11,7 +11,7 @@ Autenticación: X-Internal-Secret header.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 from django.test import Client

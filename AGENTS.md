@@ -12,7 +12,7 @@ Este archivo es la **fuente de la verdad** operativa y arquitectónica para cual
 - **Backend:** `Django 5.1` (Python Asíncrono).
 - **Frontend:** `Angular 18+` (RxJS HTTP Polling).
 - **Base de Datos:** `PostgreSQL 15+` (JSONB, Índices GIN y B-Tree).
-- **Infra / Workers:** Todo serverless. `GCP Cloud Run` (Escalado a cero) + `GCP Cloud Tasks`. Prohibido Redis o Celery.
+- **Infra / Workers:** Todo serverless. `Railway` (PostgreSQL + Redis plugin) + workers asíncronos. Redis permitido como cache y cola.
 - **Autenticación:** OIDC Stateless (Google Workspace). Prohibido guardar sesiones o contraseñas en DB.
 
 ---
@@ -62,15 +62,15 @@ Antes de modificar vistas (`views.py`) o modelos (`models.py`), el agente DEBE c
 ##  4. Seguridad, Concurrencia y SRE (Site Reliability Engineering)
 
 1. **Deadlocks y Thundering Herd:**
-   * Al recibir Webhooks masivos y asíncronos (Cloud Tasks), debes apoyarte 100% en el bloqueo transaccional a nivel de fila de PostgreSQL. Las actualizaciones críticas del estado de la FSM DEBEN ir enrutadas dentro de bloques `transaction.atomic()` usando explícitamente `select_for_update()`.
-   * Prohibido crear bloqueos o mutex lógicos a nivel de aplicación (ej. en memoria de Python o Redis inexistente).
+   * Al recibir Webhooks masivos y asíncronos (Railway Workers), debes apoyarte 100% en el bloqueo transaccional a nivel de fila de PostgreSQL. Las actualizaciones críticas del estado de la FSM DEBEN ir enrutadas dentro de bloques `transaction.atomic()` usando explícitamente `select_for_update()`.
+   * Prohibido crear bloqueos o mutex lógicos a nivel de aplicación (ej. en memoria de Python).
 
 2. **Aislamiento de API de Terceros:**
    * En los Webhooks de Twilio: **Prohibido el `get_or_create`**. Úsese Upsert Atómico (`INSERT ... ON CONFLICT DO NOTHING`).
    * Tests Unitarios: **Prohibido hacer llamadas HTTP reales a Twilio**. Usa `mock` rigurosamente.
 
 3. **Inyección de Secretos:**
-   * Prohibido hardcodear certificados o API Keys. Todo secreto proviene de `GCP Secret Manager` (Serverless) o del archivo `.env` (Local), inyectado a través del archivo de configuración global `core/settings.py`.
+   * Prohibido hardcodear certificados o API Keys. Todo secreto proviene de `Railway Secrets` o del archivo `.env` (Local), inyectado a través del archivo de configuración global `core/settings.py`.
 
 ---
 
@@ -92,7 +92,7 @@ Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `d
 
 ##  7. Logging Estructurado y Observabilidad
 
-1. **Formato JSON:** Todos los logs generados por `logging.getLogger` deben salir en formato JSON estructurado para ser procesados por GCP Cloud Logging.
+1. **Formato JSON:** Todos los logs generados por `logging.getLogger` deben salir en formato JSON estructurado.
 2. **Campos Obligatorios:** Cada log de error debe incluir `tenant_id`, `trace_id` (inyectado por el middleware) y `component_name`.
 3. **Privacidad (Data Masking):** Queda terminantemente prohibido imprimir números de teléfono (`wa_id`) o nombres de clientes en los logs. Usa siempre el `lead_id` (UUID) o el `wa_id_hash`.
 4. **Sentry Integration:** Todo error capturado por un middleware de Django debe ser enviado a Sentry con el contexto del usuario (`tenant_id`, `user_id`) para facilitar el debugging remoto en servidores locales u On-Premise.
@@ -103,6 +103,6 @@ Si detectas un conflicto entre tu conocimiento base y lo descrito aquí (o en `d
 
 2. **Transacciones Relámpago:** Queda estrictamente prohibido realizar llamadas externas (HTTP) dentro de un bloque transaction.atomic. Primero se asegura la persistencia, luego se dispara la red.
 
-3. **Seguridad OIDC:** Implementar leeway de 30s en la validación de JWT para absorber desincronizaciones de reloj entre servidores de Google/Microsoft y Cloud Run.
+3. **Seguridad OIDC:** Implementar leeway de 30s en la validación de JWT para absorber desincronizaciones de reloj entre servidores de Google/Microsoft y Railway.
 
 4. **Migraciones Zero-Downtime:** Prohibido el uso de ALTER TABLE que bloquee escrituras en tablas de Message o ChatSession. Usar el patrón: Añadir columna -> Backfill -> Eliminar antigua.

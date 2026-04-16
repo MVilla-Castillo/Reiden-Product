@@ -8,9 +8,7 @@ Valida:
 - Concurrencia (no duplica contadores)
 """
 
-import hashlib
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 

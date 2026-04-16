@@ -4,15 +4,14 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0009_add_chatsession_active_idx'),
+        ("crm", "0009_add_chatsession_active_idx"),
     ]
 
     operations = [
         migrations.RenameIndex(
-            model_name='chatsession',
-            new_name='idx_chat_sess_active',
-            old_name='idx_chatsession_tenant_lead_active',
+            model_name="chatsession",
+            new_name="idx_chat_sess_active",
+            old_name="idx_chatsession_tenant_lead_active",
         ),
     ]

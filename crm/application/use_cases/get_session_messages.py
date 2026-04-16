@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from crm.domain.entities import MessageEntity
 from crm.domain.ports import MessageRepository, SessionRepository
 
 import logging

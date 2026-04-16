@@ -14,7 +14,7 @@ from typing import Any
 from django.db import connection, models, transaction
 from django.utils import timezone
 
-from crm.models import Tenant, WebhookRateLimit
+from crm.models import WebhookRateLimit
 
 
 class RateLimitExceeded(Exception):

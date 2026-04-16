@@ -8,18 +8,14 @@ Usa freezegun para congelar el tiempo y verificar fronteras exactas.
 Todas las fechas son timezone-aware según USE_TZ=True de Django.
 """
 
-from datetime import timedelta
-
 import pytest
 from django.test import Client
-from django.utils import timezone
 from django.db import connection
-from freezegun import freeze_time
 
 from core.crypto import encrypt
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.messaging.twilio_adapter import InMemoryMessageProvider
-from crm.models import ChatSession, Lead, Message, Tenant
+from crm.models import ChatSession, Lead, Tenant
 
 
 def _make_payload(

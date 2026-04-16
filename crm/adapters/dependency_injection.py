@@ -3,7 +3,7 @@ crm/adapters/dependency_injection.py — Contenedor simple de dependencias.
 
 Resuelve las implementaciones concretas de los ports según el entorno:
 - DEBUG=True:  HttpDispatchQueue para cola de tareas (fallback local).
-- DEBUG=False: GcpCloudTasksQueue para cola de tareas (producción).
+- DEBUG=False: RailwayTaskQueue para cola de tareas (producción).
 
 El MessageProvider siempre es TwilioMessageProvider en prod;
 en tests se inyecta InMemoryMessageProvider vía los setters.
@@ -11,7 +11,6 @@ en tests se inyecta InMemoryMessageProvider vía los setters.
 
 from __future__ import annotations
 
-from typing import Any
 
 from django.conf import settings
 
@@ -25,8 +24,8 @@ from crm.adapters.database.repositories import (
 )
 from crm.adapters.messaging.twilio_adapter import TwilioMessageProvider
 from crm.adapters.push import NoOpPushAdapter
-from crm.adapters.task_queue.gcp_tasks_adapter import (
-    GcpCloudTasksQueue,
+from crm.adapters.task_queue.railway_task_queue import (
+    RailwayTaskQueue,
     HttpDispatchQueue,
 )
 from crm.application.use_cases.assign_lead import AssignLeadUseCase
@@ -128,7 +127,7 @@ class DIContainer:
             if settings.DEBUG:
                 self._task_queue = HttpDispatchQueue()
             else:
-                self._task_queue = GcpCloudTasksQueue()
+                self._task_queue = RailwayTaskQueue()
         return self._task_queue
 
     @property

@@ -4,25 +4,39 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0007_encrypt_wa_id_field'),
+        ("crm", "0007_encrypt_wa_id_field"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='appuser',
-            name='oidc_issuer',
-            field=models.CharField(blank=True, db_index=True, help_text='Origen del Subject (ej. accounts.google.com)', max_length=100, null=True),
+            model_name="appuser",
+            name="oidc_issuer",
+            field=models.CharField(
+                blank=True,
+                db_index=True,
+                help_text="Origen del Subject (ej. accounts.google.com)",
+                max_length=100,
+                null=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='appuser',
-            name='oidc_sub',
-            field=models.CharField(blank=True, help_text='Google Subject ID (sub)', max_length=255, null=True, unique=True),
+            model_name="appuser",
+            name="oidc_sub",
+            field=models.CharField(
+                blank=True,
+                help_text="Google Subject ID (sub)",
+                max_length=255,
+                null=True,
+                unique=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='lead',
-            name='wa_id',
-            field=models.CharField(help_text='ID de WhatsApp cifrado con AES-256 (privacidad PII)', max_length=255),
+            model_name="lead",
+            name="wa_id",
+            field=models.CharField(
+                help_text="ID de WhatsApp cifrado con AES-256 (privacidad PII)",
+                max_length=255,
+            ),
         ),
     ]

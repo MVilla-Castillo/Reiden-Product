@@ -11,7 +11,6 @@ los adapters en lugar de las funciones sueltas.
 import hashlib
 import json
 import pytest
-from unittest.mock import patch
 from django.test import Client
 from django.conf import settings
 

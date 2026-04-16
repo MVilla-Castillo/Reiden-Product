@@ -1,25 +1,20 @@
 """
-crm/adapters/task_queue/gcp_tasks_adapter.py — Adapters para el port TaskQueue.
+crm/adapters/task_queue/railway_task_queue.py — Railway-compatible Task Queue Adapter.
 
 Dos implementaciones:
-- GcpCloudTasksQueue: Producción, usa SDK de GCP Cloud Tasks.
-- HttpDispatchQueue: Fallback local que hace POST HTTP al worker Django.
+- RailwayTaskQueue: Producción, hace POST HTTP directo al worker.
+- HttpDispatchQueue: Fallback legacy para desarrollo local.
 
-Excepciones de dominio: los errores crudos de GCP o requests nunca se exponen
-al caller. Se traducen a TaskQueueError.
+Railway usa worker processes separados que reciben HTTP requests.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
-from typing import Any
 
 import requests
 from django.conf import settings
-from google.cloud import tasks_v2
-from google.cloud.tasks_v2.types import Task
 
 from core.log_utils import trace_id_var
 from crm.domain.ports import EnqueueRequest, EnqueueResult, TaskQueue
@@ -35,86 +30,96 @@ class TaskQueueError(Exception):
         self.underlying_error = underlying_error
 
 
-class GcpCloudTasksQueue(TaskQueue):
-    """Adapter de producción: encola payloads en GCP Cloud Tasks."""
-
-    _client: tasks_v2.CloudTasksClient | None = None
-
-    @property
-    def client(self) -> tasks_v2.CloudTasksClient:
-        if self._client is None:
-            self._client = tasks_v2.CloudTasksClient()
-        return self._client
+class RailwayTaskQueue(TaskQueue):
+    """
+    Adapter de producción para Railway.
+    Usa HTTP dispatch al worker process separado.
+    """
 
     def enqueue(self, request: EnqueueRequest) -> EnqueueResult:
-        project: str = settings.GCP_PROJECT_ID
-        location: str = settings.GCP_LOCATION
-        queue: str = settings.GCP_QUEUE_NAME
         worker_url: str = f"{settings.WORKER_BASE_URL}/api/workers/process-message/"
         internal_secret: str = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
-        service_account_email: str = getattr(
-            settings, "GCP_OIDC_SERVICE_ACCOUNT_EMAIL", ""
+
+        task_id = f"railway-task-{uuid.uuid4()}"
+        trace_id = trace_id_var.get() or str(uuid.uuid4())
+
+        logger.info(
+            "Railway: Encolando tarea para worker.",
+            extra={
+                "component_name": "railway_task_queue",
+                "task_id": task_id,
+                "worker_url": worker_url,
+                "message_sid": request.payload.get("MessageSid", ""),
+            },
         )
 
         try:
-            parent = self.client.queue_path(project, location, queue)
-        except Exception as exc:
-            if settings.DEBUG:
-                fallback = HttpDispatchQueue()
-                return fallback.enqueue(request)
-            raise TaskQueueError(
-                message=f"No se pudo inicializar Cloud Tasks: {exc}",
-                underlying_error=exc,
-            ) from exc
-
-        body = json.dumps(request.payload, default=str).encode("utf-8")
-
-        task_config: dict[str, Any] = {
-            "http_request": {
-                "http_method": tasks_v2.HttpMethod.POST,
-                "url": worker_url,
-                "headers": {
+            response = requests.post(
+                worker_url,
+                json=request.payload,
+                headers={
                     "Content-Type": "application/json",
                     "X-Internal-Secret": internal_secret,
-                    "X-Trace-ID": trace_id_var.get(),
+                    "X-Trace-ID": trace_id,
+                    "X-Railway-Task-ID": task_id,
                 },
-                "body": body,
-            }
-        }
-
-        if service_account_email:
-            task_config["http_request"]["oidc_token"] = {
-                "service_account_email": service_account_email,
-                "audience": worker_url,
-            }
-
-        try:
-            task: Task = self.client.create_task(
-                request={"parent": parent, "task": task_config}
+                timeout=30,
             )
-            logger.info(
-                "Tarea encolada en Cloud Tasks.",
+        except requests.ConnectionError as exc:
+            logger.error(
+                "Railway: No se pudo conectar al worker.",
                 extra={
-                    "component_name": "gcp_tasks_adapter",
-                    "task_name": task.name,
-                    "queue": queue,
+                    "component_name": "railway_task_queue",
+                    "worker_url": worker_url,
+                    "error": str(exc),
                 },
             )
-            return EnqueueResult(task_id=task.name, success=True)
-        except Exception as exc:
-            if settings.DEBUG:
-                fallback = HttpDispatchQueue()
-                return fallback.enqueue(request)
             raise TaskQueueError(
-                message=f"Fallo al crear tarea en Cloud Tasks: {exc}",
+                message="No se pudo conectar al worker",
                 underlying_error=exc,
             ) from exc
+        except requests.Timeout as exc:
+            logger.error(
+                "Railway: Timeout al conectar al worker.",
+                extra={
+                    "component_name": "railway_task_queue",
+                    "worker_url": worker_url,
+                    "error": str(exc),
+                },
+            )
+            raise TaskQueueError(
+                message="Timeout al conectar al worker",
+                underlying_error=exc,
+            ) from exc
+
+        if response.status_code >= 500:
+            logger.error(
+                f"Railway: Worker respondió con error 5xx: {response.text}",
+                extra={
+                    "component_name": "railway_task_queue",
+                    "task_id": task_id,
+                    "status_code": response.status_code,
+                },
+            )
+            raise TaskQueueError(
+                message=f"Worker retornó {response.status_code} - {response.text}",
+            )
+
+        logger.info(
+            "Railway: Tarea procesada exitosamente.",
+            extra={
+                "component_name": "railway_task_queue",
+                "task_id": task_id,
+                "status_code": response.status_code,
+            },
+        )
+        return EnqueueResult(task_id=task_id, success=True)
 
 
 class HttpDispatchQueue(TaskQueue):
     """
-    Fallback local: simula Cloud Tasks haciendo POST HTTP directo al worker.
-    Usado en desarrollo (DEBUG=True) y como fallback si el SDK de GCP falla.
+    Fallback legacy para desarrollo local.
+    Mantenido por compatibilidad con tests existentes.
     """
 
     def enqueue(self, request: EnqueueRequest) -> EnqueueResult:

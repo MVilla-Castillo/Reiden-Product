@@ -4,19 +4,25 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0004_alter_auditlog_id'),
+        ("crm", "0004_alter_auditlog_id"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='chatsession',
-            name='last_message_timestamp',
-            field=models.CharField(blank=True, help_text='Timestamp nativo de Twilio del último mensaje procesado (RNF-03)', max_length=50, null=True),
+            model_name="chatsession",
+            name="last_message_timestamp",
+            field=models.CharField(
+                blank=True,
+                help_text="Timestamp nativo de Twilio del último mensaje procesado (RNF-03)",
+                max_length=50,
+                null=True,
+            ),
         ),
         migrations.AddIndex(
-            model_name='message',
-            index=models.Index(fields=['session', '-created_at'], name='crm_message_session_6efd15_idx'),
+            model_name="message",
+            index=models.Index(
+                fields=["session", "-created_at"], name="crm_message_session_6efd15_idx"
+            ),
         ),
     ]

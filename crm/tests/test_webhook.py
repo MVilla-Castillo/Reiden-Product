@@ -26,7 +26,7 @@ def _reset_di():
 # TEST: Happy Path — Firma válida → 200 queued
 # ==============================================================================
 @pytest.mark.django_db
-@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.task_queue.railway_task_queue.RailwayTaskQueue.enqueue")
 @patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_valid_signature_returns_200_and_enqueues_task(
     mock_validate: MagicMock,
@@ -210,7 +210,7 @@ def test_oversized_body_returns_413(
 # TEST: Button y list_reply → aceptados (son interacciones de texto validas)
 # ==============================================================================
 @pytest.mark.django_db
-@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.task_queue.railway_task_queue.RailwayTaskQueue.enqueue")
 @patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_button_message_accepted(
     mock_validate: MagicMock,
@@ -238,7 +238,7 @@ def test_button_message_accepted(
 
 
 @pytest.mark.django_db
-@patch("crm.adapters.task_queue.gcp_tasks_adapter.GcpCloudTasksQueue.enqueue")
+@patch("crm.adapters.task_queue.railway_task_queue.RailwayTaskQueue.enqueue")
 @patch("crm.adapters.messaging.twilio_adapter.TwilioMessageProvider.validate_signature")
 def test_list_reply_message_accepted(
     mock_validate: MagicMock,

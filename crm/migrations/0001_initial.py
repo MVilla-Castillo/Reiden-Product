@@ -8,111 +8,376 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
+        ("auth", "0012_alter_user_first_name_max_length"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Lead',
+            name="Lead",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('wa_id_hash', models.CharField(db_index=True, help_text='Hash SHA-256 para búsqueda O(1) en webhooks', max_length=64, unique=True)),
-                ('wa_id', models.CharField(help_text='ID de WhatsApp en texto plano (KISS)', max_length=50, unique=True)),
-                ('first_name', models.CharField(blank=True, max_length=255, null=True)),
-                ('last_interaction', models.DateTimeField(auto_now=True)),
-                ('is_deleted', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "wa_id_hash",
+                    models.CharField(
+                        db_index=True,
+                        help_text="Hash SHA-256 para búsqueda O(1) en webhooks",
+                        max_length=64,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "wa_id",
+                    models.CharField(
+                        help_text="ID de WhatsApp en texto plano (KISS)",
+                        max_length=50,
+                        unique=True,
+                    ),
+                ),
+                ("first_name", models.CharField(blank=True, max_length=255, null=True)),
+                ("last_interaction", models.DateTimeField(auto_now=True)),
+                ("is_deleted", models.BooleanField(default=False)),
             ],
         ),
         migrations.CreateModel(
-            name='Tenant',
+            name="Tenant",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('nombre_legal', models.CharField(max_length=255)),
-                ('rut_empresa', models.CharField(max_length=50, unique=True)),
-                ('phone_number_id', models.CharField(max_length=100, unique=True)),
-                ('waba_id', models.CharField(db_index=True, max_length=100, unique=True)),
-                ('routing_mode', models.CharField(choices=[('MANUAL', 'Manual'), ('AUTO', 'Auto')], default='MANUAL', max_length=10)),
-                ('is_verified', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("nombre_legal", models.CharField(max_length=255)),
+                ("rut_empresa", models.CharField(max_length=50, unique=True)),
+                ("phone_number_id", models.CharField(max_length=100, unique=True)),
+                (
+                    "waba_id",
+                    models.CharField(db_index=True, max_length=100, unique=True),
+                ),
+                (
+                    "routing_mode",
+                    models.CharField(
+                        choices=[("MANUAL", "Manual"), ("AUTO", "Auto")],
+                        default="MANUAL",
+                        max_length=10,
+                    ),
+                ),
+                ("is_verified", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
         ),
         migrations.CreateModel(
-            name='AppUser',
+            name="AppUser",
             fields=[
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('azure_oid', models.UUIDField(blank=True, help_text='Object ID de Microsoft Azure', null=True, unique=True)),
-                ('microsoft_tenant_id', models.UUIDField(blank=True, db_index=True, null=True)),
-                ('role', models.CharField(choices=[('ADMIN', 'Admin'), ('MANAGER', 'Manager'), ('SALESPERSON', 'Salesperson')], default='SALESPERSON', max_length=20)),
-                ('email', models.EmailField(max_length=254, unique=True)),
-                ('is_staff', models.BooleanField(default=False)),
-                ('is_active', models.BooleanField(default=True)),
-                ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
-                ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
-                ('tenant', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='users', to='crm.tenant')),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "last_login",
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
+                ),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "azure_oid",
+                    models.UUIDField(
+                        blank=True,
+                        help_text="Object ID de Microsoft Azure",
+                        null=True,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "microsoft_tenant_id",
+                    models.UUIDField(blank=True, db_index=True, null=True),
+                ),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[
+                            ("ADMIN", "Admin"),
+                            ("MANAGER", "Manager"),
+                            ("SALESPERSON", "Salesperson"),
+                        ],
+                        default="SALESPERSON",
+                        max_length=20,
+                    ),
+                ),
+                ("email", models.EmailField(max_length=254, unique=True)),
+                ("is_staff", models.BooleanField(default=False)),
+                ("is_active", models.BooleanField(default=True)),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="users",
+                        to="crm.tenant",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='ChatSession',
+            name="ChatSession",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('status', models.CharField(choices=[('BOT', 'Bot'), ('PENDING_ASSIGNMENT', 'Pending Assignment'), ('CON_VENDEDOR', 'Con Vendedor'), ('GANADO', 'Ganado'), ('PERDIDO', 'Perdido'), ('ABANDONO_BOT', 'Abandono Bot'), ('PERDIDO_SISTEMA', 'Perdido Sistema')], default='BOT', max_length=20)),
-                ('fsm_answers', models.JSONField(default=dict, help_text='Ficha del Cliente (respuestas)')),
-                ('urgency_score', models.IntegerField(db_index=True, default=0)),
-                ('last_fsm_step', models.CharField(blank=True, max_length=100, null=True)),
-                ('last_client_message_at', models.DateTimeField(blank=True, null=True)),
-                ('lost_reason', models.CharField(blank=True, max_length=255, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('is_deleted', models.BooleanField(default=False)),
-                ('salesperson', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='assigned_sessions', to=settings.AUTH_USER_MODEL)),
-                ('lead', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='chat_sessions', to='crm.lead')),
-                ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='chat_sessions', to='crm.tenant')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("BOT", "Bot"),
+                            ("PENDING_ASSIGNMENT", "Pending Assignment"),
+                            ("CON_VENDEDOR", "Con Vendedor"),
+                            ("GANADO", "Ganado"),
+                            ("PERDIDO", "Perdido"),
+                            ("ABANDONO_BOT", "Abandono Bot"),
+                            ("PERDIDO_SISTEMA", "Perdido Sistema"),
+                        ],
+                        default="BOT",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "fsm_answers",
+                    models.JSONField(
+                        default=dict, help_text="Ficha del Cliente (respuestas)"
+                    ),
+                ),
+                ("urgency_score", models.IntegerField(db_index=True, default=0)),
+                (
+                    "last_fsm_step",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                ("last_client_message_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "lost_reason",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("is_deleted", models.BooleanField(default=False)),
+                (
+                    "salesperson",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="assigned_sessions",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "lead",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="chat_sessions",
+                        to="crm.lead",
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="chat_sessions",
+                        to="crm.tenant",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Message',
+            name="Message",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('provider_message_id', models.CharField(help_text='Idempotencia (RNF-03)', max_length=255, unique=True)),
-                ('direction', models.CharField(choices=[('INBOUND', 'Inbound'), ('OUTBOUND', 'Outbound')], max_length=10)),
-                ('message_type', models.CharField(choices=[('TEXT', 'Text'), ('IMAGE', 'Image'), ('AUDIO', 'Audio'), ('DOCUMENTO', 'Documento')], default='TEXT', max_length=10)),
-                ('body', models.TextField(help_text='Texto literal o URL firmada')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('session', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='crm.chatsession')),
-                ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='crm.tenant')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "provider_message_id",
+                    models.CharField(
+                        help_text="Idempotencia (RNF-03)", max_length=255, unique=True
+                    ),
+                ),
+                (
+                    "direction",
+                    models.CharField(
+                        choices=[("INBOUND", "Inbound"), ("OUTBOUND", "Outbound")],
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "message_type",
+                    models.CharField(
+                        choices=[
+                            ("TEXT", "Text"),
+                            ("IMAGE", "Image"),
+                            ("AUDIO", "Audio"),
+                            ("DOCUMENTO", "Documento"),
+                        ],
+                        default="TEXT",
+                        max_length=10,
+                    ),
+                ),
+                ("body", models.TextField(help_text="Texto literal o URL firmada")),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "session",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="messages",
+                        to="crm.chatsession",
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="messages",
+                        to="crm.tenant",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='lead',
-            name='tenant',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='leads', to='crm.tenant'),
+            model_name="lead",
+            name="tenant",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="leads",
+                to="crm.tenant",
+            ),
         ),
         migrations.CreateModel(
-            name='AuditLog',
+            name="AuditLog",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('action', models.CharField(help_text='Ej: SESSION_START, FSM_TRANSITION, STATUS_CHANGED', max_length=50)),
-                ('old_value', models.JSONField(default=dict)),
-                ('new_value', models.JSONField(default=dict)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('actor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='actions', to=settings.AUTH_USER_MODEL)),
-                ('owner_at_time_of_close', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='closed_sessions_audit', to=settings.AUTH_USER_MODEL)),
-                ('session', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='audit_logs', to='crm.chatsession')),
-                ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='audit_logs', to='crm.tenant')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "action",
+                    models.CharField(
+                        help_text="Ej: SESSION_START, FSM_TRANSITION, STATUS_CHANGED",
+                        max_length=50,
+                    ),
+                ),
+                ("old_value", models.JSONField(default=dict)),
+                ("new_value", models.JSONField(default=dict)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "actor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="actions",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "owner_at_time_of_close",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="closed_sessions_audit",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "session",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="audit_logs",
+                        to="crm.chatsession",
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="audit_logs",
+                        to="crm.tenant",
+                    ),
+                ),
             ],
         ),
         migrations.AddIndex(
-            model_name='chatsession',
-            index=django.contrib.postgres.indexes.GinIndex(fields=['fsm_answers'], name='crm_chatses_fsm_ans_384f79_gin'),
+            model_name="chatsession",
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["fsm_answers"], name="crm_chatses_fsm_ans_384f79_gin"
+            ),
         ),
     ]

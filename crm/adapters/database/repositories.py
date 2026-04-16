@@ -13,7 +13,7 @@ REGLAS SRE:
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from django.db import connection, models, transaction

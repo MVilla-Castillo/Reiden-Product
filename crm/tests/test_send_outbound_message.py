@@ -13,8 +13,7 @@ import pytest
 from django.test import Client, override_settings
 from unittest.mock import patch, MagicMock
 
-from crm.models import Tenant, Lead, ChatSession, AppUser, Message
-from core.crypto import encrypt
+from crm.models import Tenant, Lead, ChatSession, AppUser
 
 
 class MockMiddleware:

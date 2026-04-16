@@ -16,8 +16,7 @@ from uuid import uuid4
 
 from django.test import Client, override_settings
 
-from crm.models import Tenant, Lead, ChatSession, AppUser, AuditLog
-from core.crypto import encrypt
+from crm.models import Tenant, Lead, ChatSession, AuditLog
 
 
 class MockMiddleware:

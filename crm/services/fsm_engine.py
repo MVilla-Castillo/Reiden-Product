@@ -11,8 +11,6 @@ facilitar i18n y evitar strings hardcodeados dispersos.
 
 from __future__ import annotations
 
-import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -45,6 +43,12 @@ MSG_QUALIFIED = (
     "Te estamos asignando con un asesor de ventas que te atenderá "
     "a la brevedad en este mismo chat. ¡Gracias por tu interés!"
 )
+
+# ─────────────────────────────────────────────────────────
+# Constantes de estado (evitar hardcoded strings)
+# ─────────────────────────────────────────────────────────
+
+STATUS_PENDING_ASSIGNMENT = "PENDING_ASSIGNMENT"
 
 # ─────────────────────────────────────────────────────────
 # Constantes de botones interactivos
@@ -189,17 +193,15 @@ def advance_fsm(
             updated_fsm_answers=fsm_answers,
         )
 
-    # Inicialización: Provisorio para saltar FSM e ir directo al Chat
+    # Inicialización: Iniciar flujo FSM desde VEHICLE_TYPE
     if not current_step or current_step == FSMStep.INITIAL:
-        fsm_answers["current_step"] = FSMStep.QUALIFIED
+        fsm_answers["current_step"] = FSMStep.VEHICLE_TYPE
         fsm_answers["error_count"] = 0
         return FSMResult(
-            text="¡Hola! Hemos recibido tu solicitud. Te estamos asignando con un asesor de ventas que te atenderá a la brevedad en este mismo chat.",
-            next_step=FSMStep.QUALIFIED,
+            text=MSG_VEHICLE_TYPE_QUESTION,
+            interactive=BTN_VEHICLE_TYPE,
+            next_step=FSMStep.VEHICLE_TYPE,
             updated_fsm_answers=fsm_answers,
-            new_status="PENDING_ASSIGNMENT",
-            urgency_score=100,
-            is_terminal=True,
         )
 
     # VEHICLE_TYPE -> PAYMENT_METHOD
@@ -312,7 +314,7 @@ def advance_fsm(
             text=MSG_QUALIFIED,
             next_step=FSMStep.QUALIFIED,
             updated_fsm_answers=fsm_answers,
-            new_status="PENDING_ASSIGNMENT",
+            new_status=STATUS_PENDING_ASSIGNMENT,
             urgency_score=score,
             is_terminal=True,
         )

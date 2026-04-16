@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0003_oidc_multi_issuer'),
+        ("crm", "0003_oidc_multi_issuer"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='auditlog',
-            name='id',
+            model_name="auditlog",
+            name="id",
             field=models.BigAutoField(primary_key=True, serialize=False),
         ),
     ]

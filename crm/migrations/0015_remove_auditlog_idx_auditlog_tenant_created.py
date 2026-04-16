@@ -4,14 +4,13 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0014_add_auditlog_created_at_index'),
+        ("crm", "0014_add_auditlog_created_at_index"),
     ]
 
     operations = [
         migrations.RemoveIndex(
-            model_name='auditlog',
-            name='idx_auditlog_tenant_created',
+            model_name="auditlog",
+            name="idx_auditlog_tenant_created",
         ),
     ]

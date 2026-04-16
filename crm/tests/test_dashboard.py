@@ -56,7 +56,6 @@ def test_dashboard_leads_ordering_and_access(
     )
 
     # 2. ACT
-    from django.urls import path
     from django.test import override_settings
 
     with override_settings(MIDDLEWARE=["crm.tests.test_dashboard.MockMiddleware"]):

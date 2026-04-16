@@ -5,9 +5,7 @@ Patrón: AAA (Arrange, Act, Assert).
 La FSM ahora es dominio puro: usa FSMContext/FSMResult, no modelos Django.
 """
 
-import pytest
-
-from crm.services.fsm_engine import FSMContext, FSMResult, advance_fsm
+from crm.services.fsm_engine import FSMContext, advance_fsm
 from crm.services.fsm_types import (
     FSMStep,
     VehicleType,

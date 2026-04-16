@@ -1,5 +1,4 @@
 import logging
-import time
 from typing import Any
 
 import jwt
@@ -196,7 +195,7 @@ class OIDCStatelessMiddleware:
         except jwt.InvalidTokenError as e:
             logger.error(f"JWT Invalido: {str(e)}")
             return self._unauthorized("Token inválido")
-        except Exception as e:
+        except Exception:
             logger.exception("Error catastrófico en Middleware OIDC")
             return JsonResponse({"error": "Internal Server Error"}, status=500)
 
