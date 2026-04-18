@@ -7,6 +7,7 @@ Incluye rate limiting para proteger contra abuso (60 req/min por tenant).
 
 from __future__ import annotations
 
+import zoneinfo
 from datetime import datetime, timezone
 
 from django.http import HttpRequest, JsonResponse
@@ -17,6 +18,18 @@ from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.domain.entities import SessionEntity
 from crm.models import AppUser
+
+
+_CHILE_TZ = zoneinfo.ZoneInfo("America/Santiago")
+
+
+def _to_chile(dt) -> str | None:
+    """Convierte un datetime (naive→UTC, aware→cualquier tz) a ISO con offset Chile."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_CHILE_TZ).isoformat()
 
 
 def _serialize_session(s: SessionEntity) -> dict:
@@ -31,10 +44,11 @@ def _serialize_session(s: SessionEntity) -> dict:
         "budget_range": s.fsm_answers.get("budget_range"),
         "purchase_intent": s.fsm_answers.get("purchase_intent"),
         "salesperson_id": str(s.salesperson_id) if s.salesperson_id else None,
-        "assigned_at": s.assigned_at.isoformat() if s.assigned_at else None,
-        "closed_at": s.closed_at.isoformat() if s.closed_at else None,
-        "created_at": s.created_at.isoformat() if s.created_at else None,
-        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        "acquisition_source": s.acquisition_source,
+        "assigned_at": _to_chile(s.assigned_at),
+        "closed_at": _to_chile(s.closed_at),
+        "created_at": _to_chile(s.created_at),
+        "updated_at": _to_chile(s.updated_at),
     }
 
 

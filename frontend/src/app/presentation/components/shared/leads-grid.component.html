@@ -1,38 +1,113 @@
 <div class="leads-table-container">
+
+  <!-- ── Barra de filtros ─────────────────────────────────────────────── -->
+  <div class="leads-filters">
+
+    <div class="filter-search">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+      </svg>
+      <input
+        type="text"
+        placeholder="Buscar por ID, teléfono o vehículo…"
+        [ngModel]="searchText()"
+        (ngModelChange)="searchText.set($event)">
+    </div>
+
+    <!-- Estado: muestra label legible, filtra por valor crudo -->
+    <select
+      class="filter-select"
+      [class.is-active]="filterStatus()"
+      [ngModel]="filterStatus()"
+      (ngModelChange)="filterStatus.set($event)">
+      <option value="">Todos los estados</option>
+      @for (s of availableStatuses; track s) {
+        <option [value]="s">{{ statusLabel(s) }}</option>
+      }
+    </select>
+
+    <!-- Intención de compra (reemplaza "Origen") -->
+    <select
+      class="filter-select"
+      [class.is-active]="filterPurchaseIntent()"
+      [ngModel]="filterPurchaseIntent()"
+      (ngModelChange)="filterPurchaseIntent.set($event)">
+      <option value="">Intención de compra</option>
+      @for (i of availablePurchaseIntents; track i) {
+        <option [value]="i">{{ intentLabel(i) }}</option>
+      }
+    </select>
+
+    <div class="filter-dates">
+      <input
+        type="date"
+        class="filter-date"
+        [class.is-active]="filterDateFrom()"
+        title="Recibido desde"
+        [ngModel]="filterDateFrom()"
+        (ngModelChange)="filterDateFrom.set($event)">
+      <span class="date-sep">—</span>
+      <input
+        type="date"
+        class="filter-date"
+        [class.is-active]="filterDateTo()"
+        title="Recibido hasta"
+        [ngModel]="filterDateTo()"
+        (ngModelChange)="filterDateTo.set($event)">
+    </div>
+
+    @if (hasActiveFilters) {
+      <button class="btn-clear-filters" (click)="clearFilters()" title="Limpiar filtros">
+        Limpiar ✕
+      </button>
+    }
+
+  </div>
+
+  <!-- ── Resumen cuando hay filtros activos ──────────────────────────── -->
+  @if (hasActiveFilters) {
+    <div class="filter-summary">
+      Mostrando <strong>{{ filteredLeads.length }}</strong> de {{ leads.length }} leads
+    </div>
+  }
+
+  <!-- ── Tabla ────────────────────────────────────────────────────────── -->
   <table class="leads-table">
     <thead>
       <tr>
         <th>ID</th>
         <th>Contacto (Hash)</th>
-        <th>Vehículo de Interés</th>
-        <th>Origen</th>
+        <th>Vehículo</th>
+        <th>Intención</th>
         <th>Estado</th>
         <th>Recibido</th>
-        <th>Score (0-100)</th>
+        <th>Score</th>
         @if (canAssign) {
           <th>Asignar A</th>
         }
       </tr>
     </thead>
     <tbody>
-      @for (lead of leads; track lead.session_id) {
+      @for (lead of filteredLeads; track lead.session_id) {
         <tr>
           <td class="cell-id">{{ lead.session_id | slice:0:8 }}</td>
-          <td class="cell-name">{{ lead.lead_phone_hash | slice:0:12 }}...</td>
-          <td>{{ lead.vehicle_type || 'No especificado' }}</td>
+          <td class="cell-name">{{ lead.lead_phone_hash | slice:0:12 }}…</td>
+          <td>{{ lead.vehicle_type || '—' }}</td>
           <td>
-            <span class="source-badge" data-source="FSM">Bot / FSM</span>
-          </td>
-          <td>
-            <span class="status-badge status-{{ lead.status | lowercase }}">
-              {{ lead.status }}
+            <span class="intent-badge intent-{{ (lead.purchase_intent || '') | lowercase }}">
+              {{ intentLabel(lead.purchase_intent || '') || '—' }}
             </span>
           </td>
           <td>
-            <span class="waiting-time">{{ lead.created_at | date:'short' }}</span>
+            <span class="status-badge status-{{ lead.status | lowercase }}">
+              {{ statusLabel(lead.status) }}
+            </span>
           </td>
           <td>
-            <span class="urgency-badge" 
+            <span class="waiting-time">{{ lead.created_at | date:'short':'America/Santiago' }}</span>
+          </td>
+          <td>
+            <span class="urgency-badge"
                   [class.urgency-high]="lead.urgency_score > 60"
                   [class.urgency-medium]="lead.urgency_score > 30 && lead.urgency_score <= 60"
                   [class.urgency-normal]="lead.urgency_score <= 30">
@@ -42,20 +117,28 @@
           @if (canAssign) {
             <td>
               <select class="assign-select" (change)="onAssign(lead.session_id, $event)">
-                <option value="">Seleccionar Asesor...</option>
+                <option value="">Seleccionar Asesor…</option>
                 @for (sp of salesPersons; track sp.id) {
-                  <option value="{{ sp.id }}">{{ sp.email }} (Activos: {{ sp.active_sessions_count }})</option>
+                  <option [value]="sp.id">{{ sp.email }} (Activos: {{ sp.active_sessions_count }})</option>
                 }
               </select>
             </td>
           }
         </tr>
       }
-      @if (leads.length === 0) {
+
+      @if (filteredLeads.length === 0) {
         <tr>
-          <td [attr.colspan]="canAssign ? 8 : 7" class="text-center py-4">No hay leads pendientes en la fila de espera.</td>
+          <td [attr.colspan]="canAssign ? 8 : 7" class="empty-state">
+            @if (hasActiveFilters) {
+              Sin resultados para los filtros aplicados.
+            } @else {
+              No hay leads pendientes en la fila de espera.
+            }
+          </td>
         </tr>
       }
     </tbody>
   </table>
+
 </div>

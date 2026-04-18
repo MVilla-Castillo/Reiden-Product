@@ -51,6 +51,7 @@ export interface SessionDto {
   budget_range?: string;
   purchase_intent?: string;
   salesperson_id?: string | null;
+  acquisition_source?: string | null;
   assigned_at?: string | null;
   closed_at?: string | null;
   created_at?: string | null;
