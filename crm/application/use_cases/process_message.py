@@ -20,6 +20,7 @@ import hashlib
 import logging
 from dataclasses import dataclass, replace
 from typing import Any
+from uuid import UUID
 
 from django.db import IntegrityError, transaction
 
@@ -36,7 +37,7 @@ from crm.domain.ports import (
     SessionRepository,
     TenantRepository,
 )
-from crm.adapters.messaging.twilio_adapter import MessagingError
+from crm.domain.exceptions import MessagingError
 from crm.services.fsm_engine import FSMContext, FSMResult, advance_fsm
 
 from core.log_utils import mask_pii, stage_start, stage_end, tenant_id_var
@@ -53,6 +54,10 @@ class ProcessMessageResult:
     outbound_message_sid: str | None = None
     reply_text: str | None = None
     reply_interactive: dict[str, Any] | None = None
+    # Para SSE: expone contexto al caller sin acoplar el dominio al broadcaster
+    session_id: UUID | None = None
+    tenant_id: UUID | None = None
+    inbound_message_body: str | None = None
 
 
 class ProcessMessageUseCase:
@@ -533,4 +538,7 @@ class ProcessMessageUseCase:
             outbound_message_sid=outbound_sid,
             reply_text=reply_result.text if reply_result else None,
             reply_interactive=reply_result.interactive if reply_result else None,
+            session_id=session.id,
+            tenant_id=tenant_id,
+            inbound_message_body=_body,
         )

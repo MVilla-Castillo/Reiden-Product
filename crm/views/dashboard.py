@@ -7,11 +7,14 @@ Incluye rate limiting para proteger contra abuso (60 req/min por tenant).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from django.http import HttpRequest, JsonResponse
 
 from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
+from crm.adapters.sse.broadcaster import broadcaster
 from crm.domain.entities import SessionEntity
 from crm.models import AppUser
 
@@ -214,6 +217,15 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
                 {"error": "Error al actualizar routing_mode."},
                 status=500,
             )
+
+        broadcaster.publish_dashboard(
+            str(tenant.id),
+            "settings",
+            {
+                "routing_mode": new_routing_mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
         return JsonResponse(
             {

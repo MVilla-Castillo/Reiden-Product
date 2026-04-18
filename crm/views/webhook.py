@@ -20,11 +20,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from crm.adapters.dependency_injection import DIContainer, get_task_queue
-from crm.adapters.messaging.twilio_adapter import (
-    MessagingError,
-    SignatureValidationError,
-)
 from crm.adapters.task_queue.railway_task_queue import TaskQueueError
+from crm.domain.exceptions import MessagingError, SignatureValidationError
 from crm.domain.ports import (
     EnqueueRequest,
     SendMessageRequest,
@@ -124,13 +121,7 @@ def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
         "whatsapp:", ""
     ).lstrip("+")
     if _to_raw and _wa_id_raw:
-        from crm.models import Tenant
-
-        _tenant_id = (
-            Tenant.objects.filter(phone_number_id=_to_raw, is_verified=True)
-            .values_list("id", flat=True)
-            .first()
-        )
+        _tenant_id = DIContainer.instance().tenant_repo.find_id_by_phone_number(_to_raw)
         if _tenant_id is not None:
             try:
                 check_rate_limit(

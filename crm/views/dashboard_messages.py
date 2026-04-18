@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from django.http import HttpRequest, JsonResponse
@@ -17,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from crm.adapters.dependency_injection import DIContainer
+from crm.adapters.sse.broadcaster import broadcaster
 from crm.application.use_cases.send_outbound_message import MessageDeliveryError
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,20 @@ def send_message_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
 
+    broadcaster.publish_message(
+        str(request.tenant.id),
+        str(session_id),
+        "message",
+        {
+            "message_id": result.message_id,
+            "direction": result.direction,
+            "body": result.body,
+            "session_id": str(session_id),
+            "created_at": result.created_at,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
     return JsonResponse(
         {
             "message_id": result.message_id,
@@ -153,6 +169,18 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
+
+    broadcaster.publish_dashboard(
+        str(request.tenant.id),
+        "pending_leads",
+        {
+            "session_id": str(result.session_id),
+            "status": result.status,
+            "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
+            "action": "assigned",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     return JsonResponse(
         {
@@ -204,6 +232,18 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
 
+    broadcaster.publish_dashboard(
+        str(request.tenant.id),
+        "pending_leads",
+        {
+            "session_id": str(result.session_id),
+            "status": result.status,
+            "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
+            "action": "reassigned",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
     return JsonResponse(
         {
             "session_id": str(result.session_id),
@@ -250,6 +290,29 @@ def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonRes
 
     if result is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
+
+    ts = datetime.now(timezone.utc).isoformat()
+    broadcaster.publish_dashboard(
+        str(request.tenant.id),
+        "pending_leads",
+        {
+            "session_id": str(result.session_id),
+            "status": result.status,
+            "action": "status_changed",
+            "timestamp": ts,
+        },
+    )
+    broadcaster.publish_message(
+        str(request.tenant.id),
+        str(session_id),
+        "status_change",
+        {
+            "session_id": str(result.session_id),
+            "status": result.status,
+            "updated_at": result.updated_at,
+            "timestamp": ts,
+        },
+    )
 
     return JsonResponse(
         {

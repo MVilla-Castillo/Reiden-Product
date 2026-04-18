@@ -50,6 +50,31 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
     tenant_token = tenant_id_var.set("-")
     try:
         result = get_use_case().execute(payload)
+
+        if result.message_created and result.session_id and result.tenant_id:
+            from datetime import datetime, timezone
+            from crm.adapters.sse.broadcaster import broadcaster
+
+            ts = datetime.now(timezone.utc).isoformat()
+            tenant_id_str = str(result.tenant_id)
+            session_id_str = str(result.session_id)
+            broadcaster.publish_message(
+                tenant_id_str,
+                session_id_str,
+                "message",
+                {
+                    "direction": "INBOUND",
+                    "body": result.inbound_message_body or "",
+                    "session_id": session_id_str,
+                    "timestamp": ts,
+                },
+            )
+            broadcaster.publish_dashboard(
+                tenant_id_str,
+                "pending_leads",
+                {"session_id": session_id_str, "action": "new_inbound_message", "timestamp": ts},
+            )
+
         return JsonResponse(
             {"status": result.status, "created": result.message_created},
             status=200,

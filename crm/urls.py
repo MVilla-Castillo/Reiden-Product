@@ -31,6 +31,7 @@ from crm.views.dashboard_messages import (
     session_messages_api,
 )
 from crm.views.metrics import metrics_api
+from crm.views.sse import dashboard_sse_view, messages_sse_view
 from crm.views.scheduler import (
     scheduler_cleanup_bot_view,
     scheduler_cleanup_sales_view,
@@ -126,5 +127,13 @@ urlpatterns = [
         "api/dashboard/metrics/",
         metrics_api,
         name="metrics",
+    ),
+    # SSE: stream en tiempo real para el dashboard
+    path("api/sse/dashboard/", dashboard_sse_view, name="sse_dashboard"),
+    # SSE: stream en tiempo real de mensajes por sesión
+    path(
+        "api/sse/messages/<uuid:session_id>/",
+        messages_sse_view,
+        name="sse_messages",
     ),
 ]

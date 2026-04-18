@@ -20,6 +20,10 @@ from core.log_utils import tenant_id_var
 
 logger = logging.getLogger("metrics.red")
 
+_EXCLUDED_PATH_PREFIXES = ("/static/", "/health/")
+_EXCLUDED_PATHS = ("/favicon.ico",)
+_SLOW_THRESHOLD_MS = 1000
+
 
 class REDMetricsMiddleware:
     """
@@ -47,14 +51,13 @@ class REDMetricsMiddleware:
         finally:
             duration_ms = (time.perf_counter() - start_time) * 1000
 
-            if (
-                not request.path.startswith("/static/")
-                and request.path != "/favicon.ico"
-            ):
+            if not any(
+                request.path.startswith(p) for p in _EXCLUDED_PATH_PREFIXES
+            ) and request.path not in _EXCLUDED_PATHS:
                 path_pattern = self._resolve_path_pattern(request)
 
                 is_error = status_code >= 400
-                is_slow = duration_ms > 1000
+                is_slow = duration_ms > _SLOW_THRESHOLD_MS
                 is_health = request.path.startswith("/health/")
 
                 if is_error or is_slow:

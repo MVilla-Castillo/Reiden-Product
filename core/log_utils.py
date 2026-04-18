@@ -77,6 +77,7 @@ class ContextFilter(logging.Filter):
 
 
 def mask_pii(wa_id: str) -> str:
+    """Enmascara un número de WhatsApp mostrando solo los últimos 4 dígitos."""
     if not wa_id or len(wa_id) < 4:
         return "****"
     return "****" + wa_id[-4:]
@@ -96,6 +97,7 @@ def _get_stage_timings() -> dict[str, float]:
 
 
 def stage_start(stage_name: str) -> None:
+    """Registra el inicio de un stage cronometrado. Usar en par con stage_end()."""
     timings = _get_stage_timings()
     timings[stage_name] = time.perf_counter()
 
@@ -105,6 +107,12 @@ def stage_end(
     logger: logging.Logger,
     extra: dict[str, Any] | None = None,
 ) -> None:
+    """
+    Emite un log estructurado con la duración del stage iniciado con stage_start().
+
+    Si stage_name no fue iniciado previamente, retorna silenciosamente.
+    El campo extra se fusiona con los campos de observabilidad estándar.
+    """
     timings = _get_stage_timings()
     start_time = timings.pop(stage_name, None)
     if start_time is None:

@@ -5,8 +5,10 @@ import jwt
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.http import JsonResponse
 from django.core.cache import cache
+from django.http import JsonResponse
+
+from core.log_utils import tenant_id_var
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -36,32 +38,17 @@ class OIDCStatelessMiddleware:
         if any(request.path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return self.get_response(request)
 
-        # Dashboard paths públicos en DEBUG - inyectar tenant automáticamente
-        if request.path.startswith("/api/dashboard/") and request.path not in (
-            "/api/dashboard/leads/",  # исключение - только para leads
+        # DEBUG bypass: inyectar tenant automáticamente en todas las rutas de dashboard.
+        # IMPORTANTE: settings.DEBUG DEBE estar presente — sin él se saltea OIDC en producción.
+        if settings.DEBUG and (
+            request.path.startswith("/api/dashboard/")
+            or request.path.startswith("/api/sse/")
         ):
             from crm.models import Tenant
 
             tenant = Tenant.objects.order_by("created_at").first()
             if tenant:
                 request.tenant = tenant
-                request.user = User.objects.filter(tenant=tenant).first()
-                request.oidc_bypass = True
-
-                from core.log_utils import tenant_id_var
-
-                tenant_id_var.set(str(tenant.id))
-
-                return self.get_response(request)
-
-        # Dashboard paths públicos en DEBUG - inyectar tenant automáticamente
-        if settings.DEBUG and request.path.startswith("/api/dashboard/"):
-            from crm.models import Tenant
-
-            tenant = Tenant.objects.order_by("created_at").first()
-            if tenant:
-                request.tenant = tenant
-
                 user_id_header = request.headers.get("X-User-ID")
                 if user_id_header:
                     try:
@@ -74,57 +61,11 @@ class OIDCStatelessMiddleware:
                     request.user = User.objects.filter(tenant=tenant).first()
 
                 request.oidc_bypass = True
-
-                from core.log_utils import tenant_id_var
-
                 tenant_id_var.set(str(tenant.id))
-
-                logger.debug(f"OIDC: DEBUG bypass para {request.path}")
-                return self.get_response(request)
-
-        # Dashboard paths - permitir bypass en DEBUG mode (incluye /metrics, /leads, etc.)
-        if settings.DEBUG and request.path.startswith("/api/dashboard/"):
-            from crm.models import Tenant
-
-            tenant = Tenant.objects.order_by("created_at").first()
-            if tenant:
-                request.tenant = tenant
-                request.user = User.objects.filter(tenant=tenant).first()
-                request.oidc_bypass = True
-
-                from core.log_utils import tenant_id_var
-
-                tenant_id_var.set(str(tenant.id))
-
-                logger.warning(f"OIDC: DEBUG BYPASS para {request.path}")
+                logger.debug("OIDC: DEBUG bypass para %s", request.path)
                 return self.get_response(request)
 
         auth_header = request.headers.get("Authorization")
-
-        # [DEV BYPASS] Legacy - mantener para compatibilidad
-        if (
-            not auth_header
-            and settings.DEBUG
-            and request.path.startswith("/api/dashboard/leads/")
-        ):
-            from crm.models import Tenant
-
-            tenant = Tenant.objects.first()
-            if tenant:
-                request.tenant = tenant
-                request.user = (
-                    User.objects.filter(tenant=tenant).first() or User.objects.first()
-                )
-                request.oidc_bypass = True
-
-                from core.log_utils import tenant_id_var
-
-                tenant_id_var.set(str(tenant.id))
-
-                logger.warning(
-                    f"OIDC: DEV BYPASS activado para {request.path} usando Tenant {tenant.id}"
-                )
-                return self.get_response(request)
 
         if not auth_header or not auth_header.startswith("Bearer "):
             logger.info(f"OIDC: Unauthorized access attempt to {request.path}")
@@ -185,9 +126,6 @@ class OIDCStatelessMiddleware:
 
             request.user = user
             request.tenant = tenant
-
-            from core.log_utils import tenant_id_var
-
             tenant_id_var.set(str(tenant.id))
 
         except jwt.ExpiredSignatureError:

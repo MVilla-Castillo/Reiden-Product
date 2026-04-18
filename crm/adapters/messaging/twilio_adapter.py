@@ -20,6 +20,7 @@ from twilio.http.http_client import TwilioHttpClient
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
 
+from crm.domain.exceptions import MessagingError, SignatureValidationError
 from crm.domain.ports import (
     MessageProvider,
     SendMessageRequest,
@@ -28,22 +29,15 @@ from crm.domain.ports import (
     SignatureValidationResult,
 )
 
+# Re-exportar para compatibilidad con imports existentes que venían de este módulo.
+__all__ = [
+    "MessagingError",
+    "SignatureValidationError",
+    "TwilioMessageProvider",
+    "InMemoryMessageProvider",
+]
+
 logger = logging.getLogger(__name__)
-
-
-class MessagingError(Exception):
-    """Error de dominio: fallo al enviar un mensaje vía proveedor externo."""
-
-    def __init__(self, message: str, provider_code: str | None = None) -> None:
-        super().__init__(message)
-        self.provider_code = provider_code
-
-
-class SignatureValidationError(Exception):
-    """Error de dominio: la firma del webhook no es válida o está ausente."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
 
 
 class TwilioMessageProvider(MessageProvider):
