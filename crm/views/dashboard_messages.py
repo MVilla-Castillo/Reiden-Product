@@ -178,6 +178,8 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
             "status": result.status,
             "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
             "action": "assigned",
+            "assigned_delta": 1,
+            "pending_delta": -1,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -240,6 +242,8 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
             "status": result.status,
             "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
             "action": "reassigned",
+            "assigned_delta": 1,
+            "pending_delta": -1,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -292,6 +296,12 @@ def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonRes
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
 
     ts = datetime.now(timezone.utc).isoformat()
+    status_delta: dict = {}
+    if result.status == "GANADO":
+        status_delta["won_delta"] = 1
+    elif result.status == "PERDIDO":
+        status_delta["lost_delta"] = 1
+
     broadcaster.publish_dashboard(
         str(request.tenant.id),
         "pending_leads",
@@ -299,6 +309,7 @@ def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonRes
             "session_id": str(result.session_id),
             "status": result.status,
             "action": "status_changed",
+            **status_delta,
             "timestamp": ts,
         },
     )

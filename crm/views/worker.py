@@ -72,7 +72,12 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
             broadcaster.publish_dashboard(
                 tenant_id_str,
                 "pending_leads",
-                {"session_id": session_id_str, "action": "new_inbound_message", "timestamp": ts},
+                {
+                    "session_id": session_id_str,
+                    "action": "new_inbound_message",
+                    "pending_delta": 1,
+                    "timestamp": ts,
+                },
             )
 
         return JsonResponse(

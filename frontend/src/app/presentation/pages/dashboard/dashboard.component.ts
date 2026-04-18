@@ -8,6 +8,8 @@ import { KpiCardComponent } from '../../components/shared/kpi-card.component';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
 import { SessionDto, SalespersonDto, MetricsResponse, TenantSettings } from '../../../core/models/crm.models';
 
+const METRICS_BACKUP_MS = 3_600_000; // 1 hora
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -26,8 +28,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   tenantSettings = signal<TenantSettings | null>(null);
 
   isManager = signal(true);
+  isRefreshing = signal(false);
 
   private sseSub?: Subscription;
+  private metricsBackupInterval?: ReturnType<typeof setInterval>;
 
   constructor() {
     effect(() => {
@@ -36,12 +40,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // Métricas no tienen evento SSE: carga única al iniciar
+    // Carga inicial de métricas
     this.crmApi.getMetrics().subscribe(m => this.metrics.set(m));
+
+    // Backup automático cada hora: sincroniza con BD por si se perdieron eventos SSE
+    this.metricsBackupInterval = setInterval(
+      () => this.crmApi.getMetrics().subscribe(m => this.metrics.set(m)),
+      METRICS_BACKUP_MS
+    );
 
     this.sseSub = this.sseService.dashboardStream().subscribe(event => {
       if (event.type === 'snapshot') {
-        // Estado completo al conectar: pending_leads + salespeople + settings
         this.leads.set(event.data.pending_leads ?? []);
         this.salesPersons.set(event.data.salespeople ?? []);
         if (event.data.settings?.routing_mode) {
@@ -53,7 +62,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
 
       if (event.type === 'pending_leads') {
-        // Re-fetch completo para mantener consistencia (orden por urgency_score, etc.)
+        // Aplica deltas localmente a las KPI sin consultar la BD
+        this._applyDeltas(event.data);
+        // Re-fetch de la lista de leads para mantener orden y datos frescos
         this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
       }
 
@@ -68,6 +79,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.sseSub?.unsubscribe();
+    if (this.metricsBackupInterval) {
+      clearInterval(this.metricsBackupInterval);
+    }
+  }
+
+  /** Botón manual de refresh — solo visible para managers */
+  refreshMetrics(): void {
+    this.isRefreshing.set(true);
+    this.crmApi.getMetrics().subscribe({
+      next: m => {
+        this.metrics.set(m);
+        this.isRefreshing.set(false);
+      },
+      error: () => this.isRefreshing.set(false),
+    });
   }
 
   toggleRoutingMode() {
@@ -75,5 +101,54 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!ts) return;
     const newMode = ts.routing_mode === 'AUTO' ? 'MANUAL' : 'AUTO';
     this.crmApi.updateTenantSettings(newMode).subscribe(updated => this.tenantSettings.set(updated));
+  }
+
+  handleAssignment(event: {leadId: string, agentId: string}) {
+    this.crmApi.assignLead(event.leadId, event.agentId).subscribe({
+      next: () => {
+        this.leads.update(current => current.filter(l => l.session_id !== event.leadId));
+      },
+      error: (err) => {
+        console.error('Error assigning lead:', err);
+      }
+    });
+  }
+
+  /**
+   * Aplica deltas del evento SSE directamente a la señal metrics.
+   *
+   * Reglas de mapeo:
+   *   pending_delta  → total_leads  (solo cuando NO hay assigned_delta; el nuevo lead
+   *                                  entra al sistema. En asignación, el count baja
+   *                                  automáticamente al subir assigned_leads.)
+   *   assigned_delta → assigned_leads
+   *   won_delta      → won_sessions
+   *   lost_delta     → lost_sessions
+   */
+  private _applyDeltas(data: any): void {
+    const m = this.metrics();
+    if (!m) return;
+
+    const pendingDelta: number  = data.pending_delta  ?? 0;
+    const assignedDelta: number = data.assigned_delta ?? 0;
+    const wonDelta: number      = data.won_delta      ?? 0;
+    const lostDelta: number     = data.lost_delta     ?? 0;
+
+    // pending_delta solo mueve total_leads cuando es un nuevo lead (no hay assigned_delta).
+    // Si hay assigned_delta, el conteo de "pendientes" baja porque assigned_leads sube.
+    const totalDelta = assignedDelta === 0 ? pendingDelta : 0;
+
+    if (totalDelta === 0 && assignedDelta === 0 && wonDelta === 0 && lostDelta === 0) return;
+
+    this.metrics.update(current => ({
+      ...current!,
+      funnel: {
+        ...current!.funnel,
+        total_leads:    current!.funnel.total_leads    + totalDelta,
+        assigned_leads: current!.funnel.assigned_leads + assignedDelta,
+        won_sessions:   current!.funnel.won_sessions   + wonDelta,
+        lost_sessions:  current!.funnel.lost_sessions  + lostDelta,
+      },
+    }));
   }
 }

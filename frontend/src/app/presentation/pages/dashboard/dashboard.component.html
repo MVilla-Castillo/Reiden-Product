@@ -13,29 +13,44 @@
 
   @if (isManager() && metrics()) {
     <section class="kpi-section">
-      <app-kpi-card 
-        icon="⚡" 
-        [value]="metrics()!.time_metrics.avg_time_to_first_response + 'm'"
-        trend="+0%"
-        label="T. Respuesta Promedio">
-      </app-kpi-card>
-      <app-kpi-card 
-        icon="⚠️" 
-        [value]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads).toString()" 
-        label="Pendientes de Asignación"
-        [critical]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads) > 0">
-      </app-kpi-card>
-      <app-kpi-card 
-        icon="👔" 
-        [value]="metrics()!.funnel.assigned_leads.toString()" 
-        label="Leads Asignados (Vendedores)">
-      </app-kpi-card>
-      <app-kpi-card 
-        icon="🎯" 
-        [value]="metrics()!.funnel.win_rate + '%'" 
-        trend="+0%"
-        label="Tasa de Cierre">
-      </app-kpi-card>
+      <div class="kpi-section-header">
+        <span class="kpi-section-title">KPIs en tiempo real</span>
+        @if (isManager()) {
+          <button
+            class="btn-refresh-metrics"
+            (click)="refreshMetrics()"
+            [disabled]="isRefreshing()"
+            title="Sincronizar métricas con base de datos">
+            <span [class.spinning]="isRefreshing()">🔄</span>
+          </button>
+        }
+      </div>
+
+      <div class="kpi-cards">
+        <app-kpi-card
+          icon="⚡"
+          [value]="metrics()!.time_metrics.avg_time_to_first_response + 'm'"
+          trend="+0%"
+          label="T. Respuesta Promedio">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="⚠️"
+          [value]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads).toString()"
+          label="Pendientes de Asignación"
+          [critical]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads) > 0">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="👔"
+          [value]="metrics()!.funnel.assigned_leads.toString()"
+          label="Leads Asignados (Vendedores)">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="🎯"
+          [value]="metrics()!.funnel.win_rate + '%'"
+          trend="+0%"
+          label="Tasa de Cierre">
+        </app-kpi-card>
+      </div>
     </section>
   }
 
@@ -44,10 +59,11 @@
       <h2>{{ isManager() ? 'Leads Pendientes' : 'Mis Leads' }}</h2>
       <span class="lead-count">{{ leads().length }} registros pendientes</span>
     </div>
-     <app-leads-grid 
-       [leads]="leads()" 
-       [salesPersons]="salesPersons()"
-       [canAssign]="isManager()">
-     </app-leads-grid>
+<app-leads-grid
+        [leads]="leads()"
+        [salesPersons]="salesPersons()"
+        [canAssign]="isManager()"
+        (assignLead)="handleAssignment($event)">
+      </app-leads-grid>
   </section>
 </div>
