@@ -5,56 +5,69 @@ Dos streams:
   GET /api/sse/dashboard/   → snapshot inicial + eventos: pending_leads, settings, heartbeat
   GET /api/sse/messages/<session_id>/ → eventos: message, status_change, heartbeat
 
-Nota de autenticación: EventSource del browser no puede enviar headers
-Authorization. Para activar en el frontend, pasar el token como query param
-?token=<jwt> y actualizar OIDCStatelessMiddleware para leerlo de request.GET.
+Diseño 100% síncrono — compatible con WSGI (runserver local) y ASGI (uvicorn Docker).
+  - Views y generadores son funciones síncronas normales (def, no async def).
+  - StreamingHttpResponse recibe un generador síncrono: no hay conflicto con WSGI.
+  - threading.Queue.get(block=True, timeout=N) bloquea el thread WSGI del request
+    durante N segundos a lo sumo. Cada conexión SSE ocupa un thread — comportamiento
+    esperado y equivalente a lo que hacía antes el polling, pero sin repetir requests.
+  - En uvicorn (Docker), las sync views se despachan al thread pool de Django/asgiref,
+    mismo comportamiento.
+
+Error que se corrige:
+  "StreamingHttpResponse must consume asynchronous iterators in order to serve them
+   synchronously. Use a synchronous iterator instead."
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import queue as _queue
+from datetime import datetime, timezone
 from uuid import UUID
 
-from asgiref.sync import sync_to_async
 from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 
 from crm.adapters.sse.broadcaster import broadcaster, heartbeat_frame
 
 logger = logging.getLogger(__name__)
 
-HEARTBEAT_INTERVAL = 25  # segundos
+HEARTBEAT_INTERVAL = 25  # segundos — tiempo máximo entre heartbeats
 
 
-async def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
+def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     """
-    SSE stream para el dashboard: emite snapshot al conectar,
-    luego deltas a medida que llegan eventos del broadcaster.
+    SSE stream para el dashboard.
+    Emite snapshot al conectar, luego deltas a medida que el broadcaster
+    publica eventos (pending_leads, settings).
     """
     tenant = getattr(request, "tenant", None)
     if tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
     tenant_id = str(tenant.id)
-    queue = broadcaster.subscribe_dashboard(tenant_id)
+    q = broadcaster.subscribe_dashboard(tenant_id)
     logger.debug("SSE dashboard: nueva conexión (tenant=%s)", tenant_id)
 
-    async def event_stream():
+    def event_stream():
         try:
-            snapshot = await _build_dashboard_snapshot(tenant)
-            yield snapshot
+            yield _build_dashboard_snapshot(tenant)
 
             while True:
                 try:
-                    msg = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_INTERVAL)
+                    # Bloquea el thread hasta HEARTBEAT_INTERVAL seg o hasta recibir un evento.
+                    # threading.Queue.get() es thread-safe: cualquier thread WSGI puede
+                    # publicar con put_nowait() y este get() lo recibe inmediatamente.
+                    msg = q.get(block=True, timeout=HEARTBEAT_INTERVAL)
                     yield msg
-                except asyncio.TimeoutError:
+                except _queue.Empty:
+                    # Timeout sin mensajes → envía comentario SSE para mantener la conexión
                     yield heartbeat_frame()
         except GeneratorExit:
             pass
         finally:
-            broadcaster.unsubscribe_dashboard(tenant_id, queue)
+            broadcaster.unsubscribe_dashboard(tenant_id, q)
             logger.debug("SSE dashboard: conexión cerrada (tenant=%s)", tenant_id)
 
     response = StreamingHttpResponse(
@@ -66,7 +79,7 @@ async def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     return response
 
 
-async def messages_sse_view(
+def messages_sse_view(
     request: HttpRequest, session_id: UUID
 ) -> StreamingHttpResponse:
     """
@@ -79,25 +92,25 @@ async def messages_sse_view(
 
     tenant_id = str(tenant.id)
     session_id_str = str(session_id)
-    queue = broadcaster.subscribe_messages(tenant_id, session_id_str)
+    q = broadcaster.subscribe_messages(tenant_id, session_id_str)
     logger.debug(
         "SSE messages: nueva conexión (tenant=%s, session=%s)",
         tenant_id,
         session_id_str,
     )
 
-    async def event_stream():
+    def event_stream():
         try:
             while True:
                 try:
-                    msg = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_INTERVAL)
+                    msg = q.get(block=True, timeout=HEARTBEAT_INTERVAL)
                     yield msg
-                except asyncio.TimeoutError:
+                except _queue.Empty:
                     yield heartbeat_frame()
         except GeneratorExit:
             pass
         finally:
-            broadcaster.unsubscribe_messages(tenant_id, session_id_str, queue)
+            broadcaster.unsubscribe_messages(tenant_id, session_id_str, q)
             logger.debug(
                 "SSE messages: conexión cerrada (tenant=%s, session=%s)",
                 tenant_id,
@@ -113,32 +126,21 @@ async def messages_sse_view(
     return response
 
 
-async def _build_dashboard_snapshot(tenant) -> str:
+def _build_dashboard_snapshot(tenant) -> str:
     """
-    Consulta DB (vía sync_to_async) y arma el frame SSE 'snapshot'
+    Consulta DB de forma síncrona y construye el frame SSE 'snapshot'
     con pending_leads, salespeople y settings en una sola respuesta.
+    Se llama desde el generador síncrono — no necesita sync_to_async.
     """
-    from datetime import datetime, timezone
-
     from crm.adapters.dependency_injection import DIContainer
     from crm.views.dashboard import _serialize_session
 
     container = DIContainer.instance()
     tenant_id = tenant.id
 
-    get_pending = sync_to_async(
-        lambda: container.session_repo.get_pending_sessions(tenant_id, limit=50)
-    )
-    get_salespeople = sync_to_async(
-        lambda: container.user_repo.find_salespeople_by_tenant(tenant_id)
-    )
-    get_settings = sync_to_async(
-        lambda: container.tenant_repo.find_by_id(tenant_id)
-    )
-
-    pending, salespeople, settings_data = await asyncio.gather(
-        get_pending(), get_salespeople(), get_settings()
-    )
+    pending = container.session_repo.get_pending_sessions(tenant_id, limit=50)
+    salespeople = container.user_repo.find_salespeople_by_tenant(tenant_id)
+    settings_data = container.tenant_repo.find_by_id(tenant_id)
 
     payload = {
         "pending_leads": [_serialize_session(s) for s in pending],

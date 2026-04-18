@@ -1,9 +1,10 @@
 import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
+import { SseService } from '../../../infrastructure/services/sse.service';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
-import { interval, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 
 @Component({
 // ... (Keeping decorator matching)
@@ -118,33 +119,37 @@ import { interval, Subscription } from 'rxjs';
 })
 export class LeadsComponent implements OnInit, OnDestroy {
   crmApi = inject(CrmApiService);
-  
+  private sseService = inject(SseService);
+
   leads = signal<SessionDto[]>([]);
   salesPersons = signal<SalespersonDto[]>([]);
   routingMode = signal<'AUTO' | 'MANUAL'>('MANUAL');
   toastMessage = signal<string | null>(null);
-  private pollingSub?: Subscription;
+  private sseSub?: Subscription;
 
   ngOnInit() {
-    this.refreshLeads();
-    this.crmApi.getSalespeople().subscribe(sp => this.salesPersons.set(sp));
-    
-    this.crmApi.getTenantSettings().subscribe(settings => {
-      this.routingMode.set(settings.routing_mode);
-    });
+    this.sseSub = this.sseService.dashboardStream().subscribe(event => {
+      if (event.type === 'snapshot') {
+        this.leads.set(event.data.pending_leads ?? []);
+        this.salesPersons.set(event.data.salespeople ?? []);
+        if (event.data.settings?.routing_mode) {
+          this.routingMode.set(event.data.settings.routing_mode);
+        }
+      }
 
-    // Start 3 second polling interval for fresh leads
-    this.pollingSub = interval(3000).subscribe(() => this.refreshLeads());
+      if (event.type === 'pending_leads') {
+        // Re-fetch para respetar ordenamiento por urgency_score del backend
+        this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
+      }
+
+      if (event.type === 'settings') {
+        this.routingMode.set(event.data.routing_mode);
+      }
+    });
   }
 
   ngOnDestroy() {
-    if (this.pollingSub) {
-      this.pollingSub.unsubscribe();
-    }
-  }
-
-  refreshLeads() {
-    this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
+    this.sseSub?.unsubscribe();
   }
 
   toggleRoutingMode() {

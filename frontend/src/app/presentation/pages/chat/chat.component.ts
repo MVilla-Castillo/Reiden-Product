@@ -1,8 +1,9 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { interval, switchMap, filter } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
+import { SseService } from '../../../infrastructure/services/sse.service';
 import { SessionDto, BackendMessage } from '../../../core/models/crm.models';
 
 @Component({
@@ -12,8 +13,9 @@ import { SessionDto, BackendMessage } from '../../../core/models/crm.models';
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, OnDestroy {
   private crmApi = inject(CrmApiService);
+  private sseService = inject(SseService);
 
   chats = signal<SessionDto[]>([]);
   selectedSession = signal<SessionDto | null>(null);
@@ -21,20 +23,16 @@ export class ChatComponent implements OnInit {
   messages = signal<BackendMessage[]>([]);
   newMessage = signal('');
 
+  private msgSseSub?: Subscription;
+
   constructor() {}
 
   ngOnInit() {
     this.loadMyChats();
-    this.setupMessagePolling();
   }
 
-  setupMessagePolling() {
-    interval(3000).pipe(
-      filter(() => !!this.selectedSessionId()),
-      switchMap(() => this.crmApi.getMessages(this.selectedSessionId()!))
-    ).subscribe(messages => {
-      this.messages.set(messages);
-    });
+  ngOnDestroy() {
+    this.msgSseSub?.unsubscribe();
   }
 
   loadMyChats() {
@@ -46,12 +44,36 @@ export class ChatComponent implements OnInit {
   selectLead(chat: SessionDto) {
     this.selectedSession.set(chat);
     this.selectedSessionId.set(chat.session_id);
-    this.loadMessages(chat.session_id);
-  }
 
-  loadMessages(sessionId: string) {
-    this.crmApi.getMessages(sessionId).subscribe(messages => {
+    // Carga el historial completo una sola vez
+    this.crmApi.getMessages(chat.session_id).subscribe(messages => {
       this.messages.set(messages);
+    });
+
+    // Cierra la conexión anterior (si se cambia de sesión) y abre la nueva
+    this.msgSseSub?.unsubscribe();
+    this.msgSseSub = this.sseService.messagesStream(chat.session_id).subscribe(event => {
+      if (event.type === 'message') {
+        this.messages.update(msgs => {
+          // Deduplicar: evita agregar mensajes que ya están (ej. update optimista de OUTBOUND)
+          const incoming = event.data as BackendMessage;
+          const alreadyExists = incoming.message_id
+            ? msgs.some(m => m.message_id === incoming.message_id)
+            : false;
+          return alreadyExists ? msgs : [...msgs, incoming];
+        });
+      }
+
+      if (event.type === 'status_change') {
+        this.selectedSession.update(s =>
+          s ? { ...s, status: event.data.status } : s
+        );
+        this.chats.update(cs =>
+          cs.map(c =>
+            c.session_id === event.data.session_id ? { ...c, status: event.data.status } : c
+          )
+        );
+      }
     });
   }
 
@@ -60,9 +82,9 @@ export class ChatComponent implements OnInit {
     const body = this.newMessage();
     if (!sessionId || !body.trim()) return;
 
-    this.crmApi.sendMessage(sessionId, body).subscribe((res) => {
+    this.crmApi.sendMessage(sessionId, body).subscribe(res => {
       this.newMessage.set('');
-      // Optimistic update
+      // Actualización optimista: agrega inmediatamente sin esperar el evento SSE
       const msg: BackendMessage = {
         message_id: res.message_id,
         direction: res.direction,
@@ -71,17 +93,18 @@ export class ChatComponent implements OnInit {
         provider_message_sid: res.provider_message_sid
       };
       this.messages.update(msgs => [...msgs, msg]);
+      // El evento SSE que llegará después será deduplicado por message_id
     });
   }
 
   updateStatus(status: 'GANADO' | 'PERDIDO') {
     const sessionId = this.selectedSessionId();
     if (!sessionId) return;
-    
+
     let lostReason: string | undefined;
     if (status === 'PERDIDO') {
       const reason = prompt('Por favor indique el motivo de pérdida del lead:');
-      if (!reason) return; // User cancelled
+      if (!reason) return;
       lostReason = reason;
     }
 
@@ -89,7 +112,7 @@ export class ChatComponent implements OnInit {
       this.loadMyChats();
       this.selectedSession.set(null);
       this.selectedSessionId.set(null);
+      this.msgSseSub?.unsubscribe();
     });
   }
 }
-
