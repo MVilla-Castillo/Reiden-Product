@@ -44,6 +44,7 @@ class SessionEntity:
     last_message_timestamp: str | None = None
     lost_reason: str | None = None
     assigned_at: datetime | None = None
+    pending_assignment_at: datetime | None = None
     first_response_at: datetime | None = None
     closed_at: datetime | None = None
     acquisition_source: str | None = None

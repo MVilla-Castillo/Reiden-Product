@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -395,6 +396,11 @@ class ProcessMessageUseCase:
                         updated_session = replace(
                             updated_session, status=reply_result.new_status
                         )
+                        if reply_result.new_status == "PENDING_ASSIGNMENT":
+                            now = datetime.now(timezone.utc)
+                            updated_session = replace(
+                                updated_session, pending_assignment_at=now
+                            )
                     if (
                         reply_result.urgency_score
                         and reply_result.urgency_score != session.urgency_score

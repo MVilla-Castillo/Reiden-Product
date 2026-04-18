@@ -60,6 +60,7 @@ def _session_to_entity(model: ChatSession) -> SessionEntity:
         last_message_timestamp=model.last_message_timestamp,
         lost_reason=model.lost_reason,
         assigned_at=model.assigned_at,
+        pending_assignment_at=model.pending_assignment_at,
         first_response_at=model.first_response_at,
         closed_at=model.closed_at,
         acquisition_source=model.acquisition_source,
@@ -265,6 +266,8 @@ class DjangoSessionRepository(SessionRepository):
         fields_to_update.append("salesperson_id")
         update_data["assigned_at"] = session.assigned_at
         fields_to_update.append("assigned_at")
+        update_data["pending_assignment_at"] = session.pending_assignment_at
+        fields_to_update.append("pending_assignment_at")
         update_data["first_response_at"] = session.first_response_at
         fields_to_update.append("first_response_at")
         update_data["closed_at"] = session.closed_at
@@ -542,8 +545,8 @@ class DjangoSessionRepository(SessionRepository):
             (assigned_leads / completed_fsm * 100) if completed_fsm > 0 else 0
         )
         win_rate = (
-            (won_sessions / (won_sessions + lost_sessions) * 100)
-            if (won_sessions + lost_sessions) > 0
+            (won_sessions / (won_sessions + con_vendedor + lost_sessions) * 100)
+            if (won_sessions + con_vendedor + lost_sessions) > 0
             else 0
         )
 
@@ -646,9 +649,10 @@ class DjangoSessionRepository(SessionRepository):
                 ChatSession.Status.PERDIDO,
             ],
             first_response_at__isnull=False,
+            pending_assignment_at__isnull=False,
         )
         avg_time_to_first_response = with_response.aggregate(
-            avg=Avg(F("first_response_at") - F("assigned_at"))
+            avg=Avg(F("first_response_at") - F("pending_assignment_at"))
         )["avg"]
 
         closed = qs.filter(

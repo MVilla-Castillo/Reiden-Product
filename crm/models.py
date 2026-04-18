@@ -214,6 +214,11 @@ class ChatSession(models.Model):
     assigned_at = models.DateTimeField(
         blank=True, null=True, help_text="Timestamp de asignación a vendedor"
     )
+    pending_assignment_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp cuando el lead completó el FSM y quedó en PENDING_ASSIGNMENT",
+    )
     first_response_at = models.DateTimeField(
         blank=True,
         null=True,
