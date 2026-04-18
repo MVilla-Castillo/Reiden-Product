@@ -102,6 +102,8 @@ export interface MetricsResponse {
     total_leads: number;
     completed_fsm: number;
     assigned_leads: number;
+    con_vendedor: number;
+    pending_assignment: number;
     won_sessions: number;
     lost_sessions: number;
     abandoned_sessions: number;

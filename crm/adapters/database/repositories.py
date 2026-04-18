@@ -527,6 +527,10 @@ class DjangoSessionRepository(SessionRepository):
             ]
         ).count()
         assigned_leads = qs.exclude(salesperson_id__isnull=True).count()
+        con_vendedor = qs.filter(status=ChatSession.Status.CON_VENDEDOR).count()
+        pending_assignment = qs.filter(
+            status=ChatSession.Status.PENDING_ASSIGNMENT
+        ).count()
         won_sessions = qs.filter(status=ChatSession.Status.GANADO).count()
         lost_sessions = qs.filter(status__in=[ChatSession.Status.PERDIDO]).count()
         abandoned_sessions = qs.filter(status=ChatSession.Status.ABANDONO_BOT).count()
@@ -547,6 +551,8 @@ class DjangoSessionRepository(SessionRepository):
             "total_leads": total_leads,
             "completed_fsm": completed_fsm,
             "assigned_leads": assigned_leads,
+            "con_vendedor": con_vendedor,
+            "pending_assignment": pending_assignment,
             "won_sessions": won_sessions,
             "lost_sessions": lost_sessions,
             "abandoned_sessions": abandoned_sessions,

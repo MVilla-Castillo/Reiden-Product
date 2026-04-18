@@ -35,14 +35,14 @@
         </app-kpi-card>
         <app-kpi-card
           icon="⚠️"
-          [value]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads).toString()"
+          [value]="metrics()!.funnel.pending_assignment.toString()"
           label="Pendientes de Asignación"
-          [critical]="(metrics()!.funnel.total_leads - metrics()!.funnel.assigned_leads) > 0">
+          [critical]="metrics()!.funnel.pending_assignment > 0">
         </app-kpi-card>
         <app-kpi-card
           icon="👔"
-          [value]="metrics()!.funnel.assigned_leads.toString()"
-          label="Leads Asignados (Vendedores)">
+          [value]="metrics()!.funnel.con_vendedor.toString()"
+          label="Con Vendedores">
         </app-kpi-card>
         <app-kpi-card
           icon="🎯"
