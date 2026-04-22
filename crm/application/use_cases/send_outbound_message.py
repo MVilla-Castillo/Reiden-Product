@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import sentry_sdk
-from django.utils import timezone
 
 from crm.domain.ports import (
     AuditEntry,
@@ -129,11 +128,10 @@ class SendOutboundMessageUseCase:
         )
 
         if session.first_response_at is None:
-            now = timezone.now()
             self._session_repo.save(
                 session,
                 update_fields=["first_response_at"],
-                first_response_at=now,
+                first_response_at=message.created_at,
             )
 
         self._audit_logger.record(

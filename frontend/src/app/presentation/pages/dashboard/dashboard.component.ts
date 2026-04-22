@@ -96,6 +96,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Convierte minutos decimales a formato "M:SS"  (ej. 2.5 → "2:30") */
+  formatMinutes(totalMinutes: number): string {
+    const m = Math.floor(totalMinutes);
+    const s = Math.round((totalMinutes - m) * 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
   toggleRoutingMode() {
     const ts = this.tenantSettings();
     if (!ts) return;

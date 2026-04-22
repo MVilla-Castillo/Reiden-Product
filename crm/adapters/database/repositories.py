@@ -649,10 +649,14 @@ class DjangoSessionRepository(SessionRepository):
                 ChatSession.Status.PERDIDO,
             ],
             first_response_at__isnull=False,
-            pending_assignment_at__isnull=False,
+            assigned_at__isnull=False,
+            # Excluye registros con timestamps inconsistentes (first_response_at
+            # anterior a assigned_at), que indican mensajes enviados antes de la
+            # asignación formal y producirían deltas negativos en el promedio.
+            first_response_at__gt=F("assigned_at"),
         )
         avg_time_to_first_response = with_response.aggregate(
-            avg=Avg(F("first_response_at") - F("pending_assignment_at"))
+            avg=Avg(F("first_response_at") - F("assigned_at"))
         )["avg"]
 
         closed = qs.filter(

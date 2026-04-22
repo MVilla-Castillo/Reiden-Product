@@ -29,7 +29,7 @@
       <div class="kpi-cards">
         <app-kpi-card
           icon="⚡"
-          [value]="metrics()!.time_metrics.avg_time_to_first_response + 'm'"
+          [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
           trend="+0%"
           label="T. Respuesta Promedio">
         </app-kpi-card>
