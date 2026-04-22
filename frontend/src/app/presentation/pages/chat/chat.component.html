@@ -1,4 +1,4 @@
-<div class="chat-container">
+<div class="chat-container" [class.drawer-open]="drawerOpen()">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
       <h2>Mis Chats Activos</h2>
@@ -30,15 +30,27 @@
   </aside>
 
   <main class="chat-window">
+    @if (sseReconnecting()) {
+      <div class="sse-banner" role="status" aria-live="polite">
+        <span class="sse-spinner"></span>
+        Reconectando… los mensajes nuevos llegarán en cuanto se restablezca la conexión.
+      </div>
+    }
+
     @if (selectedSession()) {
       <div class="chat-header">
         <div class="header-details">
           <h3>Chat con Cliente {{ selectedSession()?.lead_phone_hash | slice:0:6 }}</h3>
-          <span class="vehicle-badge">{{ selectedSession()?.vehicle_type }}</span>
+          @if (selectedSession()?.vehicle_type) {
+            <span class="vehicle-badge">{{ selectedSession()?.vehicle_type }}</span>
+          }
         </div>
         <div class="header-actions">
            <button class="btn btn-success mx-2" (click)="updateStatus('GANADO')">Venta Cerrada (Ganado)</button>
            <button class="btn btn-danger" (click)="updateStatus('PERDIDO')">Descartar (Perdido)</button>
+           <button class="btn-drawer-toggle" (click)="toggleDrawer()" [class.active]="drawerOpen()" title="Ver ficha del lead">
+             {{ drawerOpen() ? '✕' : 'ℹ' }}
+           </button>
         </div>
       </div>
       <div class="messages-area">
@@ -64,4 +76,98 @@
       </div>
     }
   </main>
+
+  @if (drawerOpen() && selectedSession()) {
+    <aside class="lead-drawer">
+      <div class="drawer-header">
+        <h4>Ficha del Lead</h4>
+        <button class="drawer-close" (click)="toggleDrawer()" aria-label="Cerrar ficha">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="drawer-section">
+          <span class="drawer-label">Estado</span>
+          <span class="drawer-badge status-{{ selectedSession()!.status | lowercase }}">
+            {{ selectedSession()!.status }}
+          </span>
+        </div>
+
+        <div class="drawer-section">
+          <span class="drawer-label">Puntuación de urgencia</span>
+          <div class="urgency-bar-wrap">
+            <div class="urgency-bar" [style.width.%]="selectedSession()!.urgency_score">
+            </div>
+          </div>
+          <span class="urgency-value">{{ selectedSession()!.urgency_score }} / 100</span>
+        </div>
+
+        @if (selectedSession()!.purchase_intent) {
+          <div class="drawer-section">
+            <span class="drawer-label">Intención de compra</span>
+            <span class="drawer-value">{{ selectedSession()!.purchase_intent }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.vehicle_type) {
+          <div class="drawer-section">
+            <span class="drawer-label">Vehículo de interés</span>
+            <span class="drawer-value">{{ selectedSession()!.vehicle_type }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.payment_method) {
+          <div class="drawer-section">
+            <span class="drawer-label">Método de pago</span>
+            <span class="drawer-value">{{ selectedSession()!.payment_method }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.budget_range) {
+          <div class="drawer-section">
+            <span class="drawer-label">Rango de presupuesto</span>
+            <span class="drawer-value">{{ selectedSession()!.budget_range }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.fsm_step) {
+          <div class="drawer-section">
+            <span class="drawer-label">Paso en el bot</span>
+            <span class="drawer-value monospace">{{ selectedSession()!.fsm_step }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.acquisition_source) {
+          <div class="drawer-section">
+            <span class="drawer-label">Origen</span>
+            <span class="drawer-value">{{ selectedSession()!.acquisition_source }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.created_at) {
+          <div class="drawer-section">
+            <span class="drawer-label">Creado</span>
+            <span class="drawer-value">{{ selectedSession()!.created_at | date:'dd/MM/yy HH:mm' }}</span>
+          </div>
+        }
+
+        @if (selectedSession()!.assigned_at) {
+          <div class="drawer-section">
+            <span class="drawer-label">Asignado</span>
+            <span class="drawer-value">{{ selectedSession()!.assigned_at | date:'dd/MM/yy HH:mm' }}</span>
+          </div>
+        }
+
+        <div class="drawer-divider"></div>
+
+        <div class="drawer-actions">
+          <button class="btn-drawer-action btn-ganado" (click)="updateStatus('GANADO')">
+            ✓ Marcar Ganado
+          </button>
+          <button class="btn-drawer-action btn-perdido" (click)="updateStatus('PERDIDO')">
+            ✕ Marcar Perdido
+          </button>
+        </div>
+      </div>
+    </aside>
+  }
 </div>

@@ -19,6 +19,10 @@ export const INTENT_LABELS: Record<string, string> = {
   MES_O_MAS:   'Mes o más',
 };
 
+export type BatchActionEvent =
+  | { action: 'assign';   ids: string[]; agentId: string }
+  | { action: 'ganado' | 'perdido'; ids: string[] };
+
 @Component({
   selector: 'app-leads-grid',
   standalone: true,
@@ -31,7 +35,8 @@ export class LeadsGridComponent {
   @Input() salesPersons: SalespersonDto[] = [];
   @Input() canAssign = false;
 
-  @Output() assignLead = new EventEmitter<{ leadId: string; agentId: string }>();
+  @Output() assignLead  = new EventEmitter<{ leadId: string; agentId: string }>();
+  @Output() batchAction = new EventEmitter<BatchActionEvent>();
 
   // Exponer los mapas al template
   readonly statusLabels  = STATUS_LABELS;
@@ -43,6 +48,10 @@ export class LeadsGridComponent {
   filterPurchaseIntent = signal('');
   filterDateFrom      = signal('');
   filterDateTo        = signal('');
+
+  // ── Selección batch ────────────────────────────────────────────────────
+  selectedIds    = signal<Set<string>>(new Set());
+  batchAssignTo  = signal('');
 
   // ── Opciones estáticas predefinidas (no dependen de datos) ───────────────
   get availableStatuses(): string[] {
@@ -118,5 +127,52 @@ export class LeadsGridComponent {
       this.assignLead.emit({ leadId, agentId });
       target.value = '';
     }
+  }
+
+  // ── Batch selection ────────────────────────────────────────────────────
+  get selectionCount(): number { return this.selectedIds().size; }
+
+  get allSelected(): boolean {
+    const sel = this.selectedIds();
+    const rows = this.filteredLeads;
+    return rows.length > 0 && rows.every(l => sel.has(l.session_id));
+  }
+
+  isSelected(id: string): boolean { return this.selectedIds().has(id); }
+
+  toggleSelect(id: string): void {
+    this.selectedIds.update(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  toggleSelectAll(): void {
+    if (this.allSelected) {
+      this.selectedIds.set(new Set());
+    } else {
+      this.selectedIds.set(new Set(this.filteredLeads.map(l => l.session_id)));
+    }
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+    this.batchAssignTo.set('');
+  }
+
+  executeBatchAssign(): void {
+    const ids = Array.from(this.selectedIds());
+    const agentId = this.batchAssignTo();
+    if (!ids.length || !agentId) return;
+    this.batchAction.emit({ action: 'assign', ids, agentId });
+    this.clearSelection();
+  }
+
+  executeBatchStatus(action: 'ganado' | 'perdido'): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length) return;
+    this.batchAction.emit({ action, ids });
+    this.clearSelection();
   }
 }

@@ -29,6 +29,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   isManager = signal(true);
   isRefreshing = signal(false);
+  metricsError = signal(false);
+  sseReconnecting = signal(false);
 
   private sseSub?: Subscription;
   private metricsBackupInterval?: ReturnType<typeof setInterval>;
@@ -40,16 +42,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // Carga inicial de métricas
-    this.crmApi.getMetrics().subscribe(m => this.metrics.set(m));
+    this._loadMetrics();
 
     // Backup automático cada hora: sincroniza con BD por si se perdieron eventos SSE
-    this.metricsBackupInterval = setInterval(
-      () => this.crmApi.getMetrics().subscribe(m => this.metrics.set(m)),
-      METRICS_BACKUP_MS
-    );
+    this.metricsBackupInterval = setInterval(() => this._loadMetrics(), METRICS_BACKUP_MS);
 
     this.sseSub = this.sseService.dashboardStream().subscribe(event => {
+      if (event.type === 'sse_reconnecting') {
+        this.sseReconnecting.set(true);
+        return;
+      }
+      if (event.type === 'sse_connected') {
+        this.sseReconnecting.set(false);
+        return;
+      }
+
       if (event.type === 'snapshot') {
         this.leads.set(event.data.pending_leads ?? []);
         this.salesPersons.set(event.data.salespeople ?? []);
@@ -84,15 +91,29 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  private _loadMetrics(): void {
+    this.crmApi.getMetrics().subscribe({
+      next: m => {
+        this.metrics.set(m);
+        this.metricsError.set(false);
+      },
+      error: () => this.metricsError.set(true),
+    });
+  }
+
   /** Botón manual de refresh — solo visible para managers */
   refreshMetrics(): void {
     this.isRefreshing.set(true);
+    this.metricsError.set(false);
     this.crmApi.getMetrics().subscribe({
       next: m => {
         this.metrics.set(m);
         this.isRefreshing.set(false);
       },
-      error: () => this.isRefreshing.set(false),
+      error: () => {
+        this.isRefreshing.set(false);
+        this.metricsError.set(true);
+      },
     });
   }
 

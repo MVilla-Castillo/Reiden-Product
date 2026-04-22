@@ -2,7 +2,7 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
-import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
+import { LeadsGridComponent, BatchActionEvent } from '../../components/shared/leads-grid.component';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
 import { Subscription } from 'rxjs';
 
@@ -46,19 +46,23 @@ import { Subscription } from 'rxjs';
             </button>
           </div>
         }
-        <app-leads-grid 
-          [leads]="leads()" 
+        <app-leads-grid
+          [leads]="leads()"
           [salesPersons]="salesPersons()"
           [canAssign]="routingMode() === 'MANUAL'"
-          (assignLead)="handleAssignment($event)">
+          (assignLead)="handleAssignment($event)"
+          (batchAction)="handleBatchAction($event)">
         </app-leads-grid>
       </div>
 
       <!-- Toast Notification -->
       @if (toastMessage()) {
-        <div class="toast-notification success">
-          <span class="toast-icon">✅</span>
-          {{ toastMessage() }}
+        <div class="toast-notification" [class.success]="toastType() === 'success'" [class.error]="toastType() === 'error'" role="alert">
+          <span class="toast-icon">{{ toastType() === 'error' ? '⚠️' : '✅' }}</span>
+          <span class="toast-text">{{ toastMessage() }}</span>
+          @if (toastType() === 'error') {
+            <button class="toast-dismiss" (click)="dismissToast()" aria-label="Cerrar notificación">✕</button>
+          }
         </div>
       }
     </div>
@@ -101,9 +105,15 @@ import { Subscription } from 'rxjs';
 
     /* Toast */
     .toast-notification {
-      position: absolute; top: 1rem; right: 1rem; padding: 1rem 1.5rem; border-radius: 8px; display: flex; align-items: center; gap: 0.75rem; font-weight: 500; font-size: 0.95rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: absolute; top: 1rem; right: 1rem; max-width: 420px; padding: 0.875rem 1rem; border-radius: 8px; display: flex; align-items: flex-start; gap: 0.625rem; font-weight: 500; font-size: 0.875rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 100;
     }
     .toast-notification.success { background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; }
+    .toast-notification.error   { background: #fef2f2; color: #991b1b; border-left: 4px solid #ef4444; }
+    .toast-text { flex: 1; }
+    .toast-dismiss {
+      background: none; border: none; cursor: pointer; color: inherit; opacity: 0.6; font-size: 0.875rem; padding: 0; line-height: 1; flex-shrink: 0; margin-top: 1px;
+      &:hover { opacity: 1; }
+    }
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
     .auto-assign-banner {
@@ -125,7 +135,9 @@ export class LeadsComponent implements OnInit, OnDestroy {
   salesPersons = signal<SalespersonDto[]>([]);
   routingMode = signal<'AUTO' | 'MANUAL'>('MANUAL');
   toastMessage = signal<string | null>(null);
+  toastType = signal<'success' | 'error'>('success');
   private sseSub?: Subscription;
+  private toastTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit() {
     this.sseSub = this.sseService.dashboardStream().subscribe(event => {
@@ -150,22 +162,36 @@ export class LeadsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.sseSub?.unsubscribe();
+    clearTimeout(this.toastTimer);
+  }
+
+  dismissToast() {
+    clearTimeout(this.toastTimer);
+    this.toastMessage.set(null);
+  }
+
+  private _showToast(msg: string, type: 'success' | 'error' = 'success') {
+    clearTimeout(this.toastTimer);
+    this.toastMessage.set(msg);
+    this.toastType.set(type);
+    if (type === 'success') {
+      this.toastTimer = setTimeout(() => this.toastMessage.set(null), 3000);
+    }
+    // errors require manual dismiss
   }
 
   toggleRoutingMode() {
     const newMode = this.routingMode() === 'AUTO' ? 'MANUAL' : 'AUTO';
     this.crmApi.updateTenantSettings(newMode).subscribe((res: any) => {
       this.routingMode.set(newMode);
-      this.toastMessage.set('El motor fue cambiado a Enrutamiento ' + newMode);
-      setTimeout(() => this.toastMessage.set(null), 3000);
+      this._showToast('El motor fue cambiado a Enrutamiento ' + newMode);
     });
   }
 
   assignAllPendingAuto() {
     const pendingLeads = this.leads();
     if (pendingLeads.length === 0) {
-      this.toastMessage.set('No hay leads pendientes por asignar');
-      setTimeout(() => this.toastMessage.set(null), 3000);
+      this._showToast('No hay leads pendientes por asignar');
       return;
     }
 
@@ -178,31 +204,86 @@ export class LeadsComponent implements OnInit, OnDestroy {
           completed++;
           this.leads.update(current => current.filter(l => l.session_id !== lead.session_id));
           if (completed + errors === pendingLeads.length) {
-            this.toastMessage.set(`Se asignaron ${completed} lead(s) automáticamente`);
-            setTimeout(() => this.toastMessage.set(null), 3000);
+            this._showToast(`Se asignaron ${completed} lead(s) automáticamente`);
           }
         },
         error: () => {
           errors++;
           if (completed + errors === pendingLeads.length) {
-            this.toastMessage.set(`Asignados ${completed}, errores: ${errors}`);
-            setTimeout(() => this.toastMessage.set(null), 3000);
+            this._showToast(`Asignados ${completed}, errores: ${errors}`, 'error');
           }
         }
       });
     });
   }
 
+  handleBatchAction(event: BatchActionEvent) {
+    const { action, ids } = event;
+    if (action === 'assign') {
+      this._handleBatchAssign(ids, (event as { action: 'assign'; ids: string[]; agentId: string }).agentId);
+    } else {
+      this._handleBatchStatus(ids, action);
+    }
+  }
+
+  private _handleBatchAssign(ids: string[], agentId: string): void {
+    if (!agentId) return;
+    let completed = 0;
+    let errors = 0;
+    const failed: string[] = [];
+
+    ids.forEach(id => {
+      this.crmApi.assignLead(id, agentId).subscribe({
+        next: () => {
+          completed++;
+          this.leads.update(current => current.filter(l => l.session_id !== id));
+          if (completed + errors === ids.length) this._showBatchResult(completed, failed);
+        },
+        error: () => {
+          errors++;
+          failed.push(id.substring(0, 6));
+          if (completed + errors === ids.length) this._showBatchResult(completed, failed);
+        }
+      });
+    });
+  }
+
+  private _handleBatchStatus(ids: string[], action: 'ganado' | 'perdido'): void {
+    let completed = 0;
+    let errors = 0;
+    const failed: string[] = [];
+
+    ids.forEach(id => {
+      this.crmApi.updateSessionStatus(id, action === 'ganado' ? 'GANADO' : 'PERDIDO').subscribe({
+        next: () => {
+          completed++;
+          this.leads.update(current => current.filter(l => l.session_id !== id));
+          if (completed + errors === ids.length) this._showBatchResult(completed, failed);
+        },
+        error: () => {
+          errors++;
+          failed.push(id.substring(0, 6));
+          if (completed + errors === ids.length) this._showBatchResult(completed, failed);
+        }
+      });
+    });
+  }
+
+  private _showBatchResult(completed: number, failed: string[]) {
+    const msg = failed.length
+      ? `✅ ${completed} procesados — ⚠️ ${failed.length} errores: ${failed.join(', ')}`
+      : `✅ ${completed} lead${completed === 1 ? '' : 's'} procesado${completed === 1 ? '' : 's'} correctamente`;
+    this._showToast(msg, failed.length ? 'error' : 'success');
+  }
+
   handleAssignment(event: {leadId: string, agentId: string}) {
     this.crmApi.assignLead(event.leadId, event.agentId).subscribe({
       next: () => {
-        this.toastMessage.set('Has asignado correctamente el Lead ' + event.leadId.substring(0,6) + ' a este Vendedor.');
         this.leads.update(current => current.filter(l => l.session_id !== event.leadId));
-        setTimeout(() => this.toastMessage.set(null), 3000);
+        this._showToast('Lead ' + event.leadId.substring(0,6) + ' asignado correctamente.');
       },
       error: (err) => {
-        this.toastMessage.set('Error: ' + (err.error?.error || 'Falló la asignación'));
-        setTimeout(() => this.toastMessage.set(null), 3000);
+        this._showToast('Error: ' + (err.error?.error || 'Falló la asignación'), 'error');
       }
     });
   }

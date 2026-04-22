@@ -7,6 +7,12 @@
   </div>
 
   <div class="glass-card">
+    @if (sessionExpiredMessage) {
+      <div class="session-expired-banner" role="alert">
+        🔒 {{ sessionExpiredMessage }}
+      </div>
+    }
+
     <div class="card-header">
       <div class="logo-circle">
         <span class="logo-text">CC</span>

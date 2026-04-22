@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -11,11 +11,19 @@ import { SessionService, UserRole } from '../../../core/services/session.service
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private session = inject(SessionService);
   private router = inject(Router);
 
   selectedUserId = 'admin@dev.local';
+  sessionExpiredMessage = '';
+
+  ngOnInit() {
+    if (localStorage.getItem('session_expired')) {
+      this.sessionExpiredMessage = 'Tu sesión ha expirado. Vuelve a iniciar sesión.';
+      localStorage.removeItem('session_expired');
+    }
+  }
 
   login() {
     if (!this.selectedUserId) return;

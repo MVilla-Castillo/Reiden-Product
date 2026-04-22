@@ -40,9 +40,13 @@ export class SseService {
         es.addEventListener(name, handler);
       }
 
+      es.onopen = () => {
+        this.ngZone.run(() => observer.next({ type: 'sse_connected', data: null }));
+      };
+
       es.onerror = () => {
         // EventSource reconecta automáticamente (back-off nativo del browser).
-        // No cerramos ni completamos el observable.
+        this.ngZone.run(() => observer.next({ type: 'sse_reconnecting', data: null }));
       };
 
       // Cleanup al hacer unsubscribe

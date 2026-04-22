@@ -11,6 +11,24 @@
     </div>
   </header>
 
+  @if (sseReconnecting()) {
+    <div class="status-banner banner-warning" role="status" aria-live="polite">
+      <span class="banner-icon">⚡</span>
+      <span>Reconectando al servidor de eventos en tiempo real…</span>
+      <span class="banner-spinner"></span>
+    </div>
+  }
+
+  @if (metricsError()) {
+    <div class="status-banner banner-error" role="alert">
+      <span class="banner-icon">⚠️</span>
+      <span>No se pudieron cargar las métricas. Los datos mostrados pueden estar desactualizados.</span>
+      <button class="banner-retry" (click)="refreshMetrics()" [disabled]="isRefreshing()">
+        {{ isRefreshing() ? 'Reintentando…' : 'Reintentar' }}
+      </button>
+    </div>
+  }
+
   @if (isManager() && metrics()) {
     <section class="kpi-section">
       <div class="kpi-section-header">

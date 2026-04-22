@@ -22,23 +22,37 @@ export class ChatComponent implements OnInit, OnDestroy {
   selectedSessionId = signal<string | null>(null);
   messages = signal<BackendMessage[]>([]);
   newMessage = signal('');
+  sseReconnecting = signal(false);
+  drawerOpen = signal(false);
 
   private msgSseSub?: Subscription;
+  private dashboardSseSub?: Subscription;
 
   constructor() {}
 
   ngOnInit() {
     this.loadMyChats();
+    // Suscripción al stream del dashboard para recibir nuevas asignaciones en tiempo real
+    this.dashboardSseSub = this.sseService.dashboardStream().subscribe(event => {
+      if (event.type === 'snapshot' || event.type === 'pending_leads') {
+        this.loadMyChats();
+      }
+    });
   }
 
   ngOnDestroy() {
     this.msgSseSub?.unsubscribe();
+    this.dashboardSseSub?.unsubscribe();
   }
 
   loadMyChats() {
     this.crmApi.getMyChats().subscribe(chats => {
       this.chats.set(chats);
     });
+  }
+
+  toggleDrawer() {
+    this.drawerOpen.update(v => !v);
   }
 
   selectLead(chat: SessionDto) {
@@ -52,7 +66,17 @@ export class ChatComponent implements OnInit, OnDestroy {
 
     // Cierra la conexión anterior (si se cambia de sesión) y abre la nueva
     this.msgSseSub?.unsubscribe();
+    this.sseReconnecting.set(false);
     this.msgSseSub = this.sseService.messagesStream(chat.session_id).subscribe(event => {
+      if (event.type === 'sse_reconnecting') {
+        this.sseReconnecting.set(true);
+        return;
+      }
+      if (event.type === 'sse_connected') {
+        this.sseReconnecting.set(false);
+        return;
+      }
+
       if (event.type === 'message') {
         this.messages.update(msgs => {
           // Deduplicar: evita agregar mensajes que ya están (ej. update optimista de OUTBOUND)

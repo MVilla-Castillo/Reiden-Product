@@ -71,10 +71,55 @@
     </div>
   }
 
+  <!-- ── Batch action toolbar ─────────────────────────────────────────── -->
+  @if (selectionCount > 0) {
+    <div class="batch-toolbar" role="toolbar" aria-label="Acciones masivas">
+      <span class="batch-count">
+        <strong>{{ selectionCount }}</strong> lead{{ selectionCount === 1 ? '' : 's' }} seleccionado{{ selectionCount === 1 ? '' : 's' }}
+      </span>
+
+      @if (canAssign) {
+        <div class="batch-assign-group">
+          <select class="batch-assign-select"
+                  [ngModel]="batchAssignTo()"
+                  (ngModelChange)="batchAssignTo.set($event)">
+            <option value="">Asignar a…</option>
+            @for (sp of salesPersons; track sp.id) {
+              <option [value]="sp.id">{{ sp.email }} ({{ sp.active_sessions_count }} activos)</option>
+            }
+          </select>
+          <button class="btn-batch btn-batch-assign"
+                  [disabled]="!batchAssignTo()"
+                  (click)="executeBatchAssign()">
+            Asignar
+          </button>
+        </div>
+      }
+
+      <button class="btn-batch btn-batch-ganado" (click)="executeBatchStatus('ganado')">
+        ✓ Marcar Ganados
+      </button>
+      <button class="btn-batch btn-batch-perdido" (click)="executeBatchStatus('perdido')">
+        ✕ Marcar Perdidos
+      </button>
+      <button class="btn-batch btn-batch-clear" (click)="clearSelection()">
+        Deseleccionar
+      </button>
+    </div>
+  }
+
   <!-- ── Tabla ────────────────────────────────────────────────────────── -->
   <table class="leads-table">
     <thead>
       <tr>
+        <th class="col-check">
+          <input type="checkbox"
+                 class="row-checkbox"
+                 [checked]="allSelected"
+                 [indeterminate]="selectionCount > 0 && !allSelected"
+                 (change)="toggleSelectAll()"
+                 title="Seleccionar todos los filtrados">
+        </th>
         <th>ID</th>
         <th>Contacto (Hash)</th>
         <th>Vehículo</th>
@@ -89,7 +134,13 @@
     </thead>
     <tbody>
       @for (lead of filteredLeads; track lead.session_id) {
-        <tr>
+        <tr [class.row-selected]="isSelected(lead.session_id)">
+          <td class="col-check">
+            <input type="checkbox"
+                   class="row-checkbox"
+                   [checked]="isSelected(lead.session_id)"
+                   (change)="toggleSelect(lead.session_id)">
+          </td>
           <td class="cell-id">{{ lead.session_id | slice:0:8 }}</td>
           <td class="cell-name">{{ lead.lead_phone_hash | slice:0:12 }}…</td>
           <td>{{ lead.vehicle_type || '—' }}</td>
@@ -129,7 +180,7 @@
 
       @if (filteredLeads.length === 0) {
         <tr>
-          <td [attr.colspan]="canAssign ? 8 : 7" class="empty-state">
+          <td [attr.colspan]="canAssign ? 9 : 8" class="empty-state">
             @if (hasActiveFilters) {
               Sin resultados para los filtros aplicados.
             } @else {

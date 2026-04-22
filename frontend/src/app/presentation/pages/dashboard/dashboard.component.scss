@@ -26,6 +26,58 @@
   }
 }
 
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+
+  .banner-icon { font-size: 1rem; flex-shrink: 0; }
+
+  .banner-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    opacity: 0.6;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .banner-retry {
+    margin-left: auto;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    transition: opacity 0.15s;
+    &:hover:not(:disabled) { opacity: 0.75; }
+    &:disabled { opacity: 0.45; cursor: default; }
+  }
+}
+
+.banner-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.banner-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
 .kpi-section {
   margin-bottom: 2rem;
 }

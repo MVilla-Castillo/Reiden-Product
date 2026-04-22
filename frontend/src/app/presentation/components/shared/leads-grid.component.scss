@@ -247,6 +247,79 @@
   }
 }
 
+// ── Checkbox de selección ──────────────────────────────────────────────────
+.col-check {
+  width: 40px;
+  padding-left: 1rem !important;
+  padding-right: 0 !important;
+}
+
+.row-checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #4f46e5;
+}
+
+.row-selected {
+  background: #f5f3ff !important;
+}
+
+// ── Batch action toolbar ───────────────────────────────────────────────────
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: #eef2ff;
+  border-bottom: 1px solid #c7d2fe;
+  flex-wrap: wrap;
+}
+
+.batch-count {
+  font-size: 0.875rem;
+  color: #3730a3;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.batch-assign-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.batch-assign-select {
+  padding: 0.35rem 0.625rem;
+  border: 1px solid #a5b4fc;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #374151;
+  background: white;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  cursor: pointer;
+  &:focus { border-color: #4f46e5; }
+}
+
+.btn-batch {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  &:hover:not(:disabled) { opacity: 0.8; }
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+
+.btn-batch-assign  { background: #4f46e5; color: white; }
+.btn-batch-ganado  { background: #dcfce7; color: #15803d; }
+.btn-batch-perdido { background: #fee2e2; color: #b91c1c; }
+.btn-batch-clear   { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
+
 // ── Selector de asignación ─────────────────────────────────────────────────
 .assign-select {
   padding: 0.4rem 0.5rem;
