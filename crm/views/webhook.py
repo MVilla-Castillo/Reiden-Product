@@ -209,6 +209,10 @@ def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
             request.POST.get("ListTitle", ""), LIST_TITLE_MAX_LENGTH
         ),
         "Timestamp": _truncate(request.POST.get("Timestamp", ""), 64),
+        "ProfileName": _truncate(request.POST.get("ProfileName", ""), 255),
+        "Forwarded": request.POST.get("Forwarded", "").lower() == "true",
+        "FrequentlyForwarded": request.POST.get("FrequentlyForwarded", "").lower()
+        == "true",
     }
 
     try:

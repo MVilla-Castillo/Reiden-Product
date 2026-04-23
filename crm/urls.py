@@ -29,6 +29,7 @@ from crm.views.dashboard_messages import (
     salespeople_api,
     send_message_api,
     session_messages_api,
+    update_lead_api,
 )
 from crm.views.metrics import metrics_api
 from crm.views.sse import dashboard_sse_view, messages_sse_view
@@ -115,6 +116,12 @@ urlpatterns = [
         "api/dashboard/leads/<uuid:session_id>/status/",
         change_session_status_api,
         name="change_session_status",
+    ),
+    # Editar perfil del lead (nombre)
+    path(
+        "api/dashboard/leads/<uuid:session_id>/lead/",
+        update_lead_api,
+        name="update_lead",
     ),
     # Sprint 6: Listar vendedores disponibles
     path(

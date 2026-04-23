@@ -61,8 +61,8 @@ export class CrmApiService {
       .pipe(map(res => res.leads));
   }
 
-  getMessages(sessionId: string, limit: number = 50): Observable<BackendMessage[]> {
-    return this.http.get<{messages: BackendMessage[]}>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/?limit=${limit}`)
+  getMessages(sessionId: string, limit: number = 20, offset: number = 0): Observable<BackendMessage[]> {
+    return this.http.get<{messages: BackendMessage[]}>(`${this.baseUrl}/dashboard/leads/${sessionId}/messages/?limit=${limit}&offset=${offset}`)
       .pipe(map(res => res.messages));
   }
 
@@ -87,5 +87,11 @@ export class CrmApiService {
       payload.lost_reason = lostReason;
     }
     return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/status/`, payload);
+  }
+
+  updateLeadProfileName(sessionId: string, profileName: string): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/lead/`, {
+      lead_profile_name: profileName
+    });
   }
 }

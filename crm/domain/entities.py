@@ -24,6 +24,7 @@ class LeadEntity:
     tenant_id: UUID
     wa_id_hash: str
     first_name: str | None = None
+    profile_name: str | None = None
     last_interaction: datetime | None = None
     is_deleted: bool = False
 
@@ -67,3 +68,5 @@ class MessageEntity:
     body: str
     created_at: datetime | None = None
     is_deleted: bool = False
+    is_forwarded: bool = False
+    is_frequently_forwarded: bool = False

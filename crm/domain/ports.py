@@ -162,6 +162,10 @@ class LeadRepository(Protocol):
         """Retorna el wa_id decifrado de un Lead por su ID, opcionalmente filtrado por tenant."""
         ...
 
+    def update(self, lead_id: UUID, tenant_id: UUID, data: dict[str, Any]) -> None:
+        """Actualiza campos de un Lead."""
+        ...
+
 
 class SessionRepository(Protocol):
     """Puerto para persistencia de ChatSessions."""
@@ -315,6 +319,8 @@ class MessageRepository(Protocol):
         direction: str,
         message_type: str,
         body: str,
+        is_forwarded: bool = False,
+        is_frequently_forwarded: bool = False,
     ) -> MessageEntity:
         """Crea un nuevo mensaje y lo retorna."""
         ...

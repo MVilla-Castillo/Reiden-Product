@@ -55,6 +55,8 @@ class GetSessionMessagesUseCase:
                 "message_type": m.message_type,
                 "body": m.body,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
+                "is_forwarded": m.is_forwarded,
+                "is_frequently_forwarded": m.is_frequently_forwarded,
             }
             for m in messages
         ]

@@ -1,19 +1,24 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subscription } from 'rxjs';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
-import { SessionDto, BackendMessage } from '../../../core/models/crm.models';
+import { SessionDto, BackendMessage, LeadNameHistory } from '../../../core/models/crm.models';
+import { EmptyStateComponent } from '../../components/shared/empty-state.component';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollingModule, EmptyStateComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
-export class ChatComponent implements OnInit, OnDestroy {
+export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
+  @ViewChild('messagesContainer') private messagesContainer?: ElementRef<HTMLDivElement>;
+  @ViewChild('nameInput') private nameInputRef?: ElementRef<HTMLInputElement>;
+
   private crmApi = inject(CrmApiService);
   private sseService = inject(SseService);
 
@@ -23,7 +28,20 @@ export class ChatComponent implements OnInit, OnDestroy {
   messages = signal<BackendMessage[]>([]);
   newMessage = signal('');
   sseReconnecting = signal(false);
-  drawerOpen = signal(false);
+  fileUploadError = signal<string | null>(null);
+  uploadProgress = signal(0);
+  isUploading = signal(false);
+  failedUploadFile = signal<File | null>(null);
+  useVirtualScroll = computed(() => this.chats().length > 50);
+
+  messageOffset = signal(0);
+  hasMoreMessages = signal(true);
+  isLoadingMore = signal(false);
+  isAtBottom = signal(true);
+  isAtTop = signal(false);
+
+  private uploadController: AbortController | null = null;
+  private shouldScrollToBottom = false;
 
   private msgSseSub?: Subscription;
   private dashboardSseSub?: Subscription;
@@ -45,23 +63,109 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.dashboardSseSub?.unsubscribe();
   }
 
+  ngAfterViewChecked() {
+    if (this.shouldScrollToBottom) {
+      this.scrollToBottom(false);
+      this.shouldScrollToBottom = false;
+    }
+  }
+
   loadMyChats() {
     this.crmApi.getMyChats().subscribe(chats => {
       this.chats.set(chats);
     });
   }
 
-  toggleDrawer() {
-    this.drawerOpen.update(v => !v);
+  trackChat(_: number, chat: SessionDto) { return chat.session_id; }
+
+  handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
+    if (!allowed.includes(file.type)) {
+      this.fileUploadError.set('Tipos permitidos: JPG, PNG, PDF, MP4');
+      return;
+    }
+    const isVideo = file.type.startsWith('video/');
+    const maxBytes = isVideo ? 100 * 1024 * 1024 : 16 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      this.fileUploadError.set(`Archivo demasiado grande. Máximo: ${isVideo ? '100 MB' : '16 MB'}.`);
+      return;
+    }
+    this.startUpload(file);
+  }
+
+  startUpload(file: File) {
+    const sessionId = this.selectedSessionId();
+    if (!sessionId) return;
+
+    this.fileUploadError.set(null);
+    this.isUploading.set(true);
+    this.uploadProgress.set(0);
+    this.failedUploadFile.set(null);
+
+    this.uploadController = new AbortController();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) this.uploadProgress.set(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      this.isUploading.set(false);
+      this.uploadProgress.set(0);
+      if (xhr.status < 200 || xhr.status >= 300) {
+        this.failedUploadFile.set(file);
+        this.fileUploadError.set('Error al enviar el archivo. Toca reintentar.');
+      }
+    };
+    xhr.onerror = () => {
+      this.isUploading.set(false);
+      this.uploadProgress.set(0);
+      this.failedUploadFile.set(file);
+      this.fileUploadError.set('Error de red al enviar el archivo. Toca reintentar.');
+    };
+    xhr.onabort = () => {
+      this.isUploading.set(false);
+      this.uploadProgress.set(0);
+    };
+
+    const token = localStorage.getItem('access_token');
+    const userId = localStorage.getItem('user_id');
+    xhr.open('POST', `/api/v1/dashboard/leads/${sessionId}/media/`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    if (userId) xhr.setRequestHeader('X-User-ID', userId);
+    this.uploadController.signal.addEventListener('abort', () => xhr.abort());
+    xhr.send(formData);
+  }
+
+  cancelUpload() {
+    this.uploadController?.abort();
+    this.uploadController = null;
+  }
+
+  retryUpload() {
+    const file = this.failedUploadFile();
+    if (file) this.startUpload(file);
   }
 
   selectLead(chat: SessionDto) {
     this.selectedSession.set(chat);
     this.selectedSessionId.set(chat.session_id);
+    this.messageOffset.set(0);
+    this.hasMoreMessages.set(true);
+    this.isAtBottom.set(true);
+    this.isAtTop.set(false);
+    this.nameHistory.set([]);
 
-    // Carga el historial completo una sola vez
-    this.crmApi.getMessages(chat.session_id).subscribe(messages => {
+    this.crmApi.getMessages(chat.session_id, 20, 0).subscribe(messages => {
       this.messages.set(messages);
+      this.hasMoreMessages.set(messages.length === 20);
+      this.shouldScrollToBottom = true;
     });
 
     // Cierra la conexión anterior (si se cambia de sesión) y abre la nueva
@@ -79,11 +183,13 @@ export class ChatComponent implements OnInit, OnDestroy {
 
       if (event.type === 'message') {
         this.messages.update(msgs => {
-          // Deduplicar: evita agregar mensajes que ya están (ej. update optimista de OUTBOUND)
           const incoming = event.data as BackendMessage;
           const alreadyExists = incoming.message_id
             ? msgs.some(m => m.message_id === incoming.message_id)
             : false;
+          if (!alreadyExists) {
+            setTimeout(() => this.scrollToBottom(false), 0);
+          }
           return alreadyExists ? msgs : [...msgs, incoming];
         });
       }
@@ -106,19 +212,67 @@ export class ChatComponent implements OnInit, OnDestroy {
     const body = this.newMessage();
     if (!sessionId || !body.trim()) return;
 
-    this.crmApi.sendMessage(sessionId, body).subscribe(res => {
-      this.newMessage.set('');
-      // Actualización optimista: agrega inmediatamente sin esperar el evento SSE
-      const msg: BackendMessage = {
-        message_id: res.message_id,
-        direction: res.direction,
-        body: res.body,
-        created_at: res.created_at,
-        provider_message_sid: res.provider_message_sid
-      };
-      this.messages.update(msgs => [...msgs, msg]);
-      // El evento SSE que llegará después será deduplicado por message_id
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg: BackendMessage = {
+      message_id: tempId,
+      direction: 'OUTBOUND',
+      body,
+      created_at: new Date().toISOString(),
+      delivery_status: 'pending',
+    };
+    this.messages.update(msgs => [...msgs, optimisticMsg]);
+    this.newMessage.set('');
+    this.shouldScrollToBottom = true;
+
+    this.crmApi.sendMessage(sessionId, body).subscribe({
+      next: res => {
+        const confirmed: BackendMessage = {
+          message_id: res.message_id,
+          direction: res.direction,
+          body: res.body,
+          created_at: res.created_at,
+          provider_message_sid: res.provider_message_sid,
+          delivery_status: 'sent',
+        };
+        this.messages.update(msgs => this._replaceMessage(tempId, confirmed, msgs));
+      },
+      error: () => {
+        this.messages.update(msgs => this._updateStatus(tempId, 'failed', msgs));
+      },
     });
+  }
+
+  retryMessage(msgId: string) {
+    const msg = this.messages().find(m => m.message_id === msgId);
+    if (!msg || msg.delivery_status !== 'failed') return;
+    this.messages.update(msgs => this._updateStatus(msgId, 'pending', msgs));
+    const sessionId = this.selectedSessionId();
+    if (!sessionId) return;
+
+    this.crmApi.sendMessage(sessionId, msg.body).subscribe({
+      next: res => {
+        const confirmed: BackendMessage = {
+          message_id: res.message_id,
+          direction: res.direction,
+          body: res.body,
+          created_at: res.created_at,
+          provider_message_sid: res.provider_message_sid,
+          delivery_status: 'sent',
+        };
+        this.messages.update(msgs => this._replaceMessage(msgId, confirmed, msgs));
+      },
+      error: () => {
+        this.messages.update(msgs => this._updateStatus(msgId, 'failed', msgs));
+      },
+    });
+  }
+
+  private _replaceMessage(tempId: string, confirmed: BackendMessage, msgs: BackendMessage[]): BackendMessage[] {
+    return msgs.map(m => m.message_id === tempId ? confirmed : m);
+  }
+
+  private _updateStatus(msgId: string, status: BackendMessage['delivery_status'], msgs: BackendMessage[]): BackendMessage[] {
+    return msgs.map(m => m.message_id === msgId ? { ...m, delivery_status: status } : m);
   }
 
   updateStatus(status: 'GANADO' | 'PERDIDO') {
@@ -139,4 +293,92 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.msgSseSub?.unsubscribe();
     });
   }
+
+  loadMoreMessages() {
+    const sessionId = this.selectedSessionId();
+    if (!sessionId || this.isLoadingMore() || !this.hasMoreMessages()) return;
+
+    this.isLoadingMore.set(true);
+    const newOffset = this.messageOffset() + 20;
+
+    this.crmApi.getMessages(sessionId, 20, newOffset).subscribe({
+      next: olderMessages => {
+        const el = this.messagesContainer?.nativeElement;
+        const prevScrollHeight = el?.scrollHeight ?? 0;
+        this.messages.update(msgs => [...olderMessages, ...msgs]);
+        this.messageOffset.set(newOffset);
+        this.hasMoreMessages.set(olderMessages.length === 20);
+        this.isLoadingMore.set(false);
+        // Restaurar posición para que el viewport no salte al inicio
+        if (el) setTimeout(() => { el.scrollTop = el.scrollHeight - prevScrollHeight; }, 0);
+      },
+      error: () => {
+        this.isLoadingMore.set(false);
+      }
+    });
+  }
+
+  onMessagesScroll(event: Event) {
+    const target = event.target as HTMLDivElement;
+    const atTop = target.scrollTop <= 50;
+    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= 50;
+
+    this.isAtTop.set(atTop);
+    this.isAtBottom.set(atBottom);
+
+    if (atTop && this.hasMoreMessages() && !this.isLoadingMore()) {
+      this.loadMoreMessages();
+    }
+  }
+
+  scrollToBottom(smooth = true) {
+    if (!this.messagesContainer) return;
+    const el = this.messagesContainer.nativeElement;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  scrollToTop(smooth = true) {
+    if (!this.messagesContainer) return;
+    const el = this.messagesContainer.nativeElement;
+    el.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  isEditingName = signal(false);
+  editingNameValue = signal('');
+  nameHistory = signal<LeadNameHistory[]>([]);
+
+  startEditName() {
+    const session = this.selectedSession();
+    if (!session) return;
+    this.editingNameValue.set(session.lead_profile_name || '');
+    this.isEditingName.set(true);
+    setTimeout(() => this.nameInputRef?.nativeElement.focus(), 0);
+  }
+
+  cancelEditName() {
+    this.isEditingName.set(false);
+    this.editingNameValue.set('');
+  }
+
+  saveName() {
+    const sessionId = this.selectedSessionId();
+    const newName = this.editingNameValue().trim();
+    if (!sessionId) return;
+    if (!newName) { this.cancelEditName(); return; }
+
+    this.crmApi.updateLeadProfileName(sessionId, newName).subscribe({
+      next: (res) => {
+        this.selectedSession.update(s => s ? { ...s, lead_profile_name: res.lead_profile_name } : s);
+        this.chats.update(chats => chats.map(c => 
+          c.session_id === sessionId ? { ...c, lead_profile_name: res.lead_profile_name } : c
+        ));
+        this.nameHistory.set(res.name_history || []);
+        this.isEditingName.set(false);
+      },
+      error: () => {
+        this.isEditingName.set(false);
+      }
+    });
+  }
+
 }

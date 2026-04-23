@@ -57,7 +57,7 @@
     </div>
 
     @if (hasActiveFilters) {
-      <button class="btn-clear-filters" (click)="clearFilters()" title="Limpiar filtros">
+      <button class="btn-clear-filters" (click)="onClearFilters()" title="Limpiar filtros">
         Limpiar ✕
       </button>
     }
@@ -180,12 +180,14 @@
 
       @if (filteredLeads.length === 0) {
         <tr>
-          <td [attr.colspan]="canAssign ? 9 : 8" class="empty-state">
-            @if (hasActiveFilters) {
-              Sin resultados para los filtros aplicados.
-            } @else {
-              No hay leads pendientes en la fila de espera.
-            }
+          <td [attr.colspan]="canAssign ? 9 : 8" style="padding: 0; text-align: center">
+            <app-empty-state
+              [icon]="hasActiveFilters ? '🔍' : '📭'"
+              [title]="hasActiveFilters ? 'Sin resultados' : 'No hay leads pendientes'"
+              [subtitle]="hasActiveFilters ? 'Ningún lead coincide con los filtros activos.' : 'La fila de espera está vacía.'"
+              [actionLabel]="hasActiveFilters ? 'Limpiar filtros' : ''"
+              (action)="onClearFilters()">
+            </app-empty-state>
           </td>
         </tr>
       }

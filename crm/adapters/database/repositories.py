@@ -41,6 +41,7 @@ def _lead_to_entity(model: Lead) -> LeadEntity:
         tenant_id=model.tenant_id,
         wa_id_hash=model.wa_id_hash,
         first_name=model.first_name,
+        profile_name=model.profile_name,
         last_interaction=model.last_interaction,
         is_deleted=model.is_deleted,
     )
@@ -82,6 +83,8 @@ def _message_to_entity(model: Message) -> MessageEntity:
         body=model.body,
         created_at=model.created_at,
         is_deleted=model.is_deleted,
+        is_forwarded=model.is_forwarded,
+        is_frequently_forwarded=model.is_frequently_forwarded,
     )
 
 
@@ -110,6 +113,7 @@ class DjangoLeadRepository(LeadRepository):
         El wa_id se cifra antes de persistir (PII compliance).
         """
         first_name = defaults.get("first_name")
+        profile_name = defaults.get("profile_name")
         wa_id_plain = defaults.get("wa_id", "")
         wa_id_encrypted = encrypt(wa_id_plain) if wa_id_plain else ""
 
@@ -117,21 +121,23 @@ class DjangoLeadRepository(LeadRepository):
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    INSERT INTO {Lead._meta.db_table} (id, tenant_id, wa_id_hash, wa_id, first_name, is_deleted, last_interaction)
-                    VALUES (gen_random_uuid(), %s, %s, %s, %s, False, NOW())
+                    INSERT INTO {Lead._meta.db_table} (id, tenant_id, wa_id_hash, wa_id, first_name, profile_name, is_deleted, last_interaction)
+                    VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, False, NOW())
                     ON CONFLICT (wa_id_hash)
                     DO UPDATE SET
                         tenant_id = EXCLUDED.tenant_id,
                         wa_id = EXCLUDED.wa_id,
                         first_name = COALESCE(EXCLUDED.first_name, {Lead._meta.db_table}.first_name),
+                        profile_name = COALESCE(EXCLUDED.profile_name, {Lead._meta.db_table}.profile_name),
                         last_interaction = NOW()
-                    RETURNING id, tenant_id, wa_id_hash, first_name, is_deleted, last_interaction
+                    RETURNING id, tenant_id, wa_id_hash, first_name, profile_name, is_deleted, last_interaction
                     """,
                     [
                         str(tenant_id),
                         wa_id_hash,
                         wa_id_encrypted,
                         first_name,
+                        profile_name,
                     ],
                 )
                 row = cursor.fetchone()
@@ -141,8 +147,9 @@ class DjangoLeadRepository(LeadRepository):
             tenant_id=row[1],
             wa_id_hash=row[2],
             first_name=row[3],
-            is_deleted=row[4],
-            last_interaction=row[5],
+            profile_name=row[4],
+            is_deleted=row[5],
+            last_interaction=row[6],
         )
 
     def for_tenant(self, tenant_id: uuid.UUID) -> list[LeadEntity]:
@@ -161,6 +168,13 @@ class DjangoLeadRepository(LeadRepository):
         if result is None:
             return None
         return decrypt(result)
+
+    def update(
+        self, lead_id: uuid.UUID, tenant_id: uuid.UUID, data: dict[str, Any]
+    ) -> None:
+        Lead.objects.filter(id=lead_id, tenant_id=tenant_id, is_deleted=False).update(
+            **data
+        )
 
 
 class DjangoSessionRepository(SessionRepository):
@@ -821,6 +835,8 @@ class DjangoMessageRepository(MessageRepository):
         direction: str,
         message_type: str,
         body: str,
+        is_forwarded: bool = False,
+        is_frequently_forwarded: bool = False,
     ) -> MessageEntity:
         model = Message.objects.create(
             tenant_id=tenant_id,
@@ -829,6 +845,8 @@ class DjangoMessageRepository(MessageRepository):
             direction=direction,
             message_type=message_type,
             body=body,
+            is_forwarded=is_forwarded,
+            is_frequently_forwarded=is_frequently_forwarded,
         )
         return _message_to_entity(model)
 

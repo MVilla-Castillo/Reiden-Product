@@ -1,4 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { Subject, BehaviorSubject } from 'rxjs';
 
 export type UserRole = 'manager' | 'sales';
 
@@ -11,6 +12,13 @@ export class SessionService {
   readonly currentRole = computed(() => this._role());
   readonly token = computed(() => this._token());
   readonly userId = computed(() => this._userId());
+
+  readonly sessionExpired$ = new Subject<void>();
+  readonly tokenReady$ = new BehaviorSubject<string | null>(null);
+
+  private isExpiredState = false;
+
+  get isExpired() { return this.isExpiredState; }
 
   setRole(role: UserRole): void {
     localStorage.setItem('role', role);
@@ -25,6 +33,23 @@ export class SessionService {
   setToken(token: string): void {
     localStorage.setItem('access_token', token);
     this._token.set(token);
+  }
+
+  markExpired(): void {
+    if (this.isExpiredState) return;
+    this.isExpiredState = true;
+    this.tokenReady$.next(null);
+    this.clear();
+    this.sessionExpired$.next();
+  }
+
+  replayWithToken(token: string, role: UserRole, userId: string): void {
+    this.isExpiredState = false;
+    this.setRole(role);
+    this.setUserId(userId);
+    this.setToken(token);
+    this.tokenReady$.next(token);
+    this.tokenReady$.next(null);
   }
 
   clear(): void {

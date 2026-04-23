@@ -160,6 +160,12 @@ class Lead(models.Model):
     first_name = models.CharField(
         max_length=255, blank=True, null=True, verbose_name="Nombre"
     )
+    profile_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Nombre del perfil de WhatsApp del lead",
+    )
     last_interaction = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
 
@@ -169,6 +175,31 @@ class Lead(models.Model):
 
     def __str__(self) -> str:
         return f"Lead-{self.id.hex[:8]}"
+
+
+class LeadNameHistory(models.Model):
+    """Historial de cambios de nombre del lead."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lead = models.ForeignKey(
+        Lead, on_delete=models.CASCADE, related_name="name_history"
+    )
+    old_name = models.CharField(max_length=255, blank=True, null=True)
+    new_name = models.CharField(max_length=255, blank=True, null=True)
+    changed_by = models.ForeignKey(
+        "AppUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="name_changes",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-changed_at"]
+
+    def __str__(self) -> str:
+        return f"{self.old_name} → {self.new_name}"
 
 
 class ChatSession(models.Model):
@@ -307,6 +338,13 @@ class Message(models.Model):
         max_length=10, choices=Type.choices, default=Type.TEXT
     )
     body = models.TextField(help_text="Texto literal o URL firmada")
+    is_forwarded = models.BooleanField(
+        default=False, help_text="true si el mensaje fue reenviado una vez"
+    )
+    is_frequently_forwarded = models.BooleanField(
+        default=False,
+        help_text="true si el mensaje fue reenviado múltiples veces (spam/bot)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
 

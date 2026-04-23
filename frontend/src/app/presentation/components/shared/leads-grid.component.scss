@@ -1,18 +1,16 @@
-// ── Contenedor principal ───────────────────────────────────────────────────
 .leads-table-container {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
-// ── Barra de filtros ───────────────────────────────────────────────────────
 .leads-filters {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
   background: #fafafa;
 }
@@ -36,12 +34,12 @@
   input {
     width: 100%;
     padding: 0.48rem 0.75rem 0.48rem 2.1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
     color: #374151;
-    background: white;
-    font-family: 'Inter', sans-serif;
+    background: var(--color-surface);
+    font-family: inherit;
     outline: none;
     transition: border-color 0.15s;
     box-sizing: border-box;
@@ -53,12 +51,12 @@
 
 .filter-select {
   padding: 0.48rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
   color: #374151;
-  background: white;
-  font-family: 'Inter', sans-serif;
+  background: var(--color-surface);
+  font-family: inherit;
   outline: none;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -66,9 +64,9 @@
   &:focus { border-color: #93c5fd; }
 
   &.is-active {
-    border-color: #3b82f6;
-    background: #eff6ff;
-    color: #1d4ed8;
+    border-color: var(--color-info);
+    background: var(--color-info-bg);
+    color: var(--color-info);
   }
 }
 
@@ -80,37 +78,37 @@
 
   .filter-date {
     padding: 0.48rem 0.5rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
     color: #374151;
-    background: white;
-    font-family: 'Inter', sans-serif;
+    background: var(--color-surface);
+    font-family: inherit;
     outline: none;
     cursor: pointer;
     transition: border-color 0.15s;
 
     &:focus  { border-color: #93c5fd; }
-    &.is-active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+    &.is-active { border-color: var(--color-info); background: var(--color-info-bg); color: var(--color-info); }
   }
 
   .date-sep {
     color: #9ca3af;
-    font-size: 0.8rem;
+    font-size: var(--font-sm);
     user-select: none;
   }
 }
 
 .btn-clear-filters {
   padding: 0.48rem 0.75rem;
-  background: #fee2e2;
+  background: var(--color-danger-bg);
   border: none;
-  border-radius: 8px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
   font-weight: 500;
-  color: #dc2626;
+  color: var(--color-danger-text);
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   white-space: nowrap;
   transition: background 0.15s;
   flex-shrink: 0;
@@ -120,19 +118,18 @@
 
 .filter-summary {
   padding: 0.45rem 1.25rem;
-  font-size: 0.8rem;
-  color: #6b7280;
-  border-bottom: 1px solid #f3f4f6;
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-bg);
   background: #f9fafb;
 
   strong { color: #374151; }
 }
 
-// ── Tabla ──────────────────────────────────────────────────────────────────
 .leads-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
 
   thead {
     background: #f9fafb;
@@ -140,18 +137,18 @@
     th {
       padding: 1rem 1.25rem;
       text-align: left;
-      font-size: 0.75rem;
+      font-size: var(--font-xs);
       font-weight: 600;
-      color: #6b7280;
+      color: var(--color-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--color-border);
     }
   }
 
   tbody {
     tr {
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid var(--color-bg);
       transition: background 0.15s ease;
 
       &:hover { background: #f9fafb; }
@@ -160,7 +157,7 @@
 
     td {
       padding: 1rem 1.25rem;
-      font-size: 0.875rem;
+      font-size: var(--font-sm);
       color: #374151;
       vertical-align: middle;
     }
@@ -171,13 +168,12 @@
   text-align: center;
   padding: 2rem !important;
   color: #9ca3af;
-  font-size: 0.875rem;
+  font-size: var(--font-sm);
 }
 
-// ── Celdas ─────────────────────────────────────────────────────────────────
 .cell-id {
   font-family: monospace;
-  font-size: 0.8rem;
+  font-size: var(--font-sm);
   color: #9ca3af;
 }
 
@@ -186,60 +182,54 @@
   color: #111827;
 }
 
-// ── Badge de intención de compra ───────────────────────────────────────────
 .intent-badge {
   display: inline-block;
   padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
   font-weight: 500;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-muted-bg);
+  color: var(--color-muted);
 
-  &.intent-hoy         { background: #dcfce7; color: #16a34a; }
-  &.intent-esta_semana { background: #fef3c7; color: #d97706; }
-  &.intent-mes_o_mas   { background: #f3f4f6; color: #6b7280; }
+  &.intent-hoy         { background: var(--color-success-bg); color: var(--color-success-text); }
+  &.intent-esta_semana { background: var(--color-warning-bg); color: var(--color-warning-text); }
+  &.intent-mes_o_mas   { background: var(--color-muted-bg); color: var(--color-muted); }
 }
 
-// ── Badge de estado ────────────────────────────────────────────────────────
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
   font-weight: 500;
 
-  // Estados reales del backend
-  &.status-pending_assignment { background: #fef3c7; color: #d97706; }
-  &.status-con_vendedor       { background: #dbeafe; color: #1d4ed8; }
-  &.status-ganado             { background: #dcfce7; color: #16a34a; }
-  &.status-perdido            { background: #fee2e2; color: #dc2626; }
-  &.status-bot                { background: #dbeafe; color: #1d4ed8; }
-  &.status-abandoned          { background: #f3f4f6; color: #6b7280; }
-  // Genéricos de fallback
-  &.status-pending            { background: #fef3c7; color: #d97706; }
-  &.status-active             { background: #d1fae5; color: #059669; }
-  &.status-won                { background: #dcfce7; color: #16a34a; }
-  &.status-lost               { background: #fee2e2; color: #dc2626; }
+  &.status-pending_assignment { background: var(--color-warning-bg); color: var(--color-warning-text); }
+  &.status-con_vendedor       { background: var(--color-info-bg); color: var(--color-info); }
+  &.status-ganado             { background: var(--color-success-bg); color: var(--color-success-text); }
+  &.status-perdido            { background: var(--color-danger-bg); color: var(--color-danger-text); }
+  &.status-bot                { background: var(--color-info-bg); color: var(--color-info); }
+  &.status-abandoned          { background: var(--color-muted-bg); color: var(--color-muted); }
+  &.status-pending            { background: var(--color-warning-bg); color: var(--color-warning-text); }
+  &.status-active             { background: var(--color-success-bg); color: var(--color-success-text); }
+  &.status-won                { background: var(--color-success-bg); color: var(--color-success-text); }
+  &.status-lost               { background: var(--color-danger-bg); color: var(--color-danger-text); }
 }
 
-// ── Badge de urgencia ──────────────────────────────────────────────────────
 .urgency-badge {
   display: inline-block;
   padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
   font-weight: 600;
 
-  &.urgency-high   { background: #fee2e2; color: #dc2626; }
-  &.urgency-medium { background: #fef3c7; color: #d97706; }
-  &.urgency-normal { background: #f3f4f6; color: #6b7280; }
+  &.urgency-high   { background: var(--color-danger-bg); color: var(--color-danger-text); }
+  &.urgency-medium { background: var(--color-warning-bg); color: var(--color-warning-text); }
+  &.urgency-normal { background: var(--color-muted-bg); color: var(--color-muted); }
 }
 
-// ── Tiempo de espera ───────────────────────────────────────────────────────
 .waiting-time {
   font-weight: 600;
-  color: #f59e0b;
+  color: var(--color-warning);
 
   &.resolved {
     color: #9ca3af;
@@ -247,7 +237,6 @@
   }
 }
 
-// ── Checkbox de selección ──────────────────────────────────────────────────
 .col-check {
   width: 40px;
   padding-left: 1rem !important;
@@ -258,14 +247,13 @@
   width: 15px;
   height: 15px;
   cursor: pointer;
-  accent-color: #4f46e5;
+  accent-color: var(--color-primary);
 }
 
 .row-selected {
   background: #f5f3ff !important;
 }
 
-// ── Batch action toolbar ───────────────────────────────────────────────────
 .batch-toolbar {
   display: flex;
   align-items: center;
@@ -277,8 +265,8 @@
 }
 
 .batch-count {
-  font-size: 0.875rem;
-  color: #3730a3;
+  font-size: var(--font-sm);
+  color: var(--color-primary-hover);
   margin-right: 0.25rem;
   flex-shrink: 0;
 }
@@ -292,20 +280,20 @@
 .batch-assign-select {
   padding: 0.35rem 0.625rem;
   border: 1px solid #a5b4fc;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
   color: #374151;
-  background: white;
-  font-family: 'Inter', sans-serif;
+  background: var(--color-surface);
+  font-family: inherit;
   outline: none;
   cursor: pointer;
-  &:focus { border-color: #4f46e5; }
+  &:focus { border-color: var(--color-primary); }
 }
 
 .btn-batch {
   padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
   font-weight: 600;
   cursor: pointer;
   border: none;
@@ -315,22 +303,21 @@
   &:disabled { opacity: 0.4; cursor: default; }
 }
 
-.btn-batch-assign  { background: #4f46e5; color: white; }
-.btn-batch-ganado  { background: #dcfce7; color: #15803d; }
-.btn-batch-perdido { background: #fee2e2; color: #b91c1c; }
-.btn-batch-clear   { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
+.btn-batch-assign  { background: var(--color-primary); color: white; }
+.btn-batch-ganado  { background: var(--color-success-bg); color: var(--color-success-text); }
+.btn-batch-perdido { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.btn-batch-clear  { background: transparent; color: var(--color-muted); border: 1px solid #d1d5db; }
 
-// ── Selector de asignación ─────────────────────────────────────────────────
 .assign-select {
   padding: 0.4rem 0.5rem;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
   color: #374151;
-  background: white;
+  background: var(--color-surface);
   cursor: pointer;
   min-width: 180px;
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
 

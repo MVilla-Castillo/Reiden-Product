@@ -1,35 +1,60 @@
-<div class="chat-container" [class.drawer-open]="drawerOpen()">
+<div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
       <h2>Mis Chats Activos</h2>
     </div>
     <div class="chat-list">
-      @for (chat of chats(); track chat.session_id) {
-        <div 
-          class="chat-item" 
-          [class.active]="selectedSessionId() === chat.session_id"
-          (click)="selectLead(chat)">
-          <div class="lead-info">
-            <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
-            <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
+      @if (useVirtualScroll()) {
+        <cdk-virtual-scroll-viewport itemSize="80" class="chat-virtual-viewport">
+          <div
+            *cdkVirtualFor="let chat of chats(); trackBy: trackChat"
+            class="chat-item"
+            [class.active]="selectedSessionId() === chat.session_id"
+            (click)="selectLead(chat)">
+            <div class="lead-info">
+              <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
+              <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
+            </div>
+            <div class="lead-subinfo">
+              <small>{{ chat.vehicle_type || 'Vehículo pdte.' }}</small>
+            </div>
+            <div class="lead-last-msg text-muted">
+              <small>Últ. act:</small>
+              <small class="time">{{ chat.updated_at | date:'short' }}</small>
+            </div>
           </div>
-          <div class="lead-subinfo">
-            <small>{{ chat.vehicle_type || 'Vehículo pdte.' }}</small>
+        </cdk-virtual-scroll-viewport>
+      } @else {
+        @for (chat of chats(); track chat.session_id) {
+          <div
+            class="chat-item"
+            [class.active]="selectedSessionId() === chat.session_id"
+            (click)="selectLead(chat)">
+            <div class="lead-info">
+              <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
+              <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
+            </div>
+            <div class="lead-subinfo">
+              <small>{{ chat.vehicle_type || 'Vehículo pdte.' }}</small>
+            </div>
+            <div class="lead-last-msg text-muted">
+              <small>Últ. act:</small>
+              <small class="time">{{ chat.updated_at | date:'short' }}</small>
+            </div>
           </div>
-          <div class="lead-last-msg text-muted">
-             <!-- No backend field for last message preview exists, just showing time -->
-            <small>Últ. act:</small>
-            <small class="time">{{ chat.updated_at | date:'short' }}</small>
-          </div>
-        </div>
-      }
-      @if (chats().length === 0) {
-        <div class="p-4 text-center text-muted"><p>No tienes chats asignados.</p></div>
+        }
+        @if (chats().length === 0) {
+          <app-empty-state
+            icon="💬"
+            title="Sin chats activos"
+            subtitle="No tienes conversaciones asignadas todavía.">
+          </app-empty-state>
+        }
       }
     </div>
   </aside>
 
-  <main class="chat-window">
+  <main class="chat-window" style="position: relative;">
     @if (sseReconnecting()) {
       <div class="sse-banner" role="status" aria-live="polite">
         <span class="sse-spinner"></span>
@@ -40,7 +65,21 @@
     @if (selectedSession()) {
       <div class="chat-header">
         <div class="header-details">
-          <h3>Chat con Cliente {{ selectedSession()?.lead_phone_hash | slice:0:6 }}</h3>
+          @if (isEditingName()) {
+            <input
+              type="text"
+              class="name-edit-input"
+              [(ngModel)]="editingNameValue"
+              (blur)="saveName()"
+              (keyup.enter)="saveName()"
+              (keyup.escape)="cancelEditName()"
+              #nameInput>
+          } @else {
+            <h3 class="lead-name-display" (click)="startEditName()">
+              {{ selectedSession()?.lead_profile_name || ('Cliente ' + (selectedSession()?.lead_phone_hash | slice:0:6)) }}
+              <span class="edit-name-icon" title="Editar nombre">✎</span>
+            </h3>
+          }
           @if (selectedSession()?.vehicle_type) {
             <span class="vehicle-badge">{{ selectedSession()?.vehicle_type }}</span>
           }
@@ -48,113 +87,225 @@
         <div class="header-actions">
            <button class="btn btn-success mx-2" (click)="updateStatus('GANADO')">Venta Cerrada (Ganado)</button>
            <button class="btn btn-danger" (click)="updateStatus('PERDIDO')">Descartar (Perdido)</button>
-           <button class="btn-drawer-toggle" (click)="toggleDrawer()" [class.active]="drawerOpen()" title="Ver ficha del lead">
-             {{ drawerOpen() ? '✕' : 'ℹ' }}
-           </button>
         </div>
       </div>
-      <div class="messages-area">
+      @if (isLoadingMore()) {
+        <div class="loading-more">
+          <span class="spinner"></span>
+          <span>Cargando mensajes...</span>
+        </div>
+      }
+      <div class="messages-area" #messagesContainer (scroll)="onMessagesScroll($event)">
         @for (msg of messages(); track msg.message_id) {
           <div class="message" [ngClass]="msg.direction === 'OUTBOUND' ? 'sent' : 'received'">
             <div class="bubble">
               {{ msg.body }}
             </div>
-            <span class="timestamp">{{ msg.created_at | date:'shortTime' }}</span>
+            <div class="msg-meta">
+              @if (msg.is_forwarded) {
+                <span class="forwarded-icon" title="Reenviado">🔁</span>
+              }
+              <span class="timestamp">{{ msg.created_at | date:'shortTime' }}</span>
+              @if (msg.direction === 'OUTBOUND') {
+                <span class="msg-status" [ngClass]="'status-' + (msg.delivery_status || 'sent')"
+                      [title]="msg.delivery_status === 'failed' ? 'Error. Haz clic para reintentar.' : ''"
+                      (click)="msg.delivery_status === 'failed' ? retryMessage(msg.message_id!) : null"
+                      [class.retryable]="msg.delivery_status === 'failed'">
+                  @switch (msg.delivery_status) {
+                    @case ('pending') { ⏳ }
+                    @case ('sent') { ✓ }
+                    @case ('delivered') { ✓✓ }
+                    @case ('read') { ✓✓ }
+                    @case ('failed') { ✗ }
+                    @default { ✓ }
+                  }
+                </span>
+              }
+            </div>
           </div>
         }
       </div>
+      @if (!isAtBottom()) {
+        <button class="scroll-btn scroll-down" (click)="scrollToBottom()" title="Ir al final">↓</button>
+      }
+      @if (!isAtTop()) {
+        <button class="scroll-btn scroll-up" (click)="scrollToTop()" title="Ir al inicio">↑</button>
+      }
+      @if (isUploading()) {
+        <div class="upload-progress-wrap">
+          <div class="upload-progress-bar">
+            <div class="upload-progress-fill" [style.width.%]="uploadProgress()"></div>
+          </div>
+          <span class="upload-pct">{{ uploadProgress() }}%</span>
+          <button class="btn-cancel-upload" (click)="cancelUpload()" title="Cancelar">✕</button>
+        </div>
+      }
       <div class="input-area">
-        <input 
-          [(ngModel)]="newMessage" 
-          (keyup.enter)="send()" 
+        <input
+          type="file"
+          #fileInput
+          accept=".jpg,.jpeg,.png,.pdf,.mp4"
+          style="display:none"
+          (change)="handleFileSelect($event)">
+        <button class="btn-attach" type="button" (click)="fileInput.click()" [disabled]="isUploading()" title="Adjuntar archivo">📎</button>
+        <input
+          [(ngModel)]="newMessage"
+          (keyup.enter)="send()"
           placeholder="Escribe un mensaje por WhatsApp...">
         <button (click)="send()">Enviar</button>
       </div>
+      @if (fileUploadError()) {
+        <div class="file-error-banner">
+          <span>{{ fileUploadError() }}</span>
+          @if (failedUploadFile()) {
+            <button class="btn-retry-upload" (click)="retryUpload()">Reintentar</button>
+          }
+          <button (click)="fileUploadError.set(null)" aria-label="Cerrar">✕</button>
+        </div>
+      }
     } @else {
       <div class="empty-state">
-        <p>Selecciona un prospecto en la barra lateral para chatear</p>
+        <app-empty-state
+          icon="💬"
+          title="Selecciona una conversación"
+          subtitle="Elige un prospecto en la barra lateral para comenzar a chatear.">
+        </app-empty-state>
       </div>
     }
   </main>
 
-  @if (drawerOpen() && selectedSession()) {
+  @if (selectedSession()) {
     <aside class="lead-drawer">
       <div class="drawer-header">
         <h4>Ficha del Lead</h4>
-        <button class="drawer-close" (click)="toggleDrawer()" aria-label="Cerrar ficha">✕</button>
       </div>
 
       <div class="drawer-body">
-        <div class="drawer-section">
-          <span class="drawer-label">Estado</span>
-          <span class="drawer-badge status-{{ selectedSession()!.status | lowercase }}">
-            {{ selectedSession()!.status }}
-          </span>
-        </div>
 
-        <div class="drawer-section">
-          <span class="drawer-label">Puntuación de urgencia</span>
-          <div class="urgency-bar-wrap">
-            <div class="urgency-bar" [style.width.%]="selectedSession()!.urgency_score">
+        <!-- Sección 1: Datos del Cliente -->
+        <details class="drawer-group" open>
+          <summary class="drawer-group-title">Datos del Cliente</summary>
+          <div class="drawer-group-content">
+            <div class="drawer-section">
+              <span class="drawer-label">Estado</span>
+              <span class="drawer-badge status-{{ selectedSession()!.status | lowercase }}">
+                {{ selectedSession()!.status }}
+              </span>
             </div>
+            <div class="drawer-section">
+              <span class="drawer-label">Puntuación de urgencia</span>
+              <div class="urgency-bar-wrap">
+                <div class="urgency-bar" [style.width.%]="selectedSession()!.urgency_score"></div>
+              </div>
+              <span class="urgency-value">{{ selectedSession()!.urgency_score }} / 100</span>
+            </div>
+            @if (selectedSession()!.purchase_intent) {
+              <div class="drawer-section">
+                <span class="drawer-label">Intención de compra</span>
+                <span class="drawer-value">{{ selectedSession()!.purchase_intent }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Intención de compra</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
           </div>
-          <span class="urgency-value">{{ selectedSession()!.urgency_score }} / 100</span>
-        </div>
+        </details>
 
-        @if (selectedSession()!.purchase_intent) {
-          <div class="drawer-section">
-            <span class="drawer-label">Intención de compra</span>
-            <span class="drawer-value">{{ selectedSession()!.purchase_intent }}</span>
+        <!-- Sección 2: Vehículo y Financiamiento -->
+        <details class="drawer-group" open>
+          <summary class="drawer-group-title">Vehículo y Financiamiento</summary>
+          <div class="drawer-group-content">
+            @if (selectedSession()!.vehicle_type) {
+              <div class="drawer-section">
+                <span class="drawer-label">Vehículo de interés</span>
+                <span class="drawer-value">{{ selectedSession()!.vehicle_type }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Vehículo de interés</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
+            @if (selectedSession()!.payment_method) {
+              <div class="drawer-section">
+                <span class="drawer-label">Método de pago</span>
+                <span class="drawer-value">{{ selectedSession()!.payment_method }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Método de pago</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
+            @if (selectedSession()!.budget_range) {
+              <div class="drawer-section">
+                <span class="drawer-label">Rango de presupuesto</span>
+                <span class="drawer-value">{{ selectedSession()!.budget_range }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Rango de presupuesto</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
           </div>
-        }
+        </details>
 
-        @if (selectedSession()!.vehicle_type) {
-          <div class="drawer-section">
-            <span class="drawer-label">Vehículo de interés</span>
-            <span class="drawer-value">{{ selectedSession()!.vehicle_type }}</span>
+        <!-- Sección 3: Información de Contacto -->
+        <details class="drawer-group" open>
+          <summary class="drawer-group-title">Información de Contacto</summary>
+          <div class="drawer-group-content">
+            @if (selectedSession()!.acquisition_source) {
+              <div class="drawer-section">
+                <span class="drawer-label">Origen</span>
+                <span class="drawer-value">{{ selectedSession()!.acquisition_source }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Origen</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
+            @if (selectedSession()!.fsm_step) {
+              <div class="drawer-section">
+                <span class="drawer-label">Paso en el bot</span>
+                <span class="drawer-value monospace">{{ selectedSession()!.fsm_step }}</span>
+              </div>
+            } @else {
+              <div class="drawer-section empty-field">
+                <span class="drawer-label">Paso en el bot</span>
+                <span class="drawer-value muted">Sin información</span>
+              </div>
+            }
+            @if (selectedSession()!.created_at) {
+              <div class="drawer-section">
+                <span class="drawer-label">Creado</span>
+                <span class="drawer-value">{{ selectedSession()!.created_at | date:'dd/MM/yy HH:mm' }}</span>
+              </div>
+            }
+            @if (selectedSession()!.assigned_at) {
+              <div class="drawer-section">
+                <span class="drawer-label">Asignado</span>
+                <span class="drawer-value">{{ selectedSession()!.assigned_at | date:'dd/MM/yy HH:mm' }}</span>
+              </div>
+            }
           </div>
-        }
+        </details>
 
-        @if (selectedSession()!.payment_method) {
-          <div class="drawer-section">
-            <span class="drawer-label">Método de pago</span>
-            <span class="drawer-value">{{ selectedSession()!.payment_method }}</span>
-          </div>
-        }
-
-        @if (selectedSession()!.budget_range) {
-          <div class="drawer-section">
-            <span class="drawer-label">Rango de presupuesto</span>
-            <span class="drawer-value">{{ selectedSession()!.budget_range }}</span>
-          </div>
-        }
-
-        @if (selectedSession()!.fsm_step) {
-          <div class="drawer-section">
-            <span class="drawer-label">Paso en el bot</span>
-            <span class="drawer-value monospace">{{ selectedSession()!.fsm_step }}</span>
-          </div>
-        }
-
-        @if (selectedSession()!.acquisition_source) {
-          <div class="drawer-section">
-            <span class="drawer-label">Origen</span>
-            <span class="drawer-value">{{ selectedSession()!.acquisition_source }}</span>
-          </div>
-        }
-
-        @if (selectedSession()!.created_at) {
-          <div class="drawer-section">
-            <span class="drawer-label">Creado</span>
-            <span class="drawer-value">{{ selectedSession()!.created_at | date:'dd/MM/yy HH:mm' }}</span>
-          </div>
-        }
-
-        @if (selectedSession()!.assigned_at) {
-          <div class="drawer-section">
-            <span class="drawer-label">Asignado</span>
-            <span class="drawer-value">{{ selectedSession()!.assigned_at | date:'dd/MM/yy HH:mm' }}</span>
-          </div>
+        @if (nameHistory().length > 0) {
+          <details class="drawer-group">
+            <summary class="drawer-group-title">Historial de nombres</summary>
+            <div class="drawer-group-content">
+              @for (entry of nameHistory(); track entry.changed_at) {
+                <div class="drawer-section name-history-entry">
+                  <span class="drawer-value">{{ entry.old_name || '(sin nombre)' }} → {{ entry.new_name }}</span>
+                  <span class="drawer-meta">{{ entry.changed_by }} • {{ entry.changed_at | date:'dd/MM/yy HH:mm' }}</span>
+                </div>
+              }
+            </div>
+          </details>
         }
 
         <div class="drawer-divider"></div>

@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
+import { EmptyStateComponent } from './empty-state.component';
 
 // ── Mapas de etiquetas legibles ────────────────────────────────────────────
 export const STATUS_LABELS: Record<string, string> = {
@@ -26,7 +27,7 @@ export type BatchActionEvent =
 @Component({
   selector: 'app-leads-grid',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EmptyStateComponent],
   templateUrl: './leads-grid.component.html',
   styleUrl: './leads-grid.component.scss'
 })
@@ -37,6 +38,7 @@ export class LeadsGridComponent {
 
   @Output() assignLead  = new EventEmitter<{ leadId: string; agentId: string }>();
   @Output() batchAction = new EventEmitter<BatchActionEvent>();
+  @Output() clearFilters = new EventEmitter<void>();
 
   // Exponer los mapas al template
   readonly statusLabels  = STATUS_LABELS;
@@ -104,12 +106,13 @@ export class LeadsGridComponent {
     );
   }
 
-  clearFilters(): void {
+  onClearFilters(): void {
     this.searchText.set('');
     this.filterStatus.set('');
     this.filterPurchaseIntent.set('');
     this.filterDateFrom.set('');
     this.filterDateTo.set('');
+    this.clearFilters.emit();
   }
 
   statusLabel(raw: string): string {

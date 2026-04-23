@@ -159,6 +159,11 @@ class ProcessMessageUseCase:
             defaults={"wa_id": wa_id_clean},
         )
 
+        # UC-A01: Guardar ProfileName si es primera sesión y viene en payload
+        profile_name = payload.get("ProfileName")
+        if profile_name and not lead.profile_name:
+            self._lead_repo.update(lead.id, tenant_id, {"profile_name": profile_name})
+
         stage_end(
             "lead_upsert",
             logger,
@@ -338,6 +343,8 @@ class ProcessMessageUseCase:
             # El orden de llegada a la BD es la fuente de verdad
 
             _incoming_timestamp = payload.get("Timestamp", "")
+            _is_forwarded = payload.get("Forwarded", False)
+            _is_frequently_forwarded = payload.get("FrequentlyForwarded", False)
 
             # Persistir mensaje siempre y ejecutar FSM
             try:
@@ -349,6 +356,8 @@ class ProcessMessageUseCase:
                         direction="INBOUND",
                         message_type=_message_type,
                         body=_body,
+                        is_forwarded=_is_forwarded,
+                        is_frequently_forwarded=_is_frequently_forwarded,
                     )
                     message_created = True
 
@@ -362,6 +371,8 @@ class ProcessMessageUseCase:
                                 "message_sid": message_sid,
                                 "message_type": _message_type,
                                 "body_length": len(_body),
+                                "is_forwarded": _is_forwarded,
+                                "is_frequently_forwarded": _is_frequently_forwarded,
                                 "is_new_session": is_new_session,
                             },
                         )

@@ -17,6 +17,7 @@ from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.domain.entities import SessionEntity
+from crm.models import Lead
 from crm.models import AppUser
 
 
@@ -33,9 +34,19 @@ def _to_chile(dt) -> str | None:
 
 
 def _serialize_session(s: SessionEntity) -> dict:
+    lead_profile_name = None
+    lead = (
+        Lead.objects.filter(id=s.lead_id, is_deleted=False)
+        .values("profile_name")
+        .first()
+    )
+    if lead:
+        lead_profile_name = lead["profile_name"]
+
     return {
         "session_id": str(s.id),
         "lead_phone_hash": str(s.lead_id),
+        "lead_profile_name": lead_profile_name,
         "status": s.status,
         "urgency_score": s.urgency_score,
         "fsm_step": s.fsm_answers.get("current_step", "UNKNOWN"),

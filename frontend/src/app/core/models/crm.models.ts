@@ -43,6 +43,7 @@ export interface TenantSettings {
 export interface SessionDto {
   session_id: string;
   lead_phone_hash: string;
+  lead_profile_name?: string | null;
   status: string;
   urgency_score: number;
   fsm_step: string;
@@ -66,15 +67,20 @@ export interface SalespersonDto {
 }
 
 // Messaging
+export type DeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+
 export interface BackendMessage {
   message_id?: string;
-  id?: string; // Sometimes DB returns id
+  id?: string;
   direction: 'INBOUND' | 'OUTBOUND';
   message_type?: string;
   body: string;
   created_at: string;
   provider_message_id?: string;
   provider_message_sid?: string;
+  delivery_status?: DeliveryStatus;
+  is_forwarded?: boolean;
+  is_frequently_forwarded?: boolean;
 }
 
 export interface SendMessageResponse {
@@ -83,6 +89,7 @@ export interface SendMessageResponse {
   body: string;
   created_at: string;
   provider_message_sid: string;
+  delivery_status?: DeliveryStatus;
 }
 
 export interface AssignLeadResponse {
@@ -91,6 +98,18 @@ export interface AssignLeadResponse {
   salesperson_id: string | null;
   salesperson_name?: string;
   assigned_at?: string;
+}
+
+export interface LeadNameHistory {
+  old_name: string | null;
+  new_name: string | null;
+  changed_by: string | null;
+  changed_at: string | null;
+}
+
+export interface UpdateLeadResponse {
+  lead_profile_name: string | null;
+  name_history: LeadNameHistory[];
 }
 
 // Metrics

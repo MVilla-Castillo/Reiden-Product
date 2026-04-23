@@ -20,6 +20,7 @@ from django.views.decorators.http import require_http_methods
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.application.use_cases.send_outbound_message import MessageDeliveryError
+from crm.models import Lead, LeadNameHistory
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,9 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
         {
             "session_id": str(result.session_id),
             "status": result.status,
-            "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
+            "salesperson_id": str(result.salesperson_id)
+            if result.salesperson_id
+            else None,
             "action": "assigned",
             "assigned_delta": 1,
             "pending_delta": -1,
@@ -240,7 +243,9 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
         {
             "session_id": str(result.session_id),
             "status": result.status,
-            "salesperson_id": str(result.salesperson_id) if result.salesperson_id else None,
+            "salesperson_id": str(result.salesperson_id)
+            if result.salesperson_id
+            else None,
             "action": "reassigned",
             "assigned_delta": 1,
             "pending_delta": -1,
@@ -344,3 +349,69 @@ def salespeople_api(request: HttpRequest) -> JsonResponse:
     salespeople = user_repo.find_salespeople_by_tenant(request.tenant.id)
 
     return JsonResponse({"salespeople": salespeople}, status=200)
+
+
+@require_http_methods(["PATCH"])
+def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
+    if request.tenant is None:
+        return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    session_repo = DIContainer.instance().session_repo
+    session = session_repo.find_by_id(session_id, request.tenant.id)
+    if session is None:
+        return JsonResponse({"error": "Sesión no encontrada"}, status=404)
+
+    lead_id = session.lead_id
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    new_name = (
+        body.get("lead_profile_name", "").strip()
+        if body.get("lead_profile_name")
+        else None
+    )
+
+    lead = Lead.objects.filter(
+        id=lead_id, tenant=request.tenant.id, is_deleted=False
+    ).first()
+    if lead is None:
+        return JsonResponse({"error": "Lead no encontrado"}, status=404)
+
+    if new_name is not None and new_name != lead.profile_name:
+        old_name = lead.profile_name
+        LeadNameHistory.objects.create(
+            lead=lead,
+            old_name=old_name,
+            new_name=new_name,
+            changed_by=request.user if request.user.is_authenticated else None,
+        )
+        lead.profile_name = new_name
+        lead.save(update_fields=["profile_name"])
+
+    name_history = list(
+        LeadNameHistory.objects.filter(lead=lead)
+        .select_related("changed_by")
+        .order_by("-changed_at")
+        .values("old_name", "new_name", "changed_by__email", "changed_at")
+    )
+
+    return JsonResponse(
+        {
+            "lead_profile_name": lead.profile_name,
+            "name_history": [
+                {
+                    "old_name": h["old_name"],
+                    "new_name": h["new_name"],
+                    "changed_by": h["changed_by__email"],
+                    "changed_at": h["changed_at"].isoformat()
+                    if h["changed_at"]
+                    else None,
+                }
+                for h in name_history
+            ],
+        },
+        status=200,
+    )
