@@ -9,7 +9,7 @@
       </svg>
       <input
         type="text"
-        placeholder="Buscar por ID, teléfono o vehículo…"
+        placeholder="Buscar por nombre o vehículo…"
         [ngModel]="searchText()"
         (ngModelChange)="searchText.set($event)">
     </div>
@@ -108,6 +108,15 @@
     </div>
   }
 
+  <!-- ── Paginación ─────────────────────────────────────────────────────── -->
+  @if (totalPages >= 1) {
+    <div class="pagination">
+      <button class="btn-page" [disabled]="!hasPrevPage" (click)="prevPage()">← Anterior</button>
+      <span class="page-info">Página {{ currentPage() }} de {{ totalPages }}</span>
+      <button class="btn-page" [disabled]="!hasNextPage" (click)="nextPage()">Siguiente →</button>
+    </div>
+  }
+
   <!-- ── Tabla ────────────────────────────────────────────────────────── -->
   <table class="leads-table">
     <thead>
@@ -157,7 +166,7 @@
       </tr>
     </thead>
     <tbody>
-      @for (lead of filteredLeads; track lead.session_id) {
+      @for (lead of paginatedLeads; track lead.session_id) {
         <tr [class.row-selected]="isSelected(lead.session_id)">
           <td class="col-check">
             <input type="checkbox"
@@ -165,7 +174,7 @@
                    [checked]="isSelected(lead.session_id)"
                    (change)="toggleSelect(lead.session_id)">
           </td>
-          <td class="cell-name" (click)="onContactClick(lead)" style="cursor: pointer; color: var(--color-primary);">{{ lead.lead_phone_hash | slice:0:12 }}…</td>
+          <td class="cell-name" (click)="onContactClick(lead)" style="cursor: pointer; color: var(--color-primary);">{{ lead.lead_profile_name || ('Cliente ' + (lead.lead_phone_hash | slice:0:6)) }}</td>
           <td>{{ lead.vehicle_type || '—' }}</td>
           <td>
             <span class="intent-badge intent-{{ (lead.purchase_intent || '') | lowercase }}">

@@ -62,6 +62,10 @@ export class LeadsGridComponent {
   selectedIds    = signal<Set<string>>(new Set());
   batchAssignTo  = signal('');
 
+  // ── Paginación ────────────────────────────────────────────────────
+  private readonly PAGE_SIZE = 15;
+  currentPage = signal(1);
+
   // ── Opciones estáticas predefinidas (no dependen de datos) ───────────────
   get availableStatuses(): string[] {
     return Object.keys(STATUS_LABELS);
@@ -71,7 +75,7 @@ export class LeadsGridComponent {
     return Object.keys(INTENT_LABELS);
   }
 
-  // ── Lista filtrada ─────────────────────────────────────────────────────
+  // ── Lista filtrada (sin paginar) ────────────────────────────────────────
   get filteredLeads(): SessionDto[] {
     const text   = this.searchText().toLowerCase().trim();
     const status = this.filterStatus();
@@ -83,10 +87,9 @@ export class LeadsGridComponent {
 
     let result = this.leads.filter(lead => {
       if (text) {
-        const matchId      = lead.session_id.toLowerCase().includes(text);
-        const matchPhone   = lead.lead_phone_hash.toLowerCase().includes(text);
+        const matchName    = (lead.lead_profile_name ?? '').toLowerCase().includes(text);
         const matchVehicle = (lead.vehicle_type ?? '').toLowerCase().includes(text);
-        if (!matchId && !matchPhone && !matchVehicle) return false;
+        if (!matchName && !matchVehicle) return false;
       }
       if (status && lead.status !== status) return false;
       if (intent && lead.purchase_intent !== intent) return false;
@@ -117,6 +120,37 @@ export class LeadsGridComponent {
     return result;
   }
 
+  // ── Lista paginada ─────────────────────────────────────────────────────
+  get totalPages(): number {
+    return Math.ceil(this.filteredLeads.length / this.PAGE_SIZE) || 1;
+  }
+
+  get paginatedLeads(): SessionDto[] {
+    const page = this.currentPage();
+    const start = (page - 1) * this.PAGE_SIZE;
+    return this.filteredLeads.slice(start, start + this.PAGE_SIZE);
+  }
+
+  get hasNextPage(): boolean {
+    return this.currentPage() < this.totalPages;
+  }
+
+  get hasPrevPage(): boolean {
+    return this.currentPage() > 1;
+  }
+
+  nextPage(): void {
+    if (this.hasNextPage) this.currentPage.update(p => p + 1);
+  }
+
+  prevPage(): void {
+    if (this.hasPrevPage) this.currentPage.update(p => p - 1);
+  }
+
+  private resetPage(): void {
+    this.currentPage.set(1);
+  }
+
   get hasActiveFilters(): boolean {
     return !!(
       this.searchText()           ||
@@ -135,6 +169,7 @@ export class LeadsGridComponent {
     this.filterDateTo.set('');
     this.sortColumn.set('');
     this.sortDirection.set('asc');
+    this.resetPage();
     this.clearFilters.emit();
   }
 
