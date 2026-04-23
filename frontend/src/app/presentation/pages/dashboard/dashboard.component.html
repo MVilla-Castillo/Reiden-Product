@@ -1,6 +1,6 @@
 <div class="dashboard">
   <header class="dashboard-header">
-    <h1>Panel de {{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
+    <h1>{{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
     <div class="header-actions">
       <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
       @if (isManager() && tenantSettings()) {

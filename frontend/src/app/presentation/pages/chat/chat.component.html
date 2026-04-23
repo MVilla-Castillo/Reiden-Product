@@ -1,18 +1,25 @@
 <div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
-      <h2>Mis Chats Activos</h2>
+      <h2>Mis Chats</h2>
+      <div class="chat-filter">
+        <button [class.active]="chatFilter() === 'all'" (click)="setFilter('all')">Todos</button>
+        <button [class.active]="chatFilter() === 'active'" (click)="setFilter('active')">Activos</button>
+        <button [class.active]="chatFilter() === 'won'" (click)="setFilter('won')">Ganados</button>
+        <button [class.active]="chatFilter() === 'lost'" (click)="setFilter('lost')">Perdidos</button>
+        <button [class.active]="chatFilter() === 'abandoned'" (click)="setFilter('abandoned')">Abandonados</button>
+      </div>
     </div>
     <div class="chat-list">
       @if (useVirtualScroll()) {
         <cdk-virtual-scroll-viewport itemSize="80" class="chat-virtual-viewport">
           <div
-            *cdkVirtualFor="let chat of chats(); trackBy: trackChat"
+            *cdkVirtualFor="let chat of filteredChats(); trackBy: trackChat"
             class="chat-item"
             [class.active]="selectedSessionId() === chat.session_id"
             (click)="selectLead(chat)">
             <div class="lead-info">
-              <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
+              <span class="lead-name">{{ chat.lead_profile_name || ('Cliente ' + (chat.lead_phone_hash | slice:0:6)) }}</span>
               <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
             </div>
             <div class="lead-subinfo">
@@ -25,13 +32,13 @@
           </div>
         </cdk-virtual-scroll-viewport>
       } @else {
-        @for (chat of chats(); track chat.session_id) {
+        @for (chat of filteredChats(); track chat.session_id) {
           <div
             class="chat-item"
             [class.active]="selectedSessionId() === chat.session_id"
             (click)="selectLead(chat)">
             <div class="lead-info">
-              <span class="lead-name">Cliente {{ chat.lead_phone_hash | slice:0:6 }}</span>
+              <span class="lead-name">{{ chat.lead_profile_name || ('Cliente ' + (chat.lead_phone_hash | slice:0:6)) }}</span>
               <span class="lead-status status-{{ chat.status | lowercase }}">{{ chat.status }}</span>
             </div>
             <div class="lead-subinfo">
@@ -43,11 +50,11 @@
             </div>
           </div>
         }
-        @if (chats().length === 0) {
+        @if (filteredChats().length === 0) {
           <app-empty-state
             icon="💬"
-            title="Sin chats activos"
-            subtitle="No tienes conversaciones asignadas todavía.">
+            [title]="getEmptyStateTitle()"
+            [subtitle]="getEmptyStateSubtitle()">
           </app-empty-state>
         }
       }
@@ -66,14 +73,17 @@
       <div class="chat-header">
         <div class="header-details">
           @if (isEditingName()) {
-            <input
-              type="text"
-              class="name-edit-input"
-              [(ngModel)]="editingNameValue"
-              (blur)="saveName()"
-              (keyup.enter)="saveName()"
-              (keyup.escape)="cancelEditName()"
-              #nameInput>
+            <div class="name-edit-wrap">
+              <input
+                type="text"
+                class="name-edit-input"
+                [(ngModel)]="editingNameValue"
+                (keyup.enter)="saveName()"
+                (keyup.escape)="cancelEditName()"
+                #nameInput>
+              <button class="btn-save-name" (click)="saveName()" title="Guardar">✓</button>
+              <button class="btn-cancel-name" (click)="cancelEditName()" title="Cancelar">✕</button>
+            </div>
           } @else {
             <h3 class="lead-name-display" (click)="startEditName()">
               {{ selectedSession()?.lead_profile_name || ('Cliente ' + (selectedSession()?.lead_phone_hash | slice:0:6)) }}
@@ -83,10 +93,6 @@
           @if (selectedSession()?.vehicle_type) {
             <span class="vehicle-badge">{{ selectedSession()?.vehicle_type }}</span>
           }
-        </div>
-        <div class="header-actions">
-           <button class="btn btn-success mx-2" (click)="updateStatus('GANADO')">Venta Cerrada (Ganado)</button>
-           <button class="btn btn-danger" (click)="updateStatus('PERDIDO')">Descartar (Perdido)</button>
         </div>
       </div>
       @if (isLoadingMore()) {
@@ -285,7 +291,12 @@
                 <span class="drawer-value">{{ selectedSession()!.created_at | date:'dd/MM/yy HH:mm' }}</span>
               </div>
             }
-            @if (selectedSession()!.assigned_at) {
+            @if (selectedSession()!.salesperson_name) {
+              <div class="drawer-section">
+                <span class="drawer-label">Vendedor</span>
+                <span class="drawer-value">{{ selectedSession()!.salesperson_name }}</span>
+              </div>
+            } @else if (selectedSession()!.assigned_at) {
               <div class="drawer-section">
                 <span class="drawer-label">Asignado</span>
                 <span class="drawer-value">{{ selectedSession()!.assigned_at | date:'dd/MM/yy HH:mm' }}</span>

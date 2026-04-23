@@ -143,6 +143,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       border-bottom: 1px solid var(--color-border);
+
+      &.sortable {
+        cursor: pointer;
+        user-select: none;
+        &:hover { color: var(--color-primary); }
+      }
     }
   }
 
@@ -175,6 +181,18 @@
   font-family: monospace;
   font-size: var(--font-sm);
   color: #9ca3af;
+}
+
+.sort-icon {
+  margin-left: 0.35rem;
+  opacity: 0.4;
+  font-size: 0.7rem;
+  transition: opacity 0.15s;
+
+  &.active {
+    opacity: 1;
+    color: var(--color-primary);
+  }
 }
 
 .cell-name {

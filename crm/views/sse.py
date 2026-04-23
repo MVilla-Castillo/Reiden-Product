@@ -139,11 +139,13 @@ def _build_dashboard_snapshot(tenant) -> str:
     tenant_id = tenant.id
 
     pending = container.session_repo.get_pending_sessions(tenant_id, limit=50)
+    all_leads = container.session_repo.get_dashboard_sessions(tenant_id, limit=100)
     salespeople = container.user_repo.find_salespeople_by_tenant(tenant_id)
     settings_data = container.tenant_repo.find_by_id(tenant_id)
 
     payload = {
         "pending_leads": [_serialize_session(s) for s in pending],
+        "leads": [_serialize_session(s) for s in all_leads],
         "salespeople": salespeople,
         "settings": {
             "routing_mode": settings_data.get("routing_mode") if settings_data else None,

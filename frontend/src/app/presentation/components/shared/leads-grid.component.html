@@ -120,13 +120,37 @@
                  (change)="toggleSelectAll()"
                  title="Seleccionar todos los filtrados">
         </th>
-        <th>ID</th>
-        <th>Contacto (Hash)</th>
-        <th>Vehículo</th>
-        <th>Intención</th>
-        <th>Estado</th>
-        <th>Recibido</th>
-        <th>Score</th>
+        <th>Contacto</th>
+        <th class="sortable" (click)="onSort('vehicle')">
+          Vehículo
+          <span class="sort-icon" [class.active]="sortColumn() === 'vehicle'">
+            {{ sortColumn() === 'vehicle' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
+        <th class="sortable" (click)="onSort('intent')">
+          Intención
+          <span class="sort-icon" [class.active]="sortColumn() === 'intent'">
+            {{ sortColumn() === 'intent' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
+        <th class="sortable" (click)="onSort('status')">
+          Estado
+          <span class="sort-icon" [class.active]="sortColumn() === 'status'">
+            {{ sortColumn() === 'status' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
+        <th class="sortable" (click)="onSort('received')">
+          Recibido
+          <span class="sort-icon" [class.active]="sortColumn() === 'received'">
+            {{ sortColumn() === 'received' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
+        <th class="sortable" (click)="onSort('score')">
+          Score
+          <span class="sort-icon" [class.active]="sortColumn() === 'score'">
+            {{ sortColumn() === 'score' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
         @if (canAssign) {
           <th>Asignar A</th>
         }
@@ -141,8 +165,7 @@
                    [checked]="isSelected(lead.session_id)"
                    (change)="toggleSelect(lead.session_id)">
           </td>
-          <td class="cell-id">{{ lead.session_id | slice:0:8 }}</td>
-          <td class="cell-name">{{ lead.lead_phone_hash | slice:0:12 }}…</td>
+          <td class="cell-name" (click)="onContactClick(lead)" style="cursor: pointer; color: var(--color-primary);">{{ lead.lead_phone_hash | slice:0:12 }}…</td>
           <td>{{ lead.vehicle_type || '—' }}</td>
           <td>
             <span class="intent-badge intent-{{ (lead.purchase_intent || '') | lowercase }}">
@@ -180,7 +203,7 @@
 
       @if (filteredLeads.length === 0) {
         <tr>
-          <td [attr.colspan]="canAssign ? 9 : 8" style="padding: 0; text-align: center">
+          <td [attr.colspan]="canAssign ? 8 : 7" style="padding: 0; text-align: center">
             <app-empty-state
               [icon]="hasActiveFilters ? '🔍' : '📭'"
               [title]="hasActiveFilters ? 'Sin resultados' : 'No hay leads pendientes'"

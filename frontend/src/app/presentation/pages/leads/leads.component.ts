@@ -15,37 +15,11 @@ import { Subscription } from 'rxjs';
     <div class="leads-page">
       <header class="page-header">
         <div class="header-titles">
-          <h1>Gestor de Oportunidades y Leads</h1>
-          <p>Supervisa todos los prospects del sistema y asígnalos manualmente a tu equipo.</p>
-        </div>
-        
-        <div class="routing-control">
-          <label>Modo de Asignación Global:</label>
-          <div class="toggle-switch">
-             <button 
-                [class.active]="routingMode() === 'MANUAL'"
-                (click)="toggleRoutingMode()">
-                Enrutamiento Manual
-             </button>
-             <button 
-                [class.active]="routingMode() === 'AUTO'"
-                (click)="toggleRoutingMode()">
-                Automático (Round Robin)
-             </button>
-          </div>
+          <h1>Gestor leads</h1>
         </div>
       </header>
       
       <div class="grid-wrapper">
-        @if (routingMode() === 'AUTO') {
-          <div class="auto-assign-banner">
-            <span class="banner-icon">🤖</span>
-            <span class="banner-text">Modo Automático activo - Los leads se asignarán automáticamente al vendedor con menor carga</span>
-            <button class="btn-auto-assign" (click)="assignAllPendingAuto()">
-              Asignar Pendientes Ahora
-            </button>
-          </div>
-        }
         <app-leads-grid
           [leads]="leads()"
           [salesPersons]="salesPersons()"
@@ -63,30 +37,6 @@ import { Subscription } from 'rxjs';
           @if (toastType() === 'error') {
             <button class="toast-dismiss" (click)="dismissToast()" aria-label="Cerrar notificación">✕</button>
           }
-        </div>
-      }
-
-      <!-- EC-4: Failed Leads Modal -->
-      @if (showFailedModal()) {
-        <div class="failed-modal-overlay" (click)="showFailedModal.set(false)">
-          <div class="failed-modal" (click)="$event.stopPropagation()">
-            <div class="failed-modal-header">
-              <h4>⚠️ Leads no asignados ({{ failedAutoLeads().length }})</h4>
-              <button class="modal-close" (click)="showFailedModal.set(false)" aria-label="Cerrar">✕</button>
-            </div>
-            <ul class="failed-list">
-              @for (lead of failedAutoLeads(); track lead.id) {
-                <li>
-                  <span class="failed-id">Lead #{{ lead.phone }}</span>
-                  <span class="failed-reason">{{ lead.reason }}</span>
-                </li>
-              }
-            </ul>
-            <div class="failed-modal-actions">
-              <button class="btn-retry" (click)="retryFailedAutoLeads()">Reintentar seleccionados</button>
-              <button class="btn-cancel" (click)="showFailedModal.set(false)">Cerrar</button>
-            </div>
-          </div>
         </div>
       }
     </div>
@@ -189,22 +139,23 @@ export class LeadsComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.sseSub = this.sseService.dashboardStream().subscribe(event => {
       if (event.type === 'snapshot') {
-        this.leads.set(event.data.pending_leads ?? []);
+        this.leads.set(event.data.leads ?? []);
         this.salesPersons.set(event.data.salespeople ?? []);
         if (event.data.settings?.routing_mode) {
           this.routingMode.set(event.data.settings.routing_mode);
         }
       }
 
-      if (event.type === 'pending_leads') {
-        // Re-fetch para respetar ordenamiento por urgency_score del backend
-        this.crmApi.getPendingLeads().subscribe(leads => this.leads.set(leads));
+      if (event.type === 'leads') {
+        this.crmApi.getMyChats().subscribe(leads => this.leads.set(leads));
       }
 
       if (event.type === 'settings') {
         this.routingMode.set(event.data.routing_mode);
       }
     });
+
+    this.crmApi.getMyChats().subscribe(leads => this.leads.set(leads));
   }
 
   ngOnDestroy() {
@@ -233,77 +184,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
       this.routingMode.set(newMode);
       this._showToast('El motor fue cambiado a Enrutamiento ' + newMode);
     });
-  }
-
-  assignAllPendingAuto() {
-    const pendingLeads = this.leads();
-    if (pendingLeads.length === 0) {
-      this._showToast('No hay leads pendientes por asignar');
-      return;
-    }
-
-    let completed = 0;
-    const failed: Array<{id: string; phone: string; reason: string}> = [];
-
-    const checkDone = () => {
-      if (completed + failed.length !== pendingLeads.length) return;
-      if (completed > 0) this._showToast(`${completed} lead(s) asignados automáticamente`);
-      if (failed.length > 0) {
-        this.failedAutoLeads.set(failed);
-        this.showFailedModal.set(true);
-      }
-    };
-
-    pendingLeads.forEach(lead => {
-      this.crmApi.assignLead(lead.session_id, 'AUTO').subscribe({
-        next: () => {
-          completed++;
-          this.leads.update(current => current.filter(l => l.session_id !== lead.session_id));
-          checkDone();
-        },
-        error: (err) => {
-          const reason = err.error?.message || err.error?.error || 'Sin agente disponible';
-          failed.push({ id: lead.session_id, phone: lead.lead_phone_hash.substring(0, 6), reason });
-          checkDone();
-        }
-      });
-    });
-  }
-
-  retryFailedAutoLeads() {
-    const toRetry = this.failedAutoLeads();
-    this.showFailedModal.set(false);
-    this.failedAutoLeads.set([]);
-
-    let completed = 0;
-    const failed: Array<{id: string; phone: string; reason: string}> = [];
-
-    const checkDone = () => {
-      if (completed + failed.length !== toRetry.length) return;
-      if (failed.length > 0) {
-        this.failedAutoLeads.set(failed);
-        this.showFailedModal.set(true);
-        this._showToast(`${failed.length} lead(s) siguen sin poder asignarse`, 'error');
-      } else {
-        this._showToast(`${completed} lead(s) reasignados correctamente`);
-      }
-    };
-
-    toRetry.forEach(({ id, phone }) => {
-      this.crmApi.assignLead(id, 'AUTO').subscribe({
-        next: () => {
-          completed++;
-          this.leads.update(current => current.filter(l => l.session_id !== id));
-          checkDone();
-        },
-        error: (err) => {
-          const reason = err.error?.message || err.error?.error || 'Sin agente disponible';
-          failed.push({ id, phone, reason });
-          checkDone();
-        }
-      });
-    });
-  }
+}
 
   handleBatchAction(event: BatchActionEvent) {
     const { action, ids } = event;

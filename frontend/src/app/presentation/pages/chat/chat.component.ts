@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subscription } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
 import { SessionDto, BackendMessage, LeadNameHistory } from '../../../core/models/crm.models';
@@ -21,6 +22,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private crmApi = inject(CrmApiService);
   private sseService = inject(SseService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   chats = signal<SessionDto[]>([]);
   selectedSession = signal<SessionDto | null>(null);
@@ -40,20 +43,49 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   isAtBottom = signal(true);
   isAtTop = signal(false);
 
+  chatFilter = signal<'all' | 'active' | 'won' | 'lost' | 'abandoned'>('all');
+  filteredChats = computed(() => {
+    const filter = this.chatFilter();
+    const allChats = this.chats();
+    if (filter === 'all') return allChats;
+    if (filter === 'active') return allChats.filter(c => c.status === 'CON_VENDEDOR');
+    if (filter === 'won') return allChats.filter(c => c.status === 'GANADO');
+    if (filter === 'lost') return allChats.filter(c => c.status === 'PERDIDO');
+    if (filter === 'abandoned') return allChats.filter(c => c.status === 'ABANDONO_BOT');
+    return allChats;
+  });
+
   private uploadController: AbortController | null = null;
   private shouldScrollToBottom = false;
 
   private msgSseSub?: Subscription;
   private dashboardSseSub?: Subscription;
+  private queryParamsSub?: Subscription;
 
   constructor() {}
 
   ngOnInit() {
     this.loadMyChats();
-    // Suscripción al stream del dashboard para recibir nuevas asignaciones en tiempo real
     this.dashboardSseSub = this.sseService.dashboardStream().subscribe(event => {
       if (event.type === 'snapshot' || event.type === 'pending_leads') {
         this.loadMyChats();
+      }
+    });
+    this.queryParamsSub = this.route.queryParams.subscribe(params => {
+      const sessionId = params['session'];
+      if (!sessionId) return;
+
+      const existing = this.chats().find(c => c.session_id === sessionId);
+      if (existing) {
+        this.selectLead(existing);
+      } else {
+        this.crmApi.getMyChats().subscribe(chats => {
+          const chat = chats.find(c => c.session_id === sessionId);
+          if (chat) {
+            this.chats.set(chats);
+            this.selectLead(chat);
+          }
+        });
       }
     });
   }
@@ -61,6 +93,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   ngOnDestroy() {
     this.msgSseSub?.unsubscribe();
     this.dashboardSseSub?.unsubscribe();
+    this.queryParamsSub?.unsubscribe();
   }
 
   ngAfterViewChecked() {
@@ -381,4 +414,36 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
+  loadNameHistory(sessionId: string) {
+    this.crmApi.updateLeadProfileName(sessionId, '').subscribe({
+      next: (res) => {
+        this.nameHistory.set(res.name_history || []);
+      },
+      error: () => {}
+    });
+  }
+
+  setFilter(filter: 'all' | 'active' | 'won' | 'lost' | 'abandoned') {
+    this.chatFilter.set(filter);
+  }
+
+  getEmptyStateTitle(): string {
+    const filter = this.chatFilter();
+    if (filter === 'all') return 'Sin chats';
+    if (filter === 'active') return 'Sin chats activos';
+    if (filter === 'won') return 'Sin chats ganados';
+    if (filter === 'lost') return 'Sin chats perdidos';
+    if (filter === 'abandoned') return 'Sin chats abandonados';
+    return 'Sin chats';
+  }
+
+  getEmptyStateSubtitle(): string {
+    const filter = this.chatFilter();
+    if (filter === 'all') return 'No hay conversaciones todavía.';
+    if (filter === 'active') return 'No tienes conversaciones activas.';
+    if (filter === 'won') return 'No tienes ventas cerradas.';
+    if (filter === 'lost') return 'No tienes chats perdidos.';
+    if (filter === 'abandoned') return 'No hay chats abandonados.';
+    return '';
+  }
 }

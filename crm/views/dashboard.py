@@ -7,6 +7,7 @@ Incluye rate limiting para proteger contra abuso (60 req/min por tenant).
 
 from __future__ import annotations
 
+import json
 import zoneinfo
 from datetime import datetime, timezone
 
@@ -33,15 +34,30 @@ def _to_chile(dt) -> str | None:
     return dt.astimezone(_CHILE_TZ).isoformat()
 
 
-def _serialize_session(s: SessionEntity) -> dict:
+def _serialize_session(
+    s: SessionEntity, users_cache: dict | None = None, leads_cache: dict | None = None
+) -> dict:
     lead_profile_name = None
-    lead = (
-        Lead.objects.filter(id=s.lead_id, is_deleted=False)
-        .values("profile_name")
-        .first()
-    )
-    if lead:
-        lead_profile_name = lead["profile_name"]
+    salesperson_name = None
+
+    if leads_cache is not None and s.lead_id in leads_cache:
+        lead_profile_name = leads_cache[s.lead_id]
+    else:
+        lead = (
+            Lead.objects.filter(id=s.lead_id, is_deleted=False)
+            .values("profile_name")
+            .first()
+        )
+        if lead:
+            lead_profile_name = lead["profile_name"]
+
+    if s.salesperson_id:
+        if users_cache is not None and s.salesperson_id in users_cache:
+            salesperson_name = users_cache[s.salesperson_id]
+        else:
+            user = AppUser.objects.filter(id=s.salesperson_id).values("email").first()
+            if user:
+                salesperson_name = user["email"].split("@")[0]
 
     return {
         "session_id": str(s.id),
@@ -55,6 +71,7 @@ def _serialize_session(s: SessionEntity) -> dict:
         "budget_range": s.fsm_answers.get("budget_range"),
         "purchase_intent": s.fsm_answers.get("purchase_intent"),
         "salesperson_id": str(s.salesperson_id) if s.salesperson_id else None,
+        "salesperson_name": salesperson_name,
         "acquisition_source": s.acquisition_source,
         "assigned_at": _to_chile(s.assigned_at),
         "closed_at": _to_chile(s.closed_at),
@@ -154,7 +171,21 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
         tenant.id, limit=limit, filters=filters
     )
 
-    data = [_serialize_session(s) for s in sessions]
+    salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
+    users_cache = {}
+    if salesperson_ids:
+        users = AppUser.objects.filter(id__in=salesperson_ids).values("id", "email")
+        users_cache = {u["id"]: u["email"].split("@")[0] for u in users}
+
+    lead_ids = {s.lead_id for s in sessions}
+    leads_cache = {}
+    if lead_ids:
+        leads = Lead.objects.filter(id__in=lead_ids, is_deleted=False).values(
+            "id", "profile_name"
+        )
+        leads_cache = {l["id"]: l["profile_name"] for l in leads}
+
+    data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 
     return JsonResponse({"leads": data, "count": len(data)}, status=200)
 
@@ -171,7 +202,21 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
     session_repo = DIContainer.instance().session_repo
     sessions = session_repo.get_pending_sessions(tenant.id, limit=50)
 
-    data = [_serialize_session(s) for s in sessions]
+    salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
+    users_cache = {}
+    if salesperson_ids:
+        users = AppUser.objects.filter(id__in=salesperson_ids).values("id", "email")
+        users_cache = {u["id"]: u["email"].split("@")[0] for u in users}
+
+    lead_ids = {s.lead_id for s in sessions}
+    leads_cache = {}
+    if lead_ids:
+        leads = Lead.objects.filter(id__in=lead_ids, is_deleted=False).values(
+            "id", "profile_name"
+        )
+        leads_cache = {l["id"]: l["profile_name"] for l in leads}
+
+    data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 
     return JsonResponse({"pending_leads": data}, status=200)
 
@@ -204,8 +249,6 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
         )
 
     if request.method == "PATCH":
-        from crm.models import AppUser
-
         user = getattr(request, "user", None)
         if not user:
             return JsonResponse({"error": "Usuario no autenticado."}, status=401)
@@ -215,8 +258,6 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
                 {"error": "Solo administradores pueden cambiar la configuración."},
                 status=403,
             )
-
-        import json
 
         try:
             body = json.loads(request.body)

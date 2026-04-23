@@ -5,7 +5,7 @@
 }
 
 .chat-sidebar {
-  width: 300px;
+  width: 260px;
   background: var(--color-surface);
   border-right: 1px solid #e0e4ed;
   display: flex;
@@ -16,6 +16,40 @@
 .sidebar-header {
   padding: 20px;
   border-bottom: 1px solid #e0e4ed;
+
+  h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.chat-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+
+  button {
+    padding: 0.25rem 0.5rem;
+    font-size: var(--font-xs);
+    border: 1px solid #e0e4ed;
+    border-radius: 12px;
+    background: white;
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    &.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: white;
+    }
+  }
 }
 
 .chat-list {
@@ -96,6 +130,46 @@
   &:hover .edit-name-icon {
     opacity: 0.6;
   }
+}
+
+.name-edit-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.name-edit-input {
+  font-size: 1.125rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  outline: none;
+  width: 200px;
+}
+
+.btn-save-name, .btn-cancel-name {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-save-name {
+  background: var(--color-success);
+  color: white;
+  &:hover { opacity: 0.85; }
+}
+
+.btn-cancel-name {
+  background: var(--color-muted-bg);
+  color: var(--color-muted);
+  &:hover { background: var(--color-danger-bg); color: var(--color-danger); }
 }
 
 .name-edit-input {
@@ -231,7 +305,7 @@
 }
 
 .lead-drawer {
-  width: 280px;
+  width: 240px;
   flex-shrink: 0;
   background: var(--color-surface);
   border-left: 1px solid #e0e4ed;
@@ -242,7 +316,7 @@
 }
 
 @keyframes slideInDrawer {
-  from { transform: translateX(280px); opacity: 0; }
+  from { transform: translateX(240px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
 
