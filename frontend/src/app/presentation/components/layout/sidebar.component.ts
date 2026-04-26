@@ -2,11 +2,12 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { SessionService } from '../../../core/services/session.service';
+import { IconComponent } from '../../components/shared/icons.component';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, IconComponent],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'
 })
@@ -15,10 +16,10 @@ export class SidebarComponent {
   private router = inject(Router);
 
   navItems = [
-    { icon: '📊', label: 'Dashboard', route: '/dashboard', active: true, roles: ['manager'] },
-    { icon: '👥', label: 'Leads', route: '/leads', active: false, roles: ['manager'] },
-    { icon: '💬', label: 'Conversaciones', route: '/chat', active: false, roles: ['manager', 'sales'] },
-    { icon: '📈', label: 'Reportes', route: '/reports', active: false, roles: ['manager'] },
+    { icon: 'chart-bar', label: 'Dashboard', route: '/dashboard', active: true, roles: ['manager'] },
+    { icon: 'users', label: 'Leads', route: '/leads', active: false, roles: ['manager'] },
+    { icon: 'chat-bubble-left-right', label: 'Conversaciones', route: '/chat', active: false, roles: ['manager', 'sales'] },
+    { icon: 'presentation-chart-line', label: 'Reportes', route: '/reports', active: false, roles: ['manager'] },
   ];
 
   setRole(role: 'manager' | 'sales') {

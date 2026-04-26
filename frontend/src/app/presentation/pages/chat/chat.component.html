@@ -1,3 +1,4 @@
+<app-top-bar title="Conversaciones" breadcrumb="Chat"></app-top-bar>
 <div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
@@ -52,7 +53,7 @@
         }
         @if (filteredChats().length === 0) {
           <app-empty-state
-            icon="💬"
+            icon="chat-bubble-left-right"
             [title]="getEmptyStateTitle()"
             [subtitle]="getEmptyStateSubtitle()">
           </app-empty-state>
@@ -172,7 +173,7 @@
     } @else {
       <div class="empty-state">
         <app-empty-state
-          icon="💬"
+          icon="chat-bubble-left-right"
           title="Selecciona una conversación"
           subtitle="Elige un prospecto en la barra lateral para comenzar a chatear.">
         </app-empty-state>
@@ -190,7 +191,10 @@
 
         <!-- Sección 1: Datos del Cliente -->
         <details class="drawer-group" open>
-          <summary class="drawer-group-title">Datos del Cliente</summary>
+          <summary class="drawer-group-title">
+            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
+            Datos del Cliente
+          </summary>
           <div class="drawer-group-content">
             <div class="drawer-section">
               <span class="drawer-label">Estado</span>
@@ -221,7 +225,10 @@
 
         <!-- Sección 2: Vehículo y Financiamiento -->
         <details class="drawer-group" open>
-          <summary class="drawer-group-title">Vehículo y Financiamiento</summary>
+          <summary class="drawer-group-title">
+            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
+            Vehículo y Financiamiento
+          </summary>
           <div class="drawer-group-content">
             @if (selectedSession()!.vehicle_type) {
               <div class="drawer-section">
@@ -261,7 +268,10 @@
 
         <!-- Sección 3: Información de Contacto -->
         <details class="drawer-group" open>
-          <summary class="drawer-group-title">Información de Contacto</summary>
+          <summary class="drawer-group-title">
+            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
+            Información de Contacto
+          </summary>
           <div class="drawer-group-content">
             @if (selectedSession()!.acquisition_source) {
               <div class="drawer-section">
@@ -307,7 +317,10 @@
 
         @if (nameHistory().length > 0) {
           <details class="drawer-group">
-            <summary class="drawer-group-title">Historial de nombres</summary>
+            <summary class="drawer-group-title">
+              <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
+              Historial de nombres
+            </summary>
             <div class="drawer-group-content">
               @for (entry of nameHistory(); track entry.changed_at) {
                 <div class="drawer-section name-history-entry">

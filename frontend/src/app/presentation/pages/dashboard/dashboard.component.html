@@ -1,19 +1,22 @@
+<app-top-bar [title]="isManager() ? 'Gerencia' : 'Ventas'" [breadcrumb]="isManager() ? 'Dashboard' : 'Chat'">
+  <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
+  @if (isManager() && tenantSettings()) {
+    <button 
+      class="routing-badge" 
+      [class.auto]="tenantSettings()!.routing_mode === 'AUTO'"
+      [class.manual]="tenantSettings()!.routing_mode === 'MANUAL'"
+      (click)="toggleRoutingMode()">
+      <span class="routing-label">Routing</span>
+      <span class="routing-mode">{{ tenantSettings()!.routing_mode }}</span>
+    </button>
+  }
+</app-top-bar>
+
 <div class="dashboard">
-  <header class="dashboard-header">
-    <h1>{{ isManager() ? 'Gerencia' : 'Ventas' }}</h1>
-    <div class="header-actions">
-      <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
-      @if (isManager() && tenantSettings()) {
-        <button class="toggle-routing" (click)="toggleRoutingMode()">
-          Routing: <strong>{{ tenantSettings()!.routing_mode }}</strong>
-        </button>
-      }
-    </div>
-  </header>
 
   @if (sseReconnecting()) {
     <div class="status-banner banner-warning" role="status" aria-live="polite">
-      <span class="banner-icon">⚡</span>
+      <app-icon name="bolt" [size]="20"></app-icon>
       <span>Reconectando al servidor de eventos en tiempo real…</span>
       <span class="banner-spinner"></span>
     </div>
@@ -21,12 +24,31 @@
 
   @if (metricsError()) {
     <div class="status-banner banner-error" role="alert">
-      <span class="banner-icon">⚠️</span>
+      <app-icon name="exclamation-triangle" [size]="20"></app-icon>
       <span>No se pudieron cargar las métricas. Los datos mostrados pueden estar desactualizados.</span>
       <button class="banner-retry" (click)="refreshMetrics()" [disabled]="isRefreshing()">
         {{ isRefreshing() ? 'Reintentando…' : 'Reintentar' }}
       </button>
     </div>
+  }
+
+  @if (isManager() && !metrics()) {
+    <section class="kpi-section">
+      <div class="kpi-section-header">
+        <app-skeleton width="180px" height="24px"></app-skeleton>
+      </div>
+      <div class="kpi-cards">
+        @for (i of [1,2,3,4]; track i) {
+          <div class="kpi-skeleton">
+            <app-skeleton width="56px" height="56px" radius="14px"></app-skeleton>
+            <div class="kpi-skeleton-content">
+              <app-skeleton width="80px" height="32px"></app-skeleton>
+              <app-skeleton width="120px" height="16px"></app-skeleton>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
   }
 
   @if (isManager() && metrics()) {
@@ -39,31 +61,31 @@
             (click)="refreshMetrics()"
             [disabled]="isRefreshing()"
             title="Sincronizar métricas con base de datos">
-            <span [class.spinning]="isRefreshing()">🔄</span>
+            <app-icon name="arrow-path" [size]="18" [class.cssClass]="isRefreshing() ? 'spinning' : ''"></app-icon>
           </button>
         }
       </div>
 
       <div class="kpi-cards">
         <app-kpi-card
-          icon="⚡"
+          icon="bolt"
           [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
           trend="+0%"
           label="T. Respuesta Promedio">
         </app-kpi-card>
         <app-kpi-card
-          icon="⚠️"
+          icon="exclamation-triangle"
           [value]="metrics()!.funnel.pending_assignment.toString()"
           label="Pendientes de Asignación"
           [critical]="metrics()!.funnel.pending_assignment > 0">
         </app-kpi-card>
         <app-kpi-card
-          icon="👔"
+          icon="briefcase"
           [value]="metrics()!.funnel.con_vendedor.toString()"
           label="Con Vendedores">
         </app-kpi-card>
         <app-kpi-card
-          icon="🎯"
+          icon="target"
           [value]="metrics()!.funnel.win_rate + '%'"
           trend="+0%"
           label="Tasa de Cierre">

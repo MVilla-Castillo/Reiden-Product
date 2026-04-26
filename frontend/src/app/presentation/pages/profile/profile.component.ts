@@ -2,18 +2,15 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SessionService } from '../../../core/services/session.service';
+import { TopBarComponent } from '../../components/shared/top-bar.component';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TopBarComponent],
   template: `
+    <app-top-bar title="Mi Perfil" breadcrumb="Perfil"></app-top-bar>
     <div class="profile-page">
-      <header class="page-header">
-        <h1>Mi Perfil</h1>
-        <p>Actualiza tu información personal y datos de contacto.</p>
-      </header>
-
       <div class="profile-card">
         <div class="avatar-section">
           <div class="avatar-circle">

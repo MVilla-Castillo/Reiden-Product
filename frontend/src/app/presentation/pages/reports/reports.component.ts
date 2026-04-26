@@ -1,17 +1,19 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TopBarComponent } from '../../components/shared/top-bar.component';
+import { IconComponent } from '../../components/shared/icons.component';
 
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TopBarComponent, IconComponent],
   template: `
+    <app-top-bar title="Reportes" breadcrumb="Reportes"></app-top-bar>
     <div class="reports-page">
-      <header class="page-header">
-        <h1>Reportes de Rendimiento</h1>
-        <p>Métricas y analytics en tiempo real de tu equipo comercial.</p>
-      </header>
-
+      <div class="demo-banner">
+        <app-icon name="information-circle" [size]="18"></app-icon>
+        <span>Datos de ejemplo — funcionalidad en desarrollo</span>
+      </div>
       <div class="charts-grid">
         <div class="chart-card">
           <h3>Tasa de Conversión (Últimos 7 días)</h3>
@@ -53,6 +55,19 @@ import { CommonModule } from '@angular/common';
   `,
   styles: [`
     .reports-page { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+    .demo-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--color-warning-bg);
+      border: 1px solid var(--color-warning);
+      border-radius: var(--radius-md);
+      color: var(--color-warning-text);
+      font-size: var(--font-sm);
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
     .page-header {
       margin-bottom: 2rem;
       h1 { font-size: 1.8rem; color: #111827; margin: 0 0 0.5rem; }

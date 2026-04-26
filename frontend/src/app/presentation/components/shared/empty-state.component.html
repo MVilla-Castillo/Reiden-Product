@@ -1,5 +1,5 @@
 <div class="empty-state">
-  <span class="empty-icon">{{ icon }}</span>
+  <app-icon [name]="icon" [size]="48" [cssClass]="'empty-icon'"></app-icon>
   <p class="empty-title">{{ title }}</p>
   @if (subtitle) {
     <p class="empty-subtitle">{{ subtitle }}</p>

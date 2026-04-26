@@ -351,7 +351,7 @@ def salespeople_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"salespeople": salespeople}, status=200)
 
 
-@require_http_methods(["PATCH"])
+@require_http_methods(["GET", "PATCH"])
 def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
@@ -363,33 +363,34 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     lead_id = session.lead_id
 
-    try:
-        body = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return JsonResponse({"error": "JSON inválido"}, status=400)
-
-    new_name = (
-        body.get("lead_profile_name", "").strip()
-        if body.get("lead_profile_name")
-        else None
-    )
-
     lead = Lead.objects.filter(
-        id=lead_id, tenant=request.tenant.id, is_deleted=False
+        id=lead_id, tenant_id=request.tenant.id, is_deleted=False
     ).first()
     if lead is None:
         return JsonResponse({"error": "Lead no encontrado"}, status=404)
 
-    if new_name is not None and new_name != lead.profile_name:
-        old_name = lead.profile_name
-        LeadNameHistory.objects.create(
-            lead=lead,
-            old_name=old_name,
-            new_name=new_name,
-            changed_by=request.user if request.user.is_authenticated else None,
+    if request.method == "PATCH":
+        try:
+            body = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            return JsonResponse({"error": "JSON inválido"}, status=400)
+
+        new_name = (
+            body.get("lead_profile_name", "").strip()
+            if body.get("lead_profile_name")
+            else None
         )
-        lead.profile_name = new_name
-        lead.save(update_fields=["profile_name"])
+
+        if new_name is not None and new_name != lead.profile_name:
+            old_name = lead.profile_name
+            LeadNameHistory.objects.create(
+                lead=lead,
+                old_name=old_name,
+                new_name=new_name,
+                changed_by=request.user if request.user.is_authenticated else None,
+            )
+            lead.profile_name = new_name
+            lead.save(update_fields=["profile_name"])
 
     name_history = list(
         LeadNameHistory.objects.filter(lead=lead)

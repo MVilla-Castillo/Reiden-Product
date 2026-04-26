@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
 import { LeadsGridComponent, BatchActionEvent } from '../../components/shared/leads-grid.component';
+import { TopBarComponent } from '../../components/shared/top-bar.component';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
 import { Subscription } from 'rxjs';
 
@@ -10,14 +11,10 @@ import { Subscription } from 'rxjs';
 // ... (Keeping decorator matching)
   selector: 'app-leads',
   standalone: true,
-  imports: [CommonModule, LeadsGridComponent],
+  imports: [CommonModule, LeadsGridComponent, TopBarComponent],
   template: `
     <div class="leads-page">
-      <header class="page-header">
-        <div class="header-titles">
-          <h1>Gestor leads</h1>
-        </div>
-      </header>
+      <app-top-bar title="Gestor de Leads" breadcrumb="Leads"></app-top-bar>
       
       <div class="grid-wrapper">
         <app-leads-grid
@@ -78,7 +75,7 @@ import { Subscription } from 'rxjs';
     }
 
     .toast-notification {
-      position: absolute; top: 1rem; right: 1rem; max-width: 420px; padding: 0.875rem 1rem; border-radius: var(--radius-md); display: flex; align-items: flex-start; gap: 0.625rem; font-weight: 500; font-size: var(--font-sm); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 100;
+      position: fixed; top: 1rem; right: 1rem; max-width: 420px; padding: 0.875rem 1rem; border-radius: var(--radius-md); display: flex; align-items: flex-start; gap: 0.625rem; font-weight: 500; font-size: var(--font-sm); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 100;
     }
     .toast-notification.success { background: var(--color-success-bg); color: var(--color-success-text); border-left: 4px solid var(--color-success); }
     .toast-notification.error   { background: var(--color-danger-bg); color: var(--color-danger-text); border-left: 4px solid var(--color-danger); }
@@ -146,7 +143,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
         }
       }
 
-      if (event.type === 'leads') {
+      if (event.type === 'pending_leads') {
         this.crmApi.getMyChats().subscribe(leads => this.leads.set(leads));
       }
 

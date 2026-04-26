@@ -1,13 +1,16 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { IconComponent } from './icons.component';
 
 @Component({
   selector: 'app-kpi-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   template: `
     <div class="kpi-card" [class.critical]="critical">
-      <div class="kpi-icon">{{ icon }}</div>
+      <div class="kpi-icon">
+        <app-icon [name]="icon" [size]="24" [cssClass]="'kpi-svg-icon'"></app-icon>
+      </div>
       <div class="kpi-content">
         <div class="kpi-value-row">
           <div class="kpi-value">{{ value }}</div>
@@ -59,8 +62,11 @@ import { CommonModule } from '@angular/common';
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
       background: #f3f4f6;
+    }
+    
+    ::ng-deep .kpi-svg-icon {
+      color: #6b7280;
     }
     
     .kpi-content {

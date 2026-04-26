@@ -1,17 +1,14 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TopBarComponent } from '../../components/shared/top-bar.component';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TopBarComponent],
   template: `
+    <app-top-bar title="Configuración" breadcrumb="Ajustes"></app-top-bar>
     <div class="settings-page">
-      <header class="page-header">
-        <h1>Ajustes del Sistema</h1>
-        <p>Personaliza tu experiencia y la apariencia visual de la plataforma.</p>
-      </header>
-      
       <div class="settings-card">
         <h3>Tema y Colores Primarios</h3>
         <p class="description">Selecciona un color de acento para los botones y elementos activos del sistema.</p>

@@ -8,11 +8,13 @@ import { CrmApiService } from '../../../infrastructure/repositories/crm.api.serv
 import { SseService } from '../../../infrastructure/services/sse.service';
 import { SessionDto, BackendMessage, LeadNameHistory } from '../../../core/models/crm.models';
 import { EmptyStateComponent } from '../../components/shared/empty-state.component';
+import { TopBarComponent } from '../../components/shared/top-bar.component';
+import { IconComponent } from '../../components/shared/icons.component';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollingModule, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, ScrollingModule, EmptyStateComponent, TopBarComponent, IconComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
@@ -301,7 +303,16 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private _replaceMessage(tempId: string, confirmed: BackendMessage, msgs: BackendMessage[]): BackendMessage[] {
-    return msgs.map(m => m.message_id === tempId ? confirmed : m);
+    const replaced = msgs.map(m => m.message_id === tempId ? confirmed : m);
+    // Si SSE llegó antes que HTTP, el mensaje real ya fue agregado al array.
+    // Deduplicar por message_id para evitar que aparezca dos veces.
+    const seen = new Set<string>();
+    return replaced.filter(m => {
+      if (!m.message_id) return true;
+      if (seen.has(m.message_id)) return false;
+      seen.add(m.message_id);
+      return true;
+    });
   }
 
   private _updateStatus(msgId: string, status: BackendMessage['delivery_status'], msgs: BackendMessage[]): BackendMessage[] {
@@ -415,7 +426,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   loadNameHistory(sessionId: string) {
-    this.crmApi.updateLeadProfileName(sessionId, '').subscribe({
+    this.crmApi.getLeadNameHistory(sessionId).subscribe({
       next: (res) => {
         this.nameHistory.set(res.name_history || []);
       },

@@ -8,7 +8,8 @@ import {
   MetricsResponse,
   SalespersonDto,
   SendMessageResponse,
-  TenantSettings
+  TenantSettings,
+  UpdateLeadResponse,
 } from '../../core/models/crm.models';
 
 @Injectable({
@@ -89,8 +90,12 @@ export class CrmApiService {
     return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/status/`, payload);
   }
 
-  updateLeadProfileName(sessionId: string, profileName: string): Observable<any> {
-    return this.http.patch<any>(`${this.baseUrl}/dashboard/leads/${sessionId}/lead/`, {
+  getLeadNameHistory(sessionId: string): Observable<UpdateLeadResponse> {
+    return this.http.get<UpdateLeadResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/lead/`);
+  }
+
+  updateLeadProfileName(sessionId: string, profileName: string): Observable<UpdateLeadResponse> {
+    return this.http.patch<UpdateLeadResponse>(`${this.baseUrl}/dashboard/leads/${sessionId}/lead/`, {
       lead_profile_name: profileName
     });
   }

@@ -25,7 +25,7 @@
     @for (item of navItems; track item.route) {
       @if (item.roles.includes(session.currentRole())) {
         <a class="nav-item" [routerLink]="item.route" routerLinkActive="active">
-          <span class="nav-icon">{{ item.icon }}</span>
+          <app-icon [name]="item.icon" [size]="20"></app-icon>
           {{ item.label }}
         </a>
       }
@@ -35,11 +35,11 @@
   <nav class="nav-section">
     <div class="nav-title">Configuración</div>
     <a class="nav-item" routerLink="/settings" routerLinkActive="active">
-      <span class="nav-icon">⚙️</span>
+      <app-icon name="cog" [size]="20"></app-icon>
       Ajustes
     </a>
     <a class="nav-item" routerLink="/profile" routerLinkActive="active">
-      <span class="nav-icon">👤</span>
+      <app-icon name="user" [size]="20"></app-icon>
       Perfil
     </a>
   </nav>

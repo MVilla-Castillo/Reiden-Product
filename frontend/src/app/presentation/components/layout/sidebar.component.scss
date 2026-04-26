@@ -1,7 +1,6 @@
 :host {
   --sidebar-bg: #1a1d23;
   --sidebar-text: #9ca3af;
-  --sidebar-active: #3b82f6;
   --sidebar-hover: #374151;
   --sidebar-width: 260px;
 }
@@ -80,7 +79,7 @@
       transition: all 0.2s ease;
 
       &.active {
-        background: var(--sidebar-active);
+        background: var(--color-primary);
         color: white;
       }
 
@@ -122,9 +121,9 @@
     color: white;
   }
 
-  &.active {
+&.active {
     background: rgba(59, 130, 246, 0.15);
-    color: var(--sidebar-active);
+    color: var(--color-primary);
     font-weight: 600;
     border-left: 3px solid var(--color-primary);
   }
@@ -157,7 +156,7 @@
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #6366f1 0%, var(--color-primary) 100%);
+    background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
