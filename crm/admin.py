@@ -24,9 +24,10 @@ class AppUserAdmin(admin.ModelAdmin):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ("id", "tenant", "wa_id_display", "first_name", "last_interaction")
+    list_display = ("id", "tenant", "wa_id_hash", "first_name", "last_interaction")
     search_fields = ("wa_id_hash", "first_name")
     list_filter = ("tenant",)
+    readonly_fields = ("wa_id_display",)
 
     def wa_id_display(self, obj: Lead) -> str:
         return decrypt(obj.wa_id)

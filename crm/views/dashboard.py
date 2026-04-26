@@ -18,7 +18,6 @@ from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.domain.entities import SessionEntity
-from crm.models import Lead
 from crm.models import AppUser
 
 
@@ -35,29 +34,24 @@ def _to_chile(dt) -> str | None:
 
 
 def _serialize_session(
-    s: SessionEntity, users_cache: dict | None = None, leads_cache: dict | None = None
+    s: SessionEntity, users_cache: dict, leads_cache: dict
 ) -> dict:
+    if users_cache is None or leads_cache is None:
+        raise TypeError("users_cache y leads_cache son requeridos")
+
     lead_profile_name = None
     salesperson_name = None
 
-    if leads_cache is not None and s.lead_id in leads_cache:
+    if s.lead_id in leads_cache:
         lead_profile_name = leads_cache[s.lead_id]
     else:
-        lead = (
-            Lead.objects.filter(id=s.lead_id, is_deleted=False)
-            .values("profile_name")
-            .first()
-        )
-        if lead:
-            lead_profile_name = lead["profile_name"]
+        raise KeyError(f"lead_id {s.lead_id} no encontrado en leads_cache")
 
     if s.salesperson_id:
-        if users_cache is not None and s.salesperson_id in users_cache:
+        if s.salesperson_id in users_cache:
             salesperson_name = users_cache[s.salesperson_id]
         else:
-            user = AppUser.objects.filter(id=s.salesperson_id).values("email").first()
-            if user:
-                salesperson_name = user["email"].split("@")[0]
+            raise KeyError(f"salesperson_id {s.salesperson_id} no encontrado en users_cache")
 
     return {
         "session_id": str(s.id),
@@ -167,23 +161,17 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
         filters["salesperson_id"] = str(user.id)
 
     session_repo = DIContainer.instance().session_repo
+    lead_repo = DIContainer.instance().lead_repo
+
     sessions = session_repo.get_dashboard_sessions(
         tenant.id, limit=limit, filters=filters
     )
 
     salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
-    users_cache = {}
-    if salesperson_ids:
-        users = AppUser.objects.filter(id__in=salesperson_ids).values("id", "email")
-        users_cache = {u["id"]: u["email"].split("@")[0] for u in users}
+    users_cache = session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
 
     lead_ids = {s.lead_id for s in sessions}
-    leads_cache = {}
-    if lead_ids:
-        leads = Lead.objects.filter(id__in=lead_ids, is_deleted=False).values(
-            "id", "profile_name"
-        )
-        leads_cache = {l["id"]: l["profile_name"] for l in leads}
+    leads_cache = lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
 
     data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 
@@ -200,21 +188,15 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
     session_repo = DIContainer.instance().session_repo
+    lead_repo = DIContainer.instance().lead_repo
+
     sessions = session_repo.get_pending_sessions(tenant.id, limit=50)
 
     salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
-    users_cache = {}
-    if salesperson_ids:
-        users = AppUser.objects.filter(id__in=salesperson_ids).values("id", "email")
-        users_cache = {u["id"]: u["email"].split("@")[0] for u in users}
+    users_cache = session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
 
     lead_ids = {s.lead_id for s in sessions}
-    leads_cache = {}
-    if lead_ids:
-        leads = Lead.objects.filter(id__in=lead_ids, is_deleted=False).values(
-            "id", "profile_name"
-        )
-        leads_cache = {l["id"]: l["profile_name"] for l in leads}
+    leads_cache = lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
 
     data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 

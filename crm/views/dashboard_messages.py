@@ -51,11 +51,17 @@ def session_messages_api(request: HttpRequest, session_id: UUID) -> JsonResponse
             status=400,
         )
 
-    offset_raw = request.GET.get("offset", "0")
-    try:
-        offset = int(offset_raw)
-    except (ValueError, TypeError):
+    offset_raw = request.GET.get("offset")
+    if offset_raw is None:
         offset = 0
+    else:
+        try:
+            offset = int(offset_raw)
+        except (ValueError, TypeError):
+            return JsonResponse(
+                {"error": "El parámetro 'offset' debe ser un entero válido"},
+                status=400,
+            )
 
     use_case = DIContainer.instance().get_session_messages_use_case
     result = use_case.execute(session_id, request.tenant.id, limit=limit, offset=offset)

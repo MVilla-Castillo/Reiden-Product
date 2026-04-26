@@ -30,6 +30,91 @@ class TaskQueueError(Exception):
         self.underlying_error = underlying_error
 
 
+def _do_http_dispatch(
+    worker_url: str,
+    internal_secret: str,
+    task_prefix: str,
+    component_name: str,
+    task_id_header: str,
+    payload: dict,
+) -> EnqueueResult:
+    """Lógica compartida para dispatch HTTP a worker."""
+    task_id = f"{task_prefix}-{uuid.uuid4()}"
+    trace_id = trace_id_var.get() or str(uuid.uuid4())
+
+    logger.info(
+        f"{component_name}: Enviando payload al worker.",
+        extra={
+            "component_name": component_name,
+            "task_id": task_id,
+            "worker_url": worker_url,
+            "message_sid": payload.get("MessageSid", ""),
+        },
+    )
+
+    try:
+        response = requests.post(
+            worker_url,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Internal-Secret": internal_secret,
+                "X-Trace-ID": trace_id,
+                task_id_header: task_id,
+            },
+            timeout=30,
+        )
+    except requests.ConnectionError as exc:
+        logger.error(
+            f"{component_name}: No se pudo conectar al worker.",
+            extra={
+                "component_name": component_name,
+                "worker_url": worker_url,
+                "error": str(exc),
+            },
+        )
+        raise TaskQueueError(
+            message="No se pudo conectar al worker",
+            underlying_error=exc,
+        ) from exc
+    except requests.Timeout as exc:
+        logger.error(
+            f"{component_name}: Timeout al conectar al worker.",
+            extra={
+                "component_name": component_name,
+                "worker_url": worker_url,
+                "error": str(exc),
+            },
+        )
+        raise TaskQueueError(
+            message="Timeout al conectar al worker",
+            underlying_error=exc,
+        ) from exc
+
+    if response.status_code >= 500:
+        logger.error(
+            f"{component_name}: Worker respondió con error 5xx: {response.text}",
+            extra={
+                "component_name": component_name,
+                "task_id": task_id,
+                "status_code": response.status_code,
+            },
+        )
+        raise TaskQueueError(
+            message=f"Worker retornó {response.status_code} - {response.text}",
+        )
+
+    logger.info(
+        f"{component_name}: Worker procesó exitosamente.",
+        extra={
+            "component_name": component_name,
+            "task_id": task_id,
+            "status_code": response.status_code,
+        },
+    )
+    return EnqueueResult(task_id=task_id, success=True)
+
+
 class RailwayTaskQueue(TaskQueue):
     """
     Adapter de producción para Railway.
@@ -40,80 +125,14 @@ class RailwayTaskQueue(TaskQueue):
         worker_url: str = f"{settings.WORKER_BASE_URL}/api/workers/process-message/"
         internal_secret: str = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
 
-        task_id = f"railway-task-{uuid.uuid4()}"
-        trace_id = trace_id_var.get() or str(uuid.uuid4())
-
-        logger.info(
-            "Railway: Encolando tarea para worker.",
-            extra={
-                "component_name": "railway_task_queue",
-                "task_id": task_id,
-                "worker_url": worker_url,
-                "message_sid": request.payload.get("MessageSid", ""),
-            },
+        return _do_http_dispatch(
+            worker_url=worker_url,
+            internal_secret=internal_secret,
+            task_prefix="railway-task",
+            component_name="railway_task_queue",
+            task_id_header="X-Railway-Task-ID",
+            payload=request.payload,
         )
-
-        try:
-            response = requests.post(
-                worker_url,
-                json=request.payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Internal-Secret": internal_secret,
-                    "X-Trace-ID": trace_id,
-                    "X-Railway-Task-ID": task_id,
-                },
-                timeout=30,
-            )
-        except requests.ConnectionError as exc:
-            logger.error(
-                "Railway: No se pudo conectar al worker.",
-                extra={
-                    "component_name": "railway_task_queue",
-                    "worker_url": worker_url,
-                    "error": str(exc),
-                },
-            )
-            raise TaskQueueError(
-                message="No se pudo conectar al worker",
-                underlying_error=exc,
-            ) from exc
-        except requests.Timeout as exc:
-            logger.error(
-                "Railway: Timeout al conectar al worker.",
-                extra={
-                    "component_name": "railway_task_queue",
-                    "worker_url": worker_url,
-                    "error": str(exc),
-                },
-            )
-            raise TaskQueueError(
-                message="Timeout al conectar al worker",
-                underlying_error=exc,
-            ) from exc
-
-        if response.status_code >= 500:
-            logger.error(
-                f"Railway: Worker respondió con error 5xx: {response.text}",
-                extra={
-                    "component_name": "railway_task_queue",
-                    "task_id": task_id,
-                    "status_code": response.status_code,
-                },
-            )
-            raise TaskQueueError(
-                message=f"Worker retornó {response.status_code} - {response.text}",
-            )
-
-        logger.info(
-            "Railway: Tarea procesada exitosamente.",
-            extra={
-                "component_name": "railway_task_queue",
-                "task_id": task_id,
-                "status_code": response.status_code,
-            },
-        )
-        return EnqueueResult(task_id=task_id, success=True)
 
 
 class HttpDispatchQueue(TaskQueue):
@@ -126,64 +145,19 @@ class HttpDispatchQueue(TaskQueue):
         worker_url: str = f"{settings.WORKER_BASE_URL}/api/workers/process-message/"
         internal_secret: str = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
 
-        task_id = f"local-task-{uuid.uuid4()}"
-        trace_id = str(uuid.uuid4())
-
         logger.info(
             "MODO LOCAL: Despachando payload al worker vía HTTP.",
             extra={
                 "component_name": "http_dispatch_queue",
-                "task_id": task_id,
-                "worker_url": worker_url,
                 "message_sid": request.payload.get("MessageSid", ""),
             },
         )
 
-        try:
-            response = requests.post(
-                worker_url,
-                json=request.payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Internal-Secret": internal_secret,
-                    "X-Trace-ID": trace_id,
-                    "X-Local-Task-ID": task_id,
-                },
-                timeout=30,
-            )
-        except requests.ConnectionError as exc:
-            logger.error(
-                "MODO LOCAL: No se pudo conectar al worker.",
-                extra={
-                    "component_name": "http_dispatch_queue",
-                    "worker_url": worker_url,
-                    "error": str(exc),
-                },
-            )
-            raise TaskQueueError(
-                message="No se pudo conectar al worker local",
-                underlying_error=exc,
-            ) from exc
-
-        if response.status_code >= 500:
-            logger.error(
-                f"MODO LOCAL: Worker respondió con error 5xx: {response.text}",
-                extra={
-                    "component_name": "http_dispatch_queue",
-                    "task_id": task_id,
-                    "status_code": response.status_code,
-                },
-            )
-            raise TaskQueueError(
-                message=f"Worker local retornó {response.status_code} - {response.text}",
-            )
-
-        logger.info(
-            "MODO LOCAL: Worker procesó el payload exitosamente.",
-            extra={
-                "component_name": "http_dispatch_queue",
-                "task_id": task_id,
-                "status_code": response.status_code,
-            },
+        return _do_http_dispatch(
+            worker_url=worker_url,
+            internal_secret=internal_secret,
+            task_prefix="local-task",
+            component_name="http_dispatch_queue",
+            task_id_header="X-Local-Task-ID",
+            payload=request.payload,
         )
-        return EnqueueResult(task_id=task_id, success=True)

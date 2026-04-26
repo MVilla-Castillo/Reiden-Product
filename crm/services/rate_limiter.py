@@ -8,13 +8,15 @@ Ventana deslizante de 60 segundos por tenant + wa_id_hash.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from datetime import timedelta
-from typing import Any
 
 from django.db import connection, models, transaction
 from django.utils import timezone
 
 from crm.models import WebhookRateLimit
+
+_RATE_LIMIT_TABLE = WebhookRateLimit._meta.db_table
 
 
 class RateLimitExceeded(Exception):
@@ -26,7 +28,7 @@ class RateLimitExceeded(Exception):
 
 
 def check_rate_limit(
-    tenant_id: Any,
+    tenant_id: uuid.UUID,
     wa_id_raw: str,
     max_requests: int = 30,
     window_seconds: int = 60,
@@ -92,11 +94,11 @@ def check_rate_limit(
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
-                INSERT INTO {WebhookRateLimit._meta.db_table}
+                INSERT INTO {_RATE_LIMIT_TABLE}
                     (tenant_id, wa_id_hash, window_start, request_count)
                 VALUES (%s, %s, %s, 1)
                 ON CONFLICT (tenant_id, wa_id_hash, window_start)
-                DO UPDATE SET request_count = {WebhookRateLimit._meta.db_table}.request_count + 1
+                DO UPDATE SET request_count = {_RATE_LIMIT_TABLE}.request_count + 1
                 """,
                 [str(tenant_id), wa_id_hash, current_window],
             )

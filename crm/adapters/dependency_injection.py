@@ -222,21 +222,8 @@ class DIContainer:
         self._push_adapter = adapter
 
     def _get_tenant_phone_number_from_settings(self) -> str:
-        """
-        Obtiene el phone_number_id desde settings, no desde la DB.
-        En producción se inyecta vía TENANT_PHONE_NUMBER_ID env var.
-        """
-        from_settings = getattr(settings, "TENANT_PHONE_NUMBER_ID", "")
-        if from_settings:
-            return from_settings
-
-        from crm.models import Tenant
-
-        tenant = Tenant.objects.order_by("created_at").first()
-        if tenant and tenant.phone_number_id:
-            return tenant.phone_number_id
-
-        return ""
+        """Obtiene el phone_number_id desde settings."""
+        return getattr(settings, "TENANT_PHONE_NUMBER_ID", "") or ""
 
 
 def get_use_case() -> ProcessMessageUseCase:

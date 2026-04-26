@@ -171,7 +171,6 @@ class Lead(models.Model):
 
     objects = TenantManager()
     active_objects = ActiveManager()
-    tenant_objects = TenantManager()
 
     def __str__(self) -> str:
         return f"Lead-{self.id.hex[:8]}"

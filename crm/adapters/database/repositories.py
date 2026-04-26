@@ -169,9 +169,29 @@ class DjangoLeadRepository(LeadRepository):
             return None
         return decrypt(result)
 
+    def get_profile_names_batch(self, lead_ids: set[uuid.UUID], tenant_id: uuid.UUID) -> dict[uuid.UUID, str]:
+        """Batch fetch de profile_names para múltiples lead_ids."""
+        if not lead_ids:
+            return {}
+        leads = Lead.objects.filter(id__in=lead_ids, tenant_id=tenant_id, is_deleted=False).values("id", "profile_name")
+        return {row["id"]: row["profile_name"] for row in leads}
+
+    ALLOWED_UPDATE_FIELDS = frozenset({
+        "first_name",
+        "last_name",
+        "phone",
+        "email",
+        "fsm_state",
+        "fsm_substate",
+    })
+
     def update(
         self, lead_id: uuid.UUID, tenant_id: uuid.UUID, data: dict[str, Any]
     ) -> None:
+        unknown_fields = set(data.keys()) - self.ALLOWED_UPDATE_FIELDS
+        if unknown_fields:
+            raise ValueError(f"Campos no permitidos: {unknown_fields}")
+
         Lead.objects.filter(id=lead_id, tenant_id=tenant_id, is_deleted=False).update(
             **data
         )
@@ -354,7 +374,7 @@ class DjangoSessionRepository(SessionRepository):
                 update_fields["closed_at"] = now
             if lost_reason is not None:
                 update_fields["lost_reason"] = lost_reason
-            ChatSession.objects.filter(
+            ChatSession.objects.select_for_update().filter(
                 id=session_id, tenant_id=tenant_id, is_deleted=False
             ).update(**update_fields)
             model = (
@@ -426,6 +446,15 @@ class DjangoSessionRepository(SessionRepository):
             .select_related("lead")[:limit]
         )
         return [_session_to_entity(m) for m in models]
+
+    def get_users_email_batch(
+        self, user_ids: set[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """Batch fetch de emails para múltiples user_ids."""
+        if not user_ids:
+            return {}
+        users = AppUser.objects.filter(id__in=user_ids).values("id", "email")
+        return {u["id"]: u["email"].split("@")[0] for u in users}
 
     def expire_if_inactive(
         self,
@@ -780,9 +809,10 @@ class DjangoSessionRepository(SessionRepository):
                 ChatSession.Status.CON_VENDEDOR,
             ]
 
-        qs = ChatSession.tenant_objects.for_tenant(tenant_id).filter(
-            status__in=statuses,
-            is_deleted=False,
+        qs = (
+            ChatSession.tenant_objects.for_tenant(tenant_id)
+            .select_related("lead", "salesperson")
+            .filter(status__in=statuses, is_deleted=False)
         )
 
         expired = []

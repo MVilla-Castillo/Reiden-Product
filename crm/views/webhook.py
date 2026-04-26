@@ -55,6 +55,8 @@ LIST_TITLE_MAX_LENGTH = 255
 
 
 def _truncate(value: str, max_length: int) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"value debe ser str, recibió {type(value).__name__}")
     if len(value) > max_length:
         return value[:max_length]
     return value
@@ -227,6 +229,15 @@ def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
             },
         )
         return JsonResponse({"error": "internal_error"}, status=500)
+    except (SignatureValidationError, MessagingError) as e:
+        logger.error(
+            f"Error esperado en webhook: {type(e).__name__}: {e}",
+            extra={
+                "component_name": "twilio_webhook_view",
+                "message_sid": message_sid,
+            },
+        )
+        return JsonResponse({"error": str(e)}, status=400)
     except Exception:
         logger.exception(
             "Fallo inesperado al encolar.",

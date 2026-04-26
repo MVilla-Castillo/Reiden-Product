@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Literal
 from uuid import UUID
 
 from django.db import transaction
 
+from core.log_utils import trace_id_var
 from crm.domain.ports import (
     AuditEntry,
     AuditLogger,
@@ -62,7 +64,7 @@ class AssignLeadUseCase:
         self,
         session_id: UUID,
         tenant_id: UUID,
-        salesperson_id: UUID | None | str,
+        salesperson_id: Literal["AUTO"] | UUID | None,
     ) -> AssignLeadResult | None:
         session = self._session_repo.find_by_id(session_id, tenant_id)
         if session is None:
@@ -92,6 +94,8 @@ class AssignLeadUseCase:
                 "Auto-assign Round-Robin",
                 extra={
                     "component_name": "assign_lead_use_case",
+                    "tenant_id": str(tenant_id),
+                    "trace_id": trace_id_var.get() or "",
                     "session_id": str(session_id),
                     "selected_salesperson": selected["email"],
                     "active_sessions": selected["active_sessions_count"],

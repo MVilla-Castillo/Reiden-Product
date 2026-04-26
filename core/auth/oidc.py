@@ -71,7 +71,12 @@ class OIDCStatelessMiddleware:
             logger.info(f"OIDC: Unauthorized access attempt to {request.path}")
             return self._unauthorized("Token no proveído o formato inválido")
 
-        token = auth_header.split(" ")[1]
+        token_parts = auth_header.split(" ", 1)
+        if len(token_parts) != 2 or not token_parts[1]:
+            logger.info(f"OIDC: Token vacío en Authorization header para {request.path}")
+            return self._unauthorized("Token no proveído o formato inválido")
+
+        token = token_parts[1]
 
         try:
             # 2. Extraer Header y Payload sin validar firma todavía
@@ -131,11 +136,16 @@ class OIDCStatelessMiddleware:
         except jwt.ExpiredSignatureError:
             return self._unauthorized("Token expirado")
         except jwt.InvalidTokenError as e:
-            logger.error(f"JWT Invalido: {str(e)}")
+            logger.error(f"JWT Inválido: {str(e)}")
             return self._unauthorized("Token inválido")
+        except requests.RequestException as e:
+            logger.error(f"OIDC: Fallo de red al obtener JWKS: {str(e)}")
+            return JsonResponse({"error": "Internal Server Error", "detail": "External service unavailable"}, status=500)
         except Exception:
-            logger.exception("Error catastrófico en Middleware OIDC")
-            return JsonResponse({"error": "Internal Server Error"}, status=500)
+            logger.exception("OIDC: Error inesperado en Middleware (revisar stacktrace)")
+            if settings.DEBUG:
+                raise
+            return JsonResponse({"error": "Internal Server Error", "detail": "Unexpected error"}, status=500)
 
         return self.get_response(request)
 
