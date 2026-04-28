@@ -22,5 +22,5 @@ declare module '@supabase/supabase-js' {
   interface AuthError {
     message: string;
   }
-  export function createClient(supabaseUrl: string, supabaseKey: string: any): any;
+  export function createClient(supabaseUrl: string, supabaseKey: string): any;
 }
