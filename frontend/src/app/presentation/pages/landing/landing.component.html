@@ -1,4 +1,12 @@
 <div class="landing-shell">
+  <div class="ambient-bg" aria-hidden="true">
+    <span class="ambient-grid"></span>
+    <span class="ambient-beam beam-a"></span>
+    <span class="ambient-beam beam-b"></span>
+    <span class="ambient-ring ring-a"></span>
+    <span class="ambient-ring ring-b"></span>
+  </div>
+
   <div class="hero-bg"></div>
 
   <header class="topbar container">
@@ -12,7 +20,6 @@
   <main>
     <section class="hero container">
       <div class="hero-copy">
-        <p class="eyebrow">CRM para automotoras</p>
         <h1>El CRM que entiende el ritmo de tu automotora.</h1>
         <p class="subtitle">Gestiona leads, vendedores y sucursales en un solo lugar.</p>
 
@@ -60,20 +67,8 @@
       </div>
     </section>
 
-    <section class="trust-strip">
-      <div class="container trust-inner">
-        <p>Operacion comercial ordenada para cada sucursal</p>
-        <div class="trust-logos">
-          @for (logo of trustLogos; track logo) {
-            <span>{{ logo }}</span>
-          }
-        </div>
-      </div>
-    </section>
-
     <section class="problem container">
       <div class="problem-copy">
-        <p class="eyebrow">El problema</p>
         <h2>El caos de WhatsApp y las planillas termina aqui.</h2>
       </div>
 
@@ -89,7 +84,6 @@
 
     <section class="benefits container">
       <div class="section-head">
-        <p class="eyebrow">Beneficios</p>
         <h2>Una plataforma robusta, clara y lista para escalar.</h2>
       </div>
 
@@ -118,27 +112,45 @@
       </div>
     </section>
 
-    <section class="demo container">
+    <section class="implementation container">
       <div class="section-head">
-        <p class="eyebrow">Demo visual</p>
-        <h2>Una experiencia web enfocada en simplicidad y control.</h2>
+        <h2>Implementacion guiada para resultados comerciales sostenibles.</h2>
       </div>
 
-      <div class="demo-grid" aria-label="Placeholders visuales de plataforma">
-        <article class="demo-card main-shot">
-          <div class="shot-label">Dashboard general</div>
-          <div class="shot-lines">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        </article>
-        <article class="demo-card side-shot">
-          <div class="shot-label">Gestor de leads</div>
-        </article>
-        <article class="demo-card side-shot">
-          <div class="shot-label">Reporte por sucursal</div>
-        </article>
+      <div class="implementation-layout" aria-label="Plan de implementacion">
+        <div class="phase-timeline">
+          @for (phase of implementationPhases; track phase.title; let i = $index) {
+            <article class="phase-item">
+              <div class="phase-index">{{ i + 1 }}</div>
+              <div class="phase-content">
+                <p class="phase-label">{{ phase.label }}</p>
+                <h3>{{ phase.title }}</h3>
+                <p>{{ phase.description }}</p>
+              </div>
+            </article>
+          }
+        </div>
+
+        <div class="commitment-stack" aria-label="Compromisos de implementacion">
+          @for (item of commitments; track item.title) {
+            <article class="commitment-card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.description }}</p>
+            </article>
+          }
+        </div>
+      </div>
+
+      <div class="implementation-cta">
+        <p>Agenda una demo y te presentamos un plan de implementacion para tu operacion.</p>
+        <a
+          class="btn btn-primary"
+          href="https://stelard.cl/solicitar-demo"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Solicitar Demo Gratuita
+        </a>
       </div>
     </section>
   </main>
