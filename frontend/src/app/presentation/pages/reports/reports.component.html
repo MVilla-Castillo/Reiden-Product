@@ -1,0 +1,167 @@
+<div class="reports-page">
+
+  <!-- Header -->
+  <div class="reports-header">
+    <div class="reports-breadcrumb">Stelard › Reportes</div>
+    <div class="reports-controls">
+      <div class="date-filter">
+        @for (opt of dateOptions; track opt.value) {
+          <button
+            class="filter-btn"
+            [class.active]="dateFilter() === opt.value && !showCustom()"
+            (click)="setFilter(opt.value)">
+            {{ opt.label }}
+          </button>
+        }
+        <button
+          class="filter-btn"
+          [class.active]="showCustom()"
+          (click)="setFilter('custom')">
+          Personalizado
+        </button>
+      </div>
+
+      @if (showCustom()) {
+        <div class="custom-range">
+          <input type="date" class="date-input" [value]="dateFrom()" (change)="dateFrom.set($any($event.target).value)">
+          <span class="date-sep">—</span>
+          <input type="date" class="date-input" [value]="dateTo()" (change)="dateTo.set($any($event.target).value)">
+          <button class="btn-apply" (click)="applyCustom()">Aplicar</button>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error-banner">
+      <app-icon name="exclamation-triangle" [size]="18"></app-icon>
+      No se pudieron cargar los datos. Verifica la conexión.
+    </div>
+  }
+
+  <!-- Sección 1: KPIs gerenciales -->
+  <section class="reports-section">
+    <div class="section-label">Métricas del período</div>
+    @if (loading()) {
+      <div class="kpi-grid">
+        @for (i of [1,2,3,4,5]; track i) {
+          <div class="kpi-skel">
+            <app-skeleton width="100%" height="90px" radius="12px"></app-skeleton>
+          </div>
+        }
+      </div>
+    } @else if (metrics()) {
+      <div class="kpi-grid">
+        <app-kpi-card
+          icon="users"
+          [value]="metrics()!.funnel.total_leads.toString()"
+          label="Total Leads">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="check-circle"
+          [value]="metrics()!.funnel.won_sessions.toString()"
+          label="Ganados">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="exclamation-circle"
+          [value]="metrics()!.funnel.lost_sessions.toString()"
+          label="Perdidos"
+          [critical]="metrics()!.funnel.lost_sessions > 0">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="target"
+          [value]="metrics()!.funnel.win_rate + '%'"
+          label="Tasa de Cierre">
+        </app-kpi-card>
+        <app-kpi-card
+          icon="clock"
+          [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
+          label="T. Primera Respuesta">
+        </app-kpi-card>
+      </div>
+    }
+  </section>
+
+  <!-- Sección 2: Leaderboard -->
+  <section class="reports-section">
+    <div class="section-label">Leaderboard de vendedores</div>
+    @if (loading()) {
+      <app-skeleton width="100%" height="200px" radius="12px"></app-skeleton>
+    } @else if (leaderboard.length === 0) {
+      <div class="empty-section">Sin datos de rendimiento para el período seleccionado</div>
+    } @else {
+      <div class="leaderboard-wrap">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Vendedor</th>
+              <th>Asignados</th>
+              <th>Ganados</th>
+              <th>Perdidos</th>
+              <th>Win Rate</th>
+              <th>T. Respuesta</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of leaderboard; track row.salesperson_id) {
+              <tr>
+                <td class="medal-cell">{{ row.medal }}</td>
+                <td class="name-cell">{{ row.displayName }}</td>
+                <td>{{ row.leads_assigned }}</td>
+                <td class="wins-cell">{{ row.wins }}</td>
+                <td class="losses-cell">{{ row.losses }}</td>
+                <td>
+                  <span class="wr-badge" [style.background]="winRateColor(row.win_rate) + '22'" [style.color]="winRateColor(row.win_rate)">
+                    {{ row.win_rate }}%
+                  </span>
+                </td>
+                <td class="time-cell">{{ formatMinutes(row.avg_first_response_minutes) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- Sección 3: KPIs por vendedor -->
+  @if (!loading() && leaderboard.length > 0) {
+    <section class="reports-section">
+      <div class="section-label">Detalle por vendedor</div>
+      <div class="vendor-cards">
+        @for (sp of leaderboard; track sp.salesperson_id) {
+          <div class="vendor-card" [style.border-top-color]="medalBorder(sp.ranking_position)">
+            <div class="vendor-card-header">
+              <span class="vendor-medal">{{ sp.medal }}</span>
+              <span class="vendor-name">{{ sp.displayName }}</span>
+            </div>
+            <div class="vendor-wr-bar-wrap">
+              <div class="vendor-wr-bar" [style.width.%]="sp.win_rate" [style.background]="winRateColor(sp.win_rate)"></div>
+            </div>
+            <div class="vendor-wr-label">{{ sp.win_rate }}% tasa de cierre</div>
+            <div class="vendor-stats">
+              <div class="stat">
+                <span class="stat-val wins">{{ sp.wins }}</span>
+                <span class="stat-lbl">Ganados</span>
+              </div>
+              <div class="stat">
+                <span class="stat-val losses">{{ sp.losses }}</span>
+                <span class="stat-lbl">Perdidos</span>
+              </div>
+              <div class="stat">
+                <span class="stat-val">{{ sp.leads_assigned }}</span>
+                <span class="stat-lbl">Asignados</span>
+              </div>
+              <div class="stat">
+                <span class="stat-val">{{ formatMinutes(sp.avg_first_response_minutes) }}</span>
+                <span class="stat-lbl">T. Resp.</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+</div>

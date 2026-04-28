@@ -1,3 +1,141 @@
+/* ── Tab header ── */
+.chat-page-header {
+  padding: 1rem 2rem 0;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.chat-breadcrumb {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.chat-tabs {
+  display: flex;
+  gap: 0.25rem;
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+
+    &:hover { color: #334155; }
+
+    &.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+      background: white;
+    }
+  }
+}
+
+/* ── Leads tab ── */
+.leads-tab {
+  padding: 1.5rem 2rem;
+  background: #f8fafc;
+  min-height: calc(100vh - 80px);
+}
+
+.leads-tab-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.leads-tab-count {
+  font-size: 0.8125rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.leads-table-wrap {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.leads-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  thead tr {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  td { padding: 0.875rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+
+  .lead-row {
+    cursor: pointer;
+    transition: background 0.1s;
+    &:hover { background: #f8fafc; }
+    &:last-child td { border-bottom: none; }
+  }
+
+  .lead-name-cell { font-weight: 500; color: #0f172a; }
+  .date-cell { color: #94a3b8; font-size: 0.8125rem; }
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  &.status-con_vendedor { background: #dbeafe; color: #1d4ed8; }
+  &.status-ganado       { background: #dcfce7; color: #15803d; }
+  &.status-perdido      { background: #fee2e2; color: #b91c1c; }
+  &.status-abandono_bot { background: #f3f4f6; color: #6b7280; }
+  &.status-pending_assignment { background: #fef3c7; color: #92400e; }
+}
+
+.urgency-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .urgency-mini-bar {
+    height: 6px;
+    max-width: 60px;
+    background: #3b82f6;
+    border-radius: 3px;
+    min-width: 4px;
+  }
+
+  span { font-size: 0.75rem; color: #64748b; }
+}
+
+.empty-row {
+  text-align: center;
+  color: #94a3b8;
+  padding: 3rem 1rem !important;
+  font-size: 0.875rem;
+}
+
+/* ── Chat container ── */
 .chat-container {
   display: flex;
   height: 100vh;
