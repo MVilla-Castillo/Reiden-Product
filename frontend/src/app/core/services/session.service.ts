@@ -1,5 +1,4 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { supabase } from '../supabase';
 
@@ -16,6 +15,7 @@ export class SessionService {
   readonly userId = computed(() => this._userId());
 
   readonly sessionExpired$ = new Subject<void>();
+  readonly tokenReady$ = new Subject<string | null>();
 
   private isExpiredState = false;
 
@@ -27,10 +27,12 @@ export class SessionService {
 
   private initAuthListener() {
     supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+      const authEvent = event as string;
+      const authSession = session;
+      if (authEvent === 'SIGNED_OUT' || !authSession) {
         this.markExpired();
-      } else if (event === 'TOKEN_REFRESHED' && session.access_token) {
-        this.setToken(session.access_token);
+      } else if (authEvent === 'TOKEN_REFRESHED' && authSession.access_token) {
+        this.setToken(authSession.access_token);
       }
     });
   }
@@ -59,6 +61,15 @@ export class SessionService {
     localStorage.removeItem('user_id');
     this._token.set(null);
     this.sessionExpired$.next();
+  }
+
+  replayWithToken(token: string, role: UserRole, userId: string): void {
+    this.isExpiredState = false;
+    this.setRole(role);
+    this.setUserId(userId);
+    this.setToken(token);
+    this.tokenReady$.next(token);
+    this.tokenReady$.next(null);
   }
 
   clear(): void {

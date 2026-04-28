@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SessionService } from '../../../core/services/session.service';
 import { supabase } from '../../../core/supabase';
+import { AuthSession } from '@supabase/supabase-js';
 
 @Component({
   selector: 'app-login',
@@ -32,18 +33,18 @@ export class LoginComponent implements OnInit {
   }
 
   private checkExistingSession() {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: AuthSession | null } }) => {
       if (data.session) {
         this.handleSession(data.session);
       }
     });
   }
 
-  private handleSession(authSession: any) {
+  private handleSession(authSession: AuthSession) {
     const { access_token, user } = authSession;
     this.session.setToken(access_token);
-    this.session.setUserId(user.email);
-    const role = user.role || 'sales';
+    this.session.setUserId(user.email || '');
+    const role = 'sales';
     this.session.setRole(role);
     this.router.navigate(['/dashboard']);
   }
