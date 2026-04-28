@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, Session } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env['NG_APP_SUPABASE_URL'] ?? '';
 const supabaseAnonKey = import.meta.env['NG_APP_SUPABASE_ANON_KEY'] ?? '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
