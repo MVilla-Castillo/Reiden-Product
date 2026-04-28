@@ -21,6 +21,7 @@ from crm.views.dashboard import (
     leads_dashboard_api,
     pending_leads_api,
     tenant_settings_api,
+    me_api,
 )
 from crm.views.dashboard_messages import (
     assign_lead_api,
@@ -33,6 +34,7 @@ from crm.views.dashboard_messages import (
 )
 from crm.views.metrics import metrics_api
 from crm.views.sse import dashboard_sse_view, messages_sse_view
+from crm.views.sse_ticket import sse_ticket_view
 from crm.views.scheduler import (
     scheduler_cleanup_bot_view,
     scheduler_cleanup_sales_view,
@@ -135,6 +137,9 @@ urlpatterns = [
         metrics_api,
         name="metrics",
     ),
+    path("api/dashboard/me/", me_api, name="me"),
+    # SSE: ticket de un solo uso para autenticar la conexión SSE sin exponer el JWT en la URL
+    path("api/sse/ticket/", sse_ticket_view, name="sse_ticket"),
     # SSE: stream en tiempo real para el dashboard
     path("api/sse/dashboard/", dashboard_sse_view, name="sse_dashboard"),
     # SSE: stream en tiempo real de mensajes por sesión

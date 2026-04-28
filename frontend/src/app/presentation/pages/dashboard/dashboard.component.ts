@@ -49,7 +49,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Backup automático cada hora: sincroniza con BD por si se perdieron eventos SSE
     this.metricsBackupInterval = setInterval(() => this._loadMetrics(), METRICS_BACKUP_MS);
 
-    this.sseSub = this.sseService.dashboardStream().subscribe(event => {
+    this.sseSub = this.sseService.dashboardStream().subscribe({next: event => {
       if (event.type === 'sse_reconnecting') {
         this.sseReconnecting.set(true);
         return;
@@ -83,7 +83,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           routing_mode: event.data.routing_mode,
         }));
       }
-    });
+    }, error: () => {
+      this.sseReconnecting.set(true);
+    }});
   }
 
   ngOnDestroy() {

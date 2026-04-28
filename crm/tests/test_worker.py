@@ -284,3 +284,132 @@ def test_auditlog_fsm_transition_written(tenant) -> None:
     assert fsm_logs.count() == 1
     log = fsm_logs.first()
     assert log.new_value["status"] == "BOT"
+
+
+# ==============================================================================
+# TEST: Auto-Routing — Modo AUTO asigna automáticamente al vendedor
+# ==============================================================================
+@pytest.mark.django_db
+def test_auto_routing_assigns_in_auto_mode(db, tenant, salesperson) -> None:
+    """
+    ARRANGE: Tenant en modo AUTO. Hay vendedores activos.
+            Sesión en paso PURCHASE_INTENT (último paso antes de PENDING_ASSIGNMENT).
+    ACT: POST con mensaje que completa la FSM (pi_hoy).
+    ASSERT: Sesión queda en CON_VENDEDOR con salesperson asignado.
+    """
+    tenant.routing_mode = "AUTO"
+    tenant.save()
+
+    wa_id = "56987654321"
+    lead = Lead.objects.create(
+        tenant=tenant,
+        wa_id=encrypt(wa_id),
+        wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
+    )
+    session = ChatSession.objects.create(
+        tenant=tenant,
+        lead=lead,
+        status=ChatSession.Status.BOT,
+        fsm_answers={
+            "current_step": "PURCHASE_INTENT",
+            "budget_range": "MAS_15M",
+            "payment_method": "CONTADO",
+        },
+    )
+
+    client = Client()
+    payload = _make_payload("SMauto_routing_01")
+    payload["Body"] = "pi_hoy"
+
+    response = _post_to_worker(client, payload)
+
+    session.refresh_from_db()
+    assert response.status_code == 200
+    assert session.status == ChatSession.Status.CON_VENDEDOR
+    assert session.salesperson_id is not None
+    assert session.salesperson_id == salesperson.id
+
+
+# ==============================================================================
+# TEST: Auto-Routing — Modo MANUAL no asigna automáticamente
+# ==============================================================================
+@pytest.mark.django_db
+def test_auto_routing_skips_in_manual_mode(tenant, salesperson) -> None:
+    """
+    ARRANGE: Tenant en modo MANUAL (default). Hay vendedores activos.
+            Sesión en paso PURCHASE_INTENT.
+    ACT: POST con mensaje que completa la FSM (pi_hoy).
+    ASSERT: Sesión queda en PENDING_ASSIGNMENT (sin asignar).
+    """
+    assert tenant.routing_mode == "MANUAL"
+
+    wa_id = "56987654321"
+    lead = Lead.objects.create(
+        tenant=tenant,
+        wa_id=encrypt(wa_id),
+        wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
+    )
+    session = ChatSession.objects.create(
+        tenant=tenant,
+        lead=lead,
+        status=ChatSession.Status.BOT,
+        fsm_answers={
+            "current_step": "PURCHASE_INTENT",
+            "budget_range": "MAS_15M",
+            "payment_method": "CONTADO",
+        },
+    )
+
+    client = Client()
+    payload = _make_payload("SMmanual_routing_01")
+    payload["Body"] = "pi_hoy"
+
+    response = _post_to_worker(client, payload)
+
+    session.refresh_from_db()
+    assert response.status_code == 200
+    assert session.status == ChatSession.Status.PENDING_ASSIGNMENT
+    assert session.salesperson_id is None
+
+
+# ==============================================================================
+# TEST: Auto-Routing — Sin vendedores no falla el flujo
+# ==============================================================================
+@pytest.mark.django_db
+def test_auto_routing_no_salespeople_no_crash(db, tenant) -> None:
+    """
+    ARRANGE: Tenant en modo AUTO. NO hay vendedores.
+            Sesión en paso PURCHASE_INTENT.
+    ACT: POST con mensaje que completa la FSM (pi_hoy).
+    ASSERT: Sesión queda en PENDING_ASSIGNMENT. 200 OK (flujo no falla).
+    """
+    tenant.routing_mode = "AUTO"
+    tenant.save()
+
+    wa_id = "56987654321"
+    lead = Lead.objects.create(
+        tenant=tenant,
+        wa_id=encrypt(wa_id),
+        wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
+    )
+    session = ChatSession.objects.create(
+        tenant=tenant,
+        lead=lead,
+        status=ChatSession.Status.BOT,
+        fsm_answers={
+            "current_step": "PURCHASE_INTENT",
+            "budget_range": "MAS_15M",
+            "payment_method": "CONTADO",
+        },
+    )
+
+    client = Client()
+    payload = _make_payload("SMno_sales_01")
+    payload["Body"] = "pi_hoy"
+
+    response = _post_to_worker(client, payload)
+
+    session.refresh_from_db()
+    assert response.status_code == 200
+    assert response.json()["status"] == "processed"
+    assert session.status == ChatSession.Status.PENDING_ASSIGNMENT

@@ -142,6 +142,7 @@ class DIContainer:
                 audit_logger=self.audit_logger,
                 tenant_repo=self.tenant_repo,
                 content_sids=content_sids,
+                assign_lead_use_case=self.assign_lead_use_case,
             )
         return self._use_case
 

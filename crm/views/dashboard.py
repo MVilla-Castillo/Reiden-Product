@@ -12,6 +12,7 @@ import zoneinfo
 from datetime import datetime, timezone
 
 from django.http import HttpRequest, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
@@ -203,6 +204,7 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"pending_leads": data}, status=200)
 
 
+@csrf_exempt
 def tenant_settings_api(request: HttpRequest) -> JsonResponse:
     """
     API para obtener y actualizar configuración del tenant.
@@ -284,3 +286,17 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
         )
 
     return JsonResponse({"error": "Method Not Allowed"}, status=405)
+
+
+def me_api(request):
+    """Devuelve el perfil del usuario autenticado (rol, email)."""
+    from django.http import JsonResponse
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+    return JsonResponse({
+        "email": user.email,
+        "role": user.role.lower(),  # 'manager', 'salesperson', 'admin'
+    })

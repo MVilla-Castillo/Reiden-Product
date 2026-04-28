@@ -39,6 +39,7 @@ def tenant(db) -> Tenant:
         phone_number_id="56912345678",
         waba_id="WABA_TEST_001",
         is_verified=True,
+        routing_mode="MANUAL",
     )
 
 

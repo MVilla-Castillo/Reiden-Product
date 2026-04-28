@@ -28,7 +28,8 @@ export class SessionService {
   private initAuthListener() {
     supabase.auth.onAuthStateChange((event: string, session: { access_token: string } | null) => {
       if (event === 'SIGNED_OUT' || !session) {
-        this.markExpired();
+        // Solo limpia — markExpired() solo se llama ante un 401 real del backend
+        this.clear();
       } else if (event === 'TOKEN_REFRESHED' && session.access_token) {
         this.setToken(session.access_token);
       }

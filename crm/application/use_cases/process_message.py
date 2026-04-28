@@ -77,6 +77,7 @@ class ProcessMessageUseCase:
         audit_logger: AuditLogger,
         tenant_repo: TenantRepository,
         content_sids: dict[str, str] | None = None,
+        assign_lead_use_case=None,
     ) -> None:
         self._lead_repo = lead_repo
         self._session_repo = session_repo
@@ -85,6 +86,7 @@ class ProcessMessageUseCase:
         self._audit_logger = audit_logger
         self._tenant_repo = tenant_repo
         self._content_sids = content_sids or {}
+        self._assign_lead_use_case = assign_lead_use_case
 
     def execute(self, payload: dict[str, Any]) -> ProcessMessageResult:
         message_sid: str = payload.get("MessageSid", "")
@@ -481,6 +483,30 @@ class ProcessMessageUseCase:
                 "message_created": message_created,
             },
         )
+
+        if (
+            reply_result is not None
+            and reply_result.new_status == "PENDING_ASSIGNMENT"
+            and self._assign_lead_use_case is not None
+        ):
+            try:
+                self._assign_lead_use_case.execute(session.id, tenant_id, "AUTO")
+            except ValueError:
+                logger.info(
+                    "Auto-assign no aplicado — tenant en modo MANUAL o sin vendedores",
+                    extra={
+                        "session_id": str(session.id),
+                        "tenant_id": str(tenant_id),
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "Auto-assign falló inesperadamente",
+                    extra={
+                        "session_id": str(session.id),
+                        "tenant_id": str(tenant_id),
+                    },
+                )
 
         # FUERA de transacción: enviar respuesta
         outbound_sid: str | None = None

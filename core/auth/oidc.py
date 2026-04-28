@@ -38,32 +38,71 @@ class OIDCStatelessMiddleware:
         if any(request.path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return self.get_response(request)
 
-        # DEBUG bypass: inyectar tenant automáticamente en todas las rutas de dashboard.
-        # IMPORTANTE: settings.DEBUG DEBE estar presente — sin él se saltea OIDC en producción.
+        # DEBUG bypass: resuelve tenant+user desde el JWT de Supabase (sin verificar firma).
+        # IMPORTANTE: settings.DEBUG DEBE estar False en producción — el OIDC completo toma el control.
         if settings.DEBUG and (
             request.path.startswith("/api/dashboard/")
             or request.path.startswith("/api/sse/")
         ):
             from crm.models import Tenant
 
-            tenant = Tenant.objects.order_by("created_at").first()
-            if tenant:
-                request.tenant = tenant
-                user_id_header = request.headers.get("X-User-ID")
-                if user_id_header:
-                    try:
-                        request.user = User.objects.get(
-                            email=user_id_header, tenant=tenant
-                        )
-                    except User.DoesNotExist:
-                        request.user = User.objects.filter(tenant=tenant).first()
-                else:
-                    request.user = User.objects.filter(tenant=tenant).first()
+            # Extraer el JWT desde Authorization header o query param ?token= (SSE no soporta headers)
+            resolved_email = None
+            raw_token = None
 
-                request.oidc_bypass = True
-                tenant_id_var.set(str(tenant.id))
-                logger.debug("OIDC: DEBUG bypass para %s", request.path)
-                return self.get_response(request)
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                raw_token = auth_header.split(" ", 1)[1]
+            elif request.path.startswith("/api/sse/"):
+                # EventSource no puede enviar headers; el frontend pasa el token como ?token=
+                raw_token = request.GET.get("token")
+
+            # Para SSE: aceptar ?ticket=<uuid> (token de un solo uso, TTL 30s)
+            if not raw_token and request.path.startswith("/api/sse/"):
+                ticket = request.GET.get("ticket")
+                if ticket:
+                    from django.core.cache import cache
+                    ticket_data = cache.get(f"sse_ticket_{ticket}")
+                    if ticket_data:
+                        cache.delete(f"sse_ticket_{ticket}")  # un solo uso
+                        resolved_email = ticket_data.get("email")
+                    else:
+                        logger.warning("OIDC DEBUG: ticket SSE inválido o expirado para %s", request.path)
+                        return JsonResponse({"error": "Unauthorized", "detail": "Ticket SSE inválido o expirado"}, status=401)
+
+            if raw_token:
+                try:
+                    payload = jwt.decode(raw_token, options={"verify_signature": False})
+                    resolved_email = payload.get("email") or payload.get("sub")
+                except Exception:
+                    pass
+
+            if not resolved_email:
+                logger.warning("OIDC DEBUG: token ausente o sin email — acceso denegado a %s", request.path)
+                return JsonResponse({"error": "Unauthorized", "detail": "Token inválido o sin identidad"}, status=401)
+
+            # Resolver usuario primero — su tenant viene de la DB, no de un orden arbitrario
+            try:
+                user = User.objects.select_related("tenant").get(
+                    email=resolved_email, is_active=True
+                )
+            except User.DoesNotExist:
+                logger.warning("OIDC DEBUG: email '%s' no registrado en el sistema", resolved_email)
+                return JsonResponse(
+                    {"error": "Forbidden", "detail": f"El correo '{resolved_email}' no tiene acceso a este sistema."},
+                    status=403,
+                )
+
+            if not user.tenant:
+                logger.warning("OIDC DEBUG: usuario '%s' sin tenant asignado", resolved_email)
+                return JsonResponse({"error": "Forbidden", "detail": "Usuario sin tenant asignado."}, status=403)
+
+            request.tenant = user.tenant
+            request.user = user
+            request.oidc_bypass = True
+            tenant_id_var.set(str(user.tenant.id))
+            logger.debug("OIDC DEBUG bypass: %s → %s (%s)", resolved_email, request.path, user.role)
+            return self.get_response(request)
 
         auth_header = request.headers.get("Authorization")
 
