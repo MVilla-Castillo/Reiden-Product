@@ -1,15 +1,11 @@
-// Cliente de Supabase - implementado manualmente para evitar problemas de tipos
-// Las variables de entorno deben estar en .env como NG_APP_SUPABASE_URL y NG_APP_SUPABASE_ANON_KEY
-
-const supabaseUrl = (window as any).ng?.['SUPABASE_URL'] ?? 'https://nviceqkfcntxejybnpzd.supabase.co';
-const supabaseAnonKey = (window as any).ng?.['SUPABASE_ANON_KEY'] ?? '';
+const supabaseUrl = 'https://nviceqkfcntxejybnpzd.supabase.co';
 
 interface SupabaseAuth {
-  getSession(): Promise<{ data: { session: null } }>;
+  getSession(): Promise<{ data: { session: { access_token: string; user: { id: string; email: string } } | null } }>;
   signInWithOAuth(options: { provider: string; options: { redirectTo: string } }): Promise<{ error: null }>;
   signInWithPassword(options: { email: string; password: string }): Promise<{ error: { message: string } | null }>;
   signOut(): Promise<{ error: null }>;
-  onAuthStateChange(callback: (event: string, session: any) => void): { data: { subscription: { unsubscribe: () => void } } };
+  onAuthStateChange(callback: (event: string, session: { access_token: string; user: {} } | null) => void): { data: { subscription: { unsubscribe: () => void } } };
 }
 
 interface SupabaseClient {
@@ -20,7 +16,14 @@ export const supabase: SupabaseClient = {
   auth: {
     getSession: async () => {
       const token = localStorage.getItem('supabase_token');
-      return { data: { session: token ? { access_token: token, user: { id: '', email: '' } } : null } };
+      const email = localStorage.getItem('user_id');
+      return {
+        data: {
+          session: token
+            ? { access_token: token, user: { id: '', email: email || '' } }
+            : null
+        }
+      };
     },
     signInWithOAuth: async (options: { provider: string; options: { redirectTo: string } }) => {
       const redirectUrl = options.options.redirectTo;
@@ -29,19 +32,19 @@ export const supabase: SupabaseClient = {
       return { error: null };
     },
     signInWithPassword: async (options: { email: string; password: string }) => {
-      // Demo: aceptar cualquier login
       const mockToken = 'demo_token_' + Date.now();
       localStorage.setItem('supabase_token', mockToken);
       localStorage.setItem('user_id', options.email);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'supabase_token', newValue: mockToken }));
       return { error: null };
     },
     signOut: async () => {
       localStorage.removeItem('supabase_token');
       localStorage.removeItem('user_id');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'supabase_token', newValue: null }));
       return { error: null };
     },
-    onAuthStateChange: (callback: (event: string, session: any) => void) => {
-      // Escuchar cambios en localStorage
+    onAuthStateChange: (callback: (event: string, session: { access_token: string; user: {} } | null) => void) => {
       const handler = (e: StorageEvent) => {
         if (e.key === 'supabase_token') {
           const token = e.newValue;
