@@ -8,10 +8,12 @@ import { IconComponent } from './icons.component';
   imports: [CommonModule, IconComponent],
   template: `
     <div class="kpi-card" [class.critical]="critical">
-      <div class="kpi-icon">
-        <app-icon [name]="icon" [size]="24" [cssClass]="'kpi-svg-icon'"></app-icon>
-      </div>
-      <div class="kpi-content">
+      <div class="kpi-accent"></div>
+      <div class="kpi-inner">
+        <div class="kpi-header">
+          <app-icon [name]="icon" [size]="18" [cssClass]="'kpi-icon-bg'"></app-icon>
+          <span class="kpi-label">{{ label }}</span>
+        </div>
         <div class="kpi-value-row">
           <div class="kpi-value">{{ value }}</div>
           @if (trend) {
@@ -20,7 +22,6 @@ import { IconComponent } from './icons.component';
             </div>
           }
         </div>
-        <div class="kpi-label">{{ label }}</div>
       </div>
     </div>
   `,
@@ -31,14 +32,12 @@ import { IconComponent } from './icons.component';
     
     .kpi-card {
       background: white;
-      border-radius: 16px;
-      padding: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+      border-radius: 12px;
+      overflow: hidden;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       transition: all 0.2s ease;
       cursor: pointer;
+      position: relative;
       
       &:hover {
         transform: translateY(-2px);
@@ -46,67 +45,69 @@ import { IconComponent } from './icons.component';
       }
       
       &.critical {
-        background: linear-gradient(135deg, #fef2f2 0%, #fff 100%);
-        border: 1px solid #fecaca;
-        
+        .kpi-accent {
+          background: #ef4444;
+        }
         .kpi-value {
           color: #dc2626;
         }
       }
     }
     
-    .kpi-icon {
-      width: 56px;
-      height: 56px;
-      border-radius: 14px;
+    .kpi-accent {
+      height: 3px;
+      background: #3b82f6;
+    }
+    
+    .kpi-inner {
+      padding: 1rem 1.25rem 1.25rem;
+    }
+    
+    .kpi-header {
       display: flex;
       align-items: center;
-      justify-content: center;
-      background: #f3f4f6;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
     }
     
-    ::ng-deep .kpi-svg-icon {
-      color: #6b7280;
+    ::ng-deep .kpi-icon-bg {
+      color: #3b82f6;
     }
     
-    .kpi-content {
-      flex: 1;
+    .kpi-label {
+      font-size: 0.8125rem;
+      color: #64748b;
+      font-weight: 500;
     }
     
     .kpi-value-row {
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 0.5rem;
     }
-
+    
     .kpi-value {
-      font-size: 2rem;
+      font-size: 1.75rem;
       font-weight: 700;
-      color: #111827;
-      line-height: 1;
+      color: #0f172a;
+      line-height: 1.1;
     }
-
+    
     .kpi-trend {
-      font-size: 0.875rem;
+      font-size: 0.75rem;
       font-weight: 600;
       padding: 2px 6px;
       border-radius: 4px;
-      background: #f3f4f6;
-      color: #4b5563;
+      background: #f1f5f9;
+      color: #475569;
     }
     .kpi-trend.positive {
       background: #dcfce7;
       color: #166534;
     }
     .kpi-trend.negative {
-      background: #fef2f2;
+      background: #fee2e2;
       color: #991b1b;
-    }
-    
-    .kpi-label {
-      font-size: 0.875rem;
-      color: #6b7280;
-      margin-top: 0.25rem;
     }
   `]
 })

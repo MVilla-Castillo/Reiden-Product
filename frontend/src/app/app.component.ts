@@ -44,7 +44,7 @@ import { SessionService, UserRole } from './core/services/session.service';
     }
     .main-content {
       flex: 1;
-      margin-left: 260px;
+      margin-left: 220px;
       min-height: 100vh;
       transition: margin-left 0.3s ease;
     }
@@ -103,7 +103,7 @@ import { SessionService, UserRole } from './core/services/session.service';
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
-  title = 'CCRM';
+  title = 'Stelard';
   showSidebar = true;
   sessionExpiredVisible = signal(false);
   reauthUserId = 'admin@dev.local';

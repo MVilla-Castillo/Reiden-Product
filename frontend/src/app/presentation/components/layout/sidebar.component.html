@@ -1,56 +1,58 @@
 <aside class="sidebar">
-  <div class="logo">
-    <div class="logo-icon">CC</div>
-    <span class="logo-text">CCRM</span>
-  </div>
-
-  <div class="role-toggle">
-    <div class="toggle-label">Cambiar Rol (Bypass)</div>
-    <div class="toggle-switch">
-      <button 
-        [class.active]="session.currentRole() === 'manager'"
-        (click)="setRole('manager')">
-        Gerente
-      </button>
-      <button 
-        [class.active]="session.currentRole() === 'sales'"
-        (click)="setRole('sales')">
-        Vendedor
-      </button>
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">S</div>
+      <span class="logo-text">Stelard</span>
     </div>
+    <div class="tenant-name">Mi Automotora</div>
   </div>
 
-  <nav class="nav-section">
-    <div class="nav-title">Principal</div>
+  <nav class="nav-main">
     @for (item of navItems; track item.route) {
       @if (item.roles.includes(session.currentRole())) {
         <a class="nav-item" [routerLink]="item.route" routerLinkActive="active">
-          <app-icon [name]="item.icon" [size]="20"></app-icon>
+          <app-icon [name]="item.icon" [size]="18"></app-icon>
           {{ item.label }}
         </a>
       }
     }
   </nav>
 
-  <nav class="nav-section">
-    <div class="nav-title">Configuración</div>
+  <nav class="nav-config">
     <a class="nav-item" routerLink="/settings" routerLinkActive="active">
-      <app-icon name="cog" [size]="20"></app-icon>
+      <app-icon name="cog" [size]="18"></app-icon>
       Ajustes
     </a>
     <a class="nav-item" routerLink="/profile" routerLinkActive="active">
-      <app-icon name="user" [size]="20"></app-icon>
+      <app-icon name="user" [size]="18"></app-icon>
       Perfil
     </a>
   </nav>
 
-  <div class="nav-divider"></div>
+  <div class="sidebar-footer">
+    <div class="role-toggle-compact">
+      <button 
+        class="role-btn" 
+        [class.active]="session.currentRole() === 'manager'"
+        (click)="setRole('manager')"
+        title="Vista Gerente">
+        <app-icon name="briefcase" [size]="16"></app-icon>
+      </button>
+      <button 
+        class="role-btn" 
+        [class.active]="session.currentRole() === 'sales'"
+        (click)="setRole('sales')"
+        title="Vista Vendedor">
+        <app-icon name="user" [size]="16"></app-icon>
+      </button>
+    </div>
 
-  <div class="user-profile">
-    <div class="avatar">JD</div>
-    <div class="user-info">
-      <div class="user-name">Juan Demo</div>
-      <div class="user-role">{{ session.currentRole() === 'manager' ? 'Gerente' : 'Vendedor' }}</div>
+    <div class="user-profile">
+      <div class="avatar">JD</div>
+      <div class="user-info">
+        <div class="user-name">Juan Demo</div>
+        <div class="user-role">{{ session.currentRole() === 'manager' ? 'Gerente' : 'Vendedor' }}</div>
+      </div>
     </div>
   </div>
 </aside>

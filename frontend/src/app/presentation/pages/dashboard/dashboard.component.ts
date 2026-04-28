@@ -7,7 +7,6 @@ import { SessionService } from '../../../core/services/session.service';
 import { KpiCardComponent } from '../../components/shared/kpi-card.component';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
 import { IconComponent } from '../../components/shared/icons.component';
-import { TopBarComponent } from '../../components/shared/top-bar.component';
 import { SkeletonComponent } from '../../components/shared/skeleton.component';
 import { SessionDto, SalespersonDto, MetricsResponse, TenantSettings } from '../../../core/models/crm.models';
 
@@ -16,7 +15,7 @@ const METRICS_BACKUP_MS = 3_600_000;
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, KpiCardComponent, LeadsGridComponent, IconComponent, TopBarComponent, SkeletonComponent],
+  imports: [CommonModule, KpiCardComponent, LeadsGridComponent, IconComponent, SkeletonComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
@@ -182,4 +181,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
     }));
   }
+
+
 }

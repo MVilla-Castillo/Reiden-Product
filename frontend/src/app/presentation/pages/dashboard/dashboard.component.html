@@ -1,17 +1,3 @@
-<app-top-bar [title]="isManager() ? 'Gerencia' : 'Ventas'" [breadcrumb]="isManager() ? 'Dashboard' : 'Chat'">
-  <span class="role-badge">{{ isManager() ? 'Vista Gerente' : 'Vista Vendedor' }}</span>
-  @if (isManager() && tenantSettings()) {
-    <button 
-      class="routing-badge" 
-      [class.auto]="tenantSettings()!.routing_mode === 'AUTO'"
-      [class.manual]="tenantSettings()!.routing_mode === 'MANUAL'"
-      (click)="toggleRoutingMode()">
-      <span class="routing-label">Routing</span>
-      <span class="routing-mode">{{ tenantSettings()!.routing_mode }}</span>
-    </button>
-  }
-</app-top-bar>
-
 <div class="dashboard">
 
   @if (sseReconnecting()) {
@@ -31,6 +17,25 @@
       </button>
     </div>
   }
+
+  <div class="dash-header">
+    <div class="dash-header-top">
+      <div class="dash-breadcrumb">Stelard › Dashboard</div>
+      <div class="dash-header-actions">
+        <span class="role-badge">{{ isManager() ? 'Gerente' : 'Vendedor' }}</span>
+        @if (isManager() && tenantSettings()) {
+          <button
+            class="routing-badge"
+            [class.auto]="tenantSettings()!.routing_mode === 'AUTO'"
+            [class.manual]="tenantSettings()!.routing_mode === 'MANUAL'"
+            (click)="toggleRoutingMode()">
+            <span class="routing-label">Routing</span>
+            <span class="routing-mode">{{ tenantSettings()!.routing_mode }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
 
   @if (isManager() && !metrics()) {
     <section class="kpi-section">
@@ -68,42 +73,43 @@
 
       <div class="kpi-cards">
         <app-kpi-card
-          icon="bolt"
+          icon="clock"
           [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
           trend="+0%"
           label="T. Respuesta Promedio">
         </app-kpi-card>
         <app-kpi-card
-          icon="exclamation-triangle"
+          icon="exclamation-circle"
           [value]="metrics()!.funnel.pending_assignment.toString()"
           label="Pendientes de Asignación"
           [critical]="metrics()!.funnel.pending_assignment > 0">
         </app-kpi-card>
         <app-kpi-card
-          icon="briefcase"
+          icon="user-group"
           [value]="metrics()!.funnel.con_vendedor.toString()"
           label="Con Vendedores">
         </app-kpi-card>
         <app-kpi-card
-          icon="target"
+          icon="check-circle"
           [value]="metrics()!.funnel.win_rate + '%'"
           trend="+0%"
           label="Tasa de Cierre">
         </app-kpi-card>
       </div>
     </section>
+
   }
 
   <section class="leads-section">
     <div class="section-header">
       <h2>{{ isManager() ? 'Leads Pendientes' : 'Mis Leads' }}</h2>
-      <span class="lead-count">{{ leads().length }} registros pendientes</span>
+      <span class="lead-count">{{ leads().length }} registros</span>
     </div>
-<app-leads-grid
-        [leads]="leads()"
-        [salesPersons]="salesPersons()"
-        [canAssign]="isManager()"
-        (assignLead)="handleAssignment($event)">
-      </app-leads-grid>
+    <app-leads-grid
+      [leads]="leads()"
+      [salesPersons]="salesPersons()"
+      [canAssign]="isManager()"
+      (assignLead)="handleAssignment($event)">
+    </app-leads-grid>
   </section>
 </div>

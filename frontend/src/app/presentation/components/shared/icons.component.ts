@@ -66,6 +66,21 @@ import { CommonModule } from '@angular/common';
         @case ('information-circle') {
           <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M11 16.917A1 1 0 0112 16v-1.75a1 1 0 00-1-1h-1.75a1 1 0 00-1 1.75V16a1 1 0 001 1h1.75zM11.004 10A1.5 1.5 0 1011 7v3M11 17.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
         }
+        @case ('calendar') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        }
+        @case ('clock') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        }
+        @case ('check-circle') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        }
+        @case ('user-group') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        }
+        @case ('exclamation-circle') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        }
         @default {
           <circle [attr.stroke-width]="strokeWidth" cx="12" cy="12" r="10"/>
         }
