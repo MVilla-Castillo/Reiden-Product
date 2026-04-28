@@ -17,11 +17,10 @@ export const routes: Routes = [
     canActivate: [authGuard], 
     data: { role: 'manager' } 
   },
-  { 
-    path: 'leads', 
-    component: LeadsComponent, 
-    canActivate: [authGuard], 
-    data: { role: 'manager' } 
+  {
+    path: 'leads',
+    component: LeadsComponent,
+    canActivate: [authGuard]
   },
   { 
     path: 'reports', 

@@ -16,7 +16,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     if (session.currentRole() === 'manager') {
       router.navigate(['/dashboard']);
     } else {
-      router.navigate(['/chat']);
+      router.navigate(['/leads']);
     }
     return false;
   }

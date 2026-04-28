@@ -17,7 +17,7 @@ export class SidebarComponent {
 
   navItems = [
     { icon: 'chart-bar', label: 'Dashboard', route: '/dashboard', active: true, roles: ['manager'] },
-    { icon: 'users', label: 'Leads', route: '/leads', active: false, roles: ['manager'] },
+    { icon: 'users', label: 'Leads', route: '/leads', active: false, roles: ['manager', 'sales'] },
     { icon: 'chat-bubble-left-right', label: 'Conversaciones', route: '/chat', active: false, roles: ['manager', 'sales'] },
     { icon: 'presentation-chart-line', label: 'Reportes', route: '/reports', active: false, roles: ['manager'] },
   ];
@@ -27,7 +27,7 @@ export class SidebarComponent {
     if (role === 'manager') {
       this.router.navigate(['/dashboard']);
     } else {
-      this.router.navigate(['/chat']);
+      this.router.navigate(['/leads']);
     }
   }
 }

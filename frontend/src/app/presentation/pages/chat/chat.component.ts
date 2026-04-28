@@ -45,7 +45,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   isAtBottom = signal(true);
   isAtTop = signal(false);
 
-  activeTab = signal<'leads' | 'chat'>('leads');
   chatFilter = signal<'all' | 'active' | 'won' | 'lost' | 'abandoned'>('all');
   filteredChats = computed(() => {
     const filter = this.chatFilter();
@@ -433,11 +432,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       },
       error: () => {}
     });
-  }
-
-  openChat(lead: SessionDto) {
-    this.activeTab.set('chat');
-    this.selectLead(lead);
   }
 
   setFilter(filter: 'all' | 'active' | 'won' | 'lost' | 'abandoned') {

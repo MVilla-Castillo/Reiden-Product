@@ -1,60 +1,3 @@
-<div class="chat-page-header">
-  <div class="chat-breadcrumb">Stelard › Panel Vendedor</div>
-  <div class="chat-tabs">
-    <button class="tab" [class.active]="activeTab() === 'leads'" (click)="activeTab.set('leads')">
-      <app-icon name="users" [size]="16"></app-icon>
-      Mis Leads
-    </button>
-    <button class="tab" [class.active]="activeTab() === 'chat'" (click)="activeTab.set('chat')">
-      <app-icon name="chat-bubble-left-right" [size]="16"></app-icon>
-      Conversaciones
-    </button>
-  </div>
-</div>
-
-@if (activeTab() === 'leads') {
-  <div class="leads-tab">
-    <div class="leads-tab-bar">
-      <span class="leads-tab-count">{{ chats().length }} leads asignados</span>
-    </div>
-    <div class="leads-table-wrap">
-      <table class="leads-table">
-        <thead>
-          <tr>
-            <th>Lead</th>
-            <th>Estado</th>
-            <th>Vehículo</th>
-            <th>Intención</th>
-            <th>Urgencia</th>
-            <th>Última actividad</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (lead of chats(); track lead.session_id) {
-            <tr (click)="openChat(lead)" class="lead-row">
-              <td class="lead-name-cell">{{ lead.lead_profile_name || ('Cliente ' + (lead.lead_phone_hash | slice:0:6)) }}</td>
-              <td><span class="status-pill status-{{ lead.status | lowercase }}">{{ lead.status }}</span></td>
-              <td>{{ lead.vehicle_type || '—' }}</td>
-              <td>{{ lead.purchase_intent || '—' }}</td>
-              <td>
-                <div class="urgency-mini">
-                  <div class="urgency-mini-bar" [style.width.%]="lead.urgency_score"></div>
-                  <span>{{ lead.urgency_score }}</span>
-                </div>
-              </td>
-              <td class="date-cell">{{ lead.updated_at | date:'dd/MM/yy HH:mm' }}</td>
-            </tr>
-          }
-          @empty {
-            <tr><td colspan="6" class="empty-row">No tienes leads asignados aún</td></tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  </div>
-}
-
-@if (activeTab() === 'chat') {
 <div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
@@ -401,4 +344,3 @@
     </aside>
   }
 </div>
-}

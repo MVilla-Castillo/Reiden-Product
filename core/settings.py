@@ -70,6 +70,16 @@ CORS_ALLOW_HEADERS = [
     "x-trace-id",
     "x-user-id",
 ]
+CORS_EXPOSE_HEADERS = ["X-Trace-ID"]
+
+# CSRF Trusted Origins — independiente de CORS; requerido para PATCH/POST/PUT/DELETE
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:4200",
+        "http://localhost:8080",
+        "http://127.0.0.1:4200",
+    ]
 
 # Cache Backend (JWKS caching for OIDC — LocMemCache for single-instance Cloud Run)
 # For multi-instance deployments, switch to Redis/Memcached.
@@ -279,6 +289,20 @@ import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
+
+
+def _sentry_before_send(event, hint):
+    from core.log_utils import trace_id_var, tenant_id_var
+
+    trace_id = trace_id_var.get()
+    tenant_id = tenant_id_var.get()
+    if trace_id != "-":
+        event.setdefault("tags", {})["trace_id"] = trace_id
+    if tenant_id != "-":
+        event.setdefault("tags", {})["tenant_id"] = tenant_id
+    return event
+
+
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
@@ -287,4 +311,5 @@ if SENTRY_DSN:
         profiles_sample_rate=1.0,
         environment="production" if not DEBUG else "development",
         send_default_pii=False,
+        before_send=_sentry_before_send,
     )

@@ -2,6 +2,7 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
+import { SessionService } from '../../../core/services/session.service';
 import { LeadsGridComponent, BatchActionEvent } from '../../components/shared/leads-grid.component';
 import { TopBarComponent } from '../../components/shared/top-bar.component';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
@@ -14,13 +15,13 @@ import { Subscription } from 'rxjs';
   imports: [CommonModule, LeadsGridComponent, TopBarComponent],
   template: `
     <div class="leads-page">
-      <app-top-bar title="Gestor de Leads" breadcrumb="Leads"></app-top-bar>
-      
+      <app-top-bar [title]="session.currentRole() === 'manager' ? 'Gestor de Leads' : 'Mis Leads'" breadcrumb="Leads"></app-top-bar>
+
       <div class="grid-wrapper">
         <app-leads-grid
           [leads]="leads()"
           [salesPersons]="salesPersons()"
-          [canAssign]="routingMode() === 'MANUAL'"
+          [canAssign]="session.currentRole() === 'manager' && routingMode() === 'MANUAL'"
           (assignLead)="handleAssignment($event)"
           (batchAction)="handleBatchAction($event)">
         </app-leads-grid>
@@ -122,6 +123,7 @@ import { Subscription } from 'rxjs';
 export class LeadsComponent implements OnInit, OnDestroy {
   crmApi = inject(CrmApiService);
   private sseService = inject(SseService);
+  session = inject(SessionService);
 
   leads = signal<SessionDto[]>([]);
   salesPersons = signal<SalespersonDto[]>([]);

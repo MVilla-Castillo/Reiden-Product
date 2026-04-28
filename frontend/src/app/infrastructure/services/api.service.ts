@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, tap, catchError, of } from 'rxjs';
+import { Observable, map, tap } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { catchAndReport } from '../../core/utils/error-utils';
 import { Lead, SalesPerson, DashboardMetrics, AssignLeadRequest, Session, Message, FunnelMetrics, SalespersonPerformance } from '../../core/models/lead.model';
 
 @Injectable({ providedIn: 'root' })
@@ -32,7 +34,7 @@ export class ApiService {
     return this.http.get<{ leads: Lead[]; count: number }>(`${this.baseUrl}/api/dashboard/leads/`, { params })
       .pipe(
         map(response => response.leads),
-        catchError(() => of([]))
+        catchError(catchAndReport([]))
       );
   }
 
@@ -40,7 +42,7 @@ export class ApiService {
     return this.http.get<{ pending_leads: Lead[] }>(`${this.baseUrl}/api/dashboard/leads/pending/`)
       .pipe(
         map(response => response.pending_leads),
-        catchError(() => of([]))
+        catchError(catchAndReport([]))
       );
   }
 
@@ -48,7 +50,7 @@ export class ApiService {
     return this.http.get<{ salespeople: SalesPerson[] }>(`${this.baseUrl}/api/dashboard/salespeople/`)
       .pipe(
         map(response => response.salespeople),
-        catchError(() => of([]))
+        catchError(catchAndReport([]))
       );
   }
 
@@ -74,13 +76,13 @@ export class ApiService {
         funnel: response.funnel,
         salesperson_performance: response.salesperson_performance
       })),
-      catchError(() => of({ 
-        funnel: { 
-          total_leads: 0, 
-          completed_fsm: 0, 
-          assigned_leads: 0, 
-          won_sessions: 0, 
-          lost_sessions: 0, 
+      catchError(catchAndReport({
+        funnel: {
+          total_leads: 0,
+          completed_fsm: 0,
+          assigned_leads: 0,
+          won_sessions: 0,
+          lost_sessions: 0,
           abandoned_sessions: 0,
           conversion_rate_fsm: 0,
           conversion_rate_assignment: 0,
@@ -95,7 +97,7 @@ export class ApiService {
     return this.http.post<Lead>(`${this.baseUrl}/api/dashboard/leads/${sessionId}/assign/`, request)
       .pipe(
         tap(() => this.refreshLeads()),
-        catchError(() => of({} as Lead))
+        catchError(catchAndReport({} as Lead))
       );
   }
 
@@ -104,7 +106,7 @@ export class ApiService {
       salesperson_id: salespersonId
     }).pipe(
       tap(() => this.refreshLeads()),
-      catchError(() => of({} as Lead))
+      catchError(catchAndReport({} as Lead))
     );
   }
 
@@ -113,30 +115,30 @@ export class ApiService {
       status
     }).pipe(
       tap(() => this.refreshLeads()),
-      catchError(() => of({} as Lead))
+      catchError(catchAndReport({} as Lead))
     );
   }
 
   getMessages(sessionId: string): Observable<Message[]> {
     return this.http.get<Message[]>(`${this.baseUrl}/api/dashboard/leads/${sessionId}/messages/`)
-      .pipe(catchError(() => of([])));
+      .pipe(catchError(catchAndReport([])));
   }
 
   sendMessage(sessionId: string, content: string): Observable<Message> {
     return this.http.post<Message>(`${this.baseUrl}/api/dashboard/leads/${sessionId}/messages/send/`, {
       content
-    }).pipe(catchError(() => of({} as Message)));
+    }).pipe(catchError(catchAndReport({} as Message)));
   }
 
   getSettings(): Observable<{ routing_mode: string }> {
     return this.http.get<{ routing_mode: string }>(`${this.baseUrl}/api/dashboard/settings/`)
-      .pipe(catchError(() => of({ routing_mode: 'MANUAL' })));
+      .pipe(catchError(catchAndReport({ routing_mode: 'MANUAL' })));
   }
 
   updateSettings(routingMode: 'MANUAL' | 'AUTO'): Observable<{ routing_mode: string }> {
     return this.http.patch<{ routing_mode: string }>(`${this.baseUrl}/api/dashboard/settings/`, {
       routing_mode: routingMode
-    }).pipe(catchError(() => of({ routing_mode: 'MANUAL' })));
+    }).pipe(catchError(catchAndReport({ routing_mode: 'MANUAL' })));
   }
 
   refreshLeads() {

@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 
 from crm.views.health import liveness_view, readiness_view
+from core.views.errors import handler404 as handler404  # noqa: F401
+from core.views.errors import handler500 as handler500  # noqa: F401
 
 urlpatterns = [
     path("admin/", admin.site.urls),
