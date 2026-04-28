@@ -4,7 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SessionService } from '../../../core/services/session.service';
 import { supabase } from '../../../core/supabase';
-import { AuthSession } from '@supabase/supabase-js';
+
+interface AuthSession {
+  access_token: string;
+  user: { email: string | null };
+}
 
 @Component({
   selector: 'app-login',
@@ -21,7 +25,6 @@ export class LoginComponent implements OnInit {
   password = signal('');
   isLoading = signal(false);
   errorMessage = signal('');
-  showPasswordForm = signal(false);
   loginMode = signal<'google' | 'email'>('google');
 
   ngOnInit() {
@@ -89,7 +92,7 @@ export class LoginComponent implements OnInit {
     } else {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        this.handleSession(data.session);
+        this.handleSession(data.session as AuthSession);
       }
     }
   }

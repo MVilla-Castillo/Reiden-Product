@@ -1,0 +1,84 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f3f4f6;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 220px;
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+}
+
+.no-sidebar .main-content {
+  margin-left: 0;
+}
+
+.session-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.session-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.session-modal-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.session-modal h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: #111827;
+}
+
+.session-modal p {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.btn-reauth {
+  padding: 0.75rem 2rem;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.875rem;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.btn-reauth:hover {
+  background: #4338ca;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

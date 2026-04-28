@@ -1,0 +1,19 @@
+<div class="app-layout" [class.no-sidebar]="!showSidebar">
+  @if (showSidebar) {
+    <app-sidebar></app-sidebar>
+  }
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>
+
+@if (sessionExpiredVisible()) {
+  <div class="session-overlay">
+    <div class="session-modal">
+      <div class="session-modal-icon">🔒</div>
+      <h3>Sesión expirada</h3>
+      <p>Tu sesión ha cadmiumo. Vuelve a iniciar sesión para continuar donde estabas.</p>
+      <button class="btn-reauth" (click)="reAuthenticate()">Iniciar sesión</button>
+    </div>
+  </div>
+}

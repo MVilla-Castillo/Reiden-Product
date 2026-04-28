@@ -28,11 +28,10 @@ export class SessionService {
   private initAuthListener() {
     supabase.auth.onAuthStateChange((event, session) => {
       const authEvent = event as string;
-      const authSession = session;
-      if (authEvent === 'SIGNED_OUT' || !authSession) {
+      if (authEvent === 'SIGNED_OUT' || !session) {
         this.markExpired();
-      } else if (authEvent === 'TOKEN_REFRESHED' && authSession.access_token) {
-        this.setToken(authSession.access_token);
+      } else if (authEvent === 'TOKEN_REFRESHED' && session.access_token) {
+        this.setToken(session.access_token);
       }
     });
   }
