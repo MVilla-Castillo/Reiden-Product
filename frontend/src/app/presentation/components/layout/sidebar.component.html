@@ -1,7 +1,7 @@
 <aside class="sidebar">
   <div class="sidebar-header">
     <div class="logo">
-      <img class="logo-img" src="Stelard-logo-solo.png" alt="Stelard" />
+      <img class="logo-img" src="/landing/Stelard-logo-solo.svg" alt="Stelard" />
       <span class="logo-text">Stelard</span>
     </div>
     <div class="tenant-name">Mi Automotora</div>
@@ -54,5 +54,10 @@
         <div class="user-role">{{ session.currentRole() === 'manager' ? 'Gerente' : 'Vendedor' }}</div>
       </div>
     </div>
+
+    <button class="nav-item logout-btn" (click)="logout()">
+      <app-icon name="arrow-right-on-rectangle" [size]="18"></app-icon>
+      Cerrar sesión
+    </button>
   </div>
 </aside>

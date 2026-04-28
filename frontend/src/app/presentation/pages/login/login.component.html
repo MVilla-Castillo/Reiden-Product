@@ -1,34 +1,29 @@
-<div class="login-wrapper">
-  
-  <div class="animated-background">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
-  </div>
+<div class="login-shell">
+  <div class="login-bg"></div>
 
-  <div class="glass-card">
+  <section class="login-card">
+    <div class="brand-head">
+      <img src="/landing/Stelard-logo-completo.svg" alt="Stelard CRM" />
+      <p>Acceso seguro a tu plataforma comercial</p>
+    </div>
+
     @if (errorMessage()) {
-      <div class="session-expired-banner" role="alert">
+      <div class="error-banner" role="alert">
         {{ errorMessage() }}
       </div>
     }
 
-    <div class="card-header">
-      <div class="logo-circle">
-        <span class="logo-text">CC</span>
-      </div>
-      <h2>Bienvenido a Stelard</h2>
-      <p>Plataforma de Relación Conversacional</p>
-    </div>
-    
     @if (loginMode() === 'google') {
-      <div class="login-method">
-        <button class="login-submit google-btn" (click)="loginWithGoogle()" [disabled]="isLoading()">
+      <div class="auth-block">
+        <h1>Inicia sesion</h1>
+        <p>Usa tu cuenta de Google autorizada para entrar a Stelard CRM.</p>
+
+        <button class="google-btn" (click)="loginWithGoogle()" [disabled]="isLoading()">
           @if (isLoading()) {
             <span class="loading-spinner"></span>
-            Iniciando sesión...
+            Iniciando sesion...
           } @else {
-            <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+            <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -38,56 +33,52 @@
           }
         </button>
 
-        <div class="divider">
-          <span>o</span>
-        </div>
-
-        <button class="toggle-mode-btn" (click)="toggleMode()">
-          Ingresar con email y contraseña
-        </button>
+        <a class="email-link" [routerLink]="['/login']" [queryParams]="{ mode: 'email' }">
+          Iniciar con email
+        </a>
       </div>
     }
 
     @if (loginMode() === 'email') {
-      <div class="login-method">
+      <div class="auth-block">
+        <h1>Acceso interno</h1>
+        <p>Modo alternativo para cuentas de prueba.</p>
+
         <div class="form-group">
           <label for="email">Email</label>
-          <input 
-            type="email" 
+          <input
+            type="email"
             id="email"
-            [ngModel]="email()" 
+            [ngModel]="email()"
             (ngModelChange)="email.set($event)"
-            placeholder="tu@email.com"
+            placeholder="dev@stelard.cl"
             class="form-input"
           />
         </div>
 
         <div class="form-group">
-          <label for="password">Contraseña</label>
-          <input 
-            type="password" 
+          <label for="password">Contrasena</label>
+          <input
+            type="password"
             id="password"
-            [ngModel]="password()" 
+            [ngModel]="password()"
             (ngModelChange)="password.set($event)"
-            placeholder="Tu contraseña"
+            placeholder="Tu contrasena"
             class="form-input"
           />
         </div>
 
-        <button class="login-submit" (click)="loginWithEmail()" [disabled]="isLoading()">
+        <button class="email-btn" (click)="loginWithEmail()" [disabled]="isLoading()">
           @if (isLoading()) {
             <span class="loading-spinner"></span>
-            Iniciando sesión...
+            Iniciando sesion...
           } @else {
             Ingresar
-            <span class="arrow-icon">→</span>
           }
         </button>
 
-        <button class="toggle-mode-btn" (click)="toggleMode()">
-          ← Volver a Google
-        </button>
+        <button class="back-btn" (click)="backToGoogleMode()">Volver a Google</button>
       </div>
     }
-  </div>
+  </section>
 </div>

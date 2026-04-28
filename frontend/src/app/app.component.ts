@@ -21,12 +21,14 @@ export class AppComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private session = inject(SessionService);
   private expiredSub?: Subscription;
+  private navSub?: Subscription;
 
   constructor() {
-    this.router.events.pipe(
+    this.showSidebar = !this.shouldHideSidebar(this.router.url);
+    this.navSub = this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
-      this.showSidebar = !event.urlAfterRedirects.startsWith('/login');
+      this.showSidebar = !this.shouldHideSidebar(event.urlAfterRedirects);
     });
   }
 
@@ -38,6 +40,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.expiredSub?.unsubscribe();
+    this.navSub?.unsubscribe();
+  }
+
+  private shouldHideSidebar(url: string): boolean {
+    const cleanUrl = url.split('?')[0];
+    return cleanUrl === '/' || cleanUrl.startsWith('/login');
   }
 
   async reAuthenticate() {

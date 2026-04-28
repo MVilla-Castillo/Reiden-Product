@@ -166,3 +166,16 @@
     }
   }
 }
+
+.logout-btn {
+  margin-top: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-size: 0.875rem;
+
+  &:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+  }
+}

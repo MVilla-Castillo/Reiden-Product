@@ -42,6 +42,9 @@ import { CommonModule } from '@angular/common';
         @case ('arrow-path') {
           <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M20 20v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         }
+        @case ('arrow-right-on-rectangle') {
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M17 16l4-4m0 0l-4-4m4 4H7m5 4v-7a2 2 0 00-2-2H7a2 2 0 00-2 2v7"/>
+        }
         @case ('briefcase') {
           <path stroke-linecap="round" stroke-linejoin="round" [attr.stroke-width]="strokeWidth" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
         }

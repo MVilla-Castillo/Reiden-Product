@@ -1,0 +1,162 @@
+<div class="landing-shell">
+  <div class="hero-bg"></div>
+
+  <header class="topbar container">
+    <a class="brand" routerLink="/" aria-label="Inicio Stelard">
+      <img src="/landing/Stelard-logo-completo.svg" alt="Stelard CRM" />
+    </a>
+
+    <a class="topbar-login" routerLink="/login">Iniciar sesion</a>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow">CRM para automotoras</p>
+        <h1>El CRM que entiende el ritmo de tu automotora.</h1>
+        <p class="subtitle">Gestiona leads, vendedores y sucursales en un solo lugar.</p>
+
+        <div class="hero-actions">
+          <a
+            class="btn btn-primary"
+            href="https://stelard.cl/solicitar-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Solicitar Demo Gratuita
+          </a>
+          <a class="btn btn-ghost" routerLink="/login">Iniciar sesion</a>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="visual-card">
+          <div class="visual-head">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div class="visual-grid">
+            <article class="metric metric-primary">
+              <p>Leads activos</p>
+              <strong>186</strong>
+              <small>+22% semana</small>
+            </article>
+            <article class="metric">
+              <p>Tiempo de respuesta</p>
+              <strong>4m 12s</strong>
+              <small>promedio equipo</small>
+            </article>
+            <article class="pipeline">
+              <p>Pipeline por sucursal</p>
+              <div class="bars">
+                <span style="--w: 84%"></span>
+                <span style="--w: 63%"></span>
+                <span style="--w: 47%"></span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-strip">
+      <div class="container trust-inner">
+        <p>Operacion comercial ordenada para cada sucursal</p>
+        <div class="trust-logos">
+          @for (logo of trustLogos; track logo) {
+            <span>{{ logo }}</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="problem container">
+      <div class="problem-copy">
+        <p class="eyebrow">El problema</p>
+        <h2>El caos de WhatsApp y las planillas termina aqui.</h2>
+      </div>
+
+      <div class="problem-list">
+        @for (pain of painPoints; track pain) {
+          <article>
+            <div class="marker"></div>
+            <p>{{ pain }}</p>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="benefits container">
+      <div class="section-head">
+        <p class="eyebrow">Beneficios</p>
+        <h2>Una plataforma robusta, clara y lista para escalar.</h2>
+      </div>
+
+      <div class="benefit-grid">
+        @for (item of benefits; track item.title) {
+          <article class="benefit-card">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.description }}</p>
+          </article>
+        }
+      </div>
+
+      <div class="kpi-band">
+        <article>
+          <strong>24/7</strong>
+          <p>Visibilidad del embudo comercial</p>
+        </article>
+        <article>
+          <strong>100%</strong>
+          <p>Leads centralizados por sucursal</p>
+        </article>
+        <article>
+          <strong>1 Vista</strong>
+          <p>Gerencia, vendedores y operaciones</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="demo container">
+      <div class="section-head">
+        <p class="eyebrow">Demo visual</p>
+        <h2>Una experiencia web enfocada en simplicidad y control.</h2>
+      </div>
+
+      <div class="demo-grid" aria-label="Placeholders visuales de plataforma">
+        <article class="demo-card main-shot">
+          <div class="shot-label">Dashboard general</div>
+          <div class="shot-lines">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </article>
+        <article class="demo-card side-shot">
+          <div class="shot-label">Gestor de leads</div>
+        </article>
+        <article class="demo-card side-shot">
+          <div class="shot-label">Reporte por sucursal</div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <img src="/landing/Stelard-logo-solo.svg" alt="Stelard" />
+        <p>CRM para automotoras con foco en control comercial.</p>
+      </div>
+
+      <nav class="footer-links" aria-label="Enlaces legales y contacto">
+        <a href="#">Terminos y condiciones</a>
+        <a href="#">Politica de privacidad</a>
+        <a href="#">Contacto</a>
+        <a href="#">LinkedIn</a>
+        <a href="#">Instagram</a>
+      </nav>
+    </div>
+  </footer>
+</div>

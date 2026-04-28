@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { SessionService } from '../../../core/services/session.service';
 import { IconComponent } from '../../components/shared/icons.component';
+import { supabase } from '../../../core/supabase';
 
 @Component({
   selector: 'app-sidebar',
@@ -29,5 +30,11 @@ export class SidebarComponent {
     } else {
       this.router.navigate(['/leads']);
     }
+  }
+
+  async logout() {
+    await supabase.auth.signOut();
+    this.session.clear();
+    this.router.navigate(['/login']);
   }
 }

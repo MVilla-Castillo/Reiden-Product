@@ -2,7 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SessionService, UserRole } from '../../../core/services/session.service';
 import { supabase } from '../../../core/supabase';
@@ -15,13 +15,14 @@ interface AuthSession {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
 export class LoginComponent implements OnInit {
   private session = inject(SessionService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private http = inject(HttpClient);
 
   email = signal('');
@@ -33,6 +34,9 @@ export class LoginComponent implements OnInit {
   ngOnInit() {
     // Limpiar residuos de sesiones anteriores fallidas antes de cualquier chequeo
     localStorage.removeItem('session_expired');
+    if (this.route.snapshot.queryParamMap.get('mode') === 'email') {
+      this.loginMode.set('email');
+    }
     if (this.handleOAuthCallback()) return;
     this.checkExistingSession();
   }
@@ -152,8 +156,9 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  toggleMode() {
-    this.loginMode.set(this.loginMode() === 'google' ? 'email' : 'google');
+  backToGoogleMode() {
+    this.loginMode.set('google');
+    this.router.navigate(['/login'], { replaceUrl: true });
     this.errorMessage.set('');
   }
 }
