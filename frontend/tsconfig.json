@@ -22,7 +22,9 @@
     "lib": [
       "ES2022",
       "dom"
-    ]
+    ],
+    "types": ["vite/client"],
+    "typeRoots": ["./node_modules/@types", "./src/app"]
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

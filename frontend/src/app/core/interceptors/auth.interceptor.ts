@@ -6,9 +6,14 @@ import {
   HttpResponse,
 } from '@angular/common/http';
 import { inject } from '@angular/core';
+<<<<<<< HEAD
 import { catchError, throwError, switchMap, filter, take, tap } from 'rxjs';
 import * as Sentry from '@sentry/angular';
+=======
+import { catchError, throwError } from 'rxjs';
+>>>>>>> feat/integracion-front-luis
 import { SessionService } from '../services/session.service';
+import { supabase } from '../supabase';
 
 const SESSION_TRACE_ID = crypto.randomUUID();
 
@@ -16,13 +21,14 @@ function addAuth(req: HttpRequest<unknown>, token: string, userId: string) {
   return req.clone({
     headers: req.headers
       .set('Authorization', `Bearer ${token}`)
+      .set('apikey', 'supabase_anon_key')
       .set('X-User-ID', userId)
       .set('X-Trace-ID', SESSION_TRACE_ID),
   });
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('supabase_token');
   const userId = localStorage.getItem('user_id') ?? '';
   const session = inject(SessionService);
 
@@ -42,6 +48,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }),
     catchError((err: HttpErrorResponse) => {
       if (err.status === 401 && req.url.includes('/api/')) {
+<<<<<<< HEAD
         session.markExpired();
         return session.tokenReady$.pipe(
           filter((t): t is string => t !== null),
@@ -50,6 +57,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             next(addAuth(req, newToken, localStorage.getItem('user_id') ?? ''))
           )
         );
+=======
+        supabase.auth.signOut().then(() => {
+          session.markExpired();
+        });
+>>>>>>> feat/integracion-front-luis
       }
       if (err.status >= 500 || err.status === 0) {
         Sentry.withScope((scope) => {
