@@ -45,7 +45,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private shouldHideSidebar(url: string): boolean {
     const cleanUrl = url.split('?')[0];
-    return cleanUrl === '/' || cleanUrl.startsWith('/login');
+    return cleanUrl === '/'
+      || cleanUrl.startsWith('/login')
+      || cleanUrl.startsWith('/terminos-y-condiciones')
+      || cleanUrl.startsWith('/politica-de-privacidad')
+      || cleanUrl.startsWith('/contacto');
   }
 
   async reAuthenticate() {

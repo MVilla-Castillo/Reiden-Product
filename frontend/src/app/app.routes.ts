@@ -7,11 +7,17 @@ import { LeadsComponent } from './presentation/pages/leads/leads.component';
 import { ReportsComponent } from './presentation/pages/reports/reports.component';
 import { SettingsComponent } from './presentation/pages/settings/settings.component';
 import { ProfileComponent } from './presentation/pages/profile/profile.component';
+import { TermsComponent } from './presentation/pages/legal/terms.component';
+import { PrivacyComponent } from './presentation/pages/legal/privacy.component';
+import { ContactoComponent } from './presentation/pages/contacto/contacto.component';
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
   { path: 'login', component: LoginComponent },
+  { path: 'terminos-y-condiciones', component: TermsComponent },
+  { path: 'politica-de-privacidad', component: PrivacyComponent },
+  { path: 'contacto', component: ContactoComponent },
   { 
     path: 'dashboard', 
     component: DashboardComponent, 

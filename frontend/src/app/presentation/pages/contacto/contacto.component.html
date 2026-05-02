@@ -1,0 +1,121 @@
+<div class="legal-shell">
+  <div class="ambient-bg" aria-hidden="true">
+    <span class="ambient-grid"></span>
+    <span class="ambient-beam beam-a"></span>
+    <span class="ambient-beam beam-b"></span>
+    <span class="ambient-ring ring-a"></span>
+    <span class="ambient-ring ring-b"></span>
+  </div>
+
+  <div class="hero-bg"></div>
+
+  <header class="topbar container">
+    <a class="brand" routerLink="/" aria-label="Inicio Stelard">
+      <img src="/landing/Stelard-logo-completo.svg" alt="Stelard CRM" />
+    </a>
+
+    <a class="topbar-login" routerLink="/login">Iniciar sesion</a>
+  </header>
+
+  <main class="container">
+    <article class="legal-content">
+      <header class="legal-header">
+        <h1>Contacto</h1>
+        <p class="legal-meta">Escribenos y te responderemos a la brevedad.</p>
+      </header>
+
+      @if (submitted()) {
+        <section class="success-banner">
+          <p>Mensaje enviado correctamente. Nos pondremos en contacto contigo pronto.</p>
+          <a class="btn btn-ghost" routerLink="/">Volver al inicio</a>
+        </section>
+      } @else {
+        <form class="contact-form" (ngSubmit)="onSubmit()">
+          <div class="form-row">
+            <label class="form-field">
+              <span>Nombre <span class="required">*</span></span>
+              <input
+                type="text"
+                [(ngModel)]="name"
+                name="name"
+                placeholder="Tu nombre completo"
+                required
+              />
+            </label>
+
+            <label class="form-field">
+              <span>Email <span class="required">*</span></span>
+              <input
+                type="email"
+                [(ngModel)]="email"
+                name="email"
+                placeholder="correo@ejemplo.com"
+                required
+              />
+            </label>
+          </div>
+
+          <label class="form-field">
+            <span>Asunto</span>
+            <select [(ngModel)]="subject" name="subject">
+              <option value="" disabled selected>Selecciona un motivo</option>
+              @for (opt of subjectOptions; track opt) {
+                <option [value]="opt">{{ opt }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span>Mensaje <span class="required">*</span></span>
+            <textarea
+              [(ngModel)]="message"
+              name="message"
+              rows="5"
+              placeholder="Escribe tu mensaje aqui..."
+              required
+            ></textarea>
+          </label>
+
+          @if (errorMessage()) {
+            <p class="form-error">{{ errorMessage() }}</p>
+          }
+
+          <div class="form-actions">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="isLoading()"
+            >
+              @if (isLoading()) {
+                Enviando...
+              } @else {
+                Enviar mensaje
+              }
+            </button>
+          </div>
+        </form>
+      }
+
+      <footer class="legal-back">
+        <a class="btn btn-ghost" routerLink="/">Volver al inicio</a>
+      </footer>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <img src="/landing/Stelard-logo-solo.svg" alt="Stelard" />
+        <p>CRM para automotoras con foco en control comercial.</p>
+      </div>
+
+      <nav class="footer-links" aria-label="Enlaces legales y contacto">
+        <a routerLink="/terminos-y-condiciones">Terminos y condiciones</a>
+        <a routerLink="/politica-de-privacidad">Politica de privacidad</a>
+        <a routerLink="/contacto">Contacto</a>
+        <a href="#">LinkedIn</a>
+        <a href="#">Instagram</a>
+      </nav>
+    </div>
+  </footer>
+</div>
