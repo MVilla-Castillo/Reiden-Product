@@ -60,14 +60,14 @@ import { IconComponent } from './icons.component';
     }
     
     .kpi-inner {
-      padding: 1rem 1.25rem 1.25rem;
+      padding: 0.75rem 1rem;
     }
     
     .kpi-header {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.375rem;
     }
     
     ::ng-deep .kpi-icon-bg {
@@ -87,7 +87,7 @@ import { IconComponent } from './icons.component';
     }
     
     .kpi-value {
-      font-size: 1.75rem;
+      font-size: 1.5rem;
       font-weight: 700;
       color: #0f172a;
       line-height: 1.1;

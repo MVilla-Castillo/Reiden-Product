@@ -9,7 +9,7 @@
       </svg>
       <input
         type="text"
-        placeholder="Buscar por nombre o vehículo…"
+        placeholder="nombre"
         [ngModel]="searchText()"
         (ngModelChange)="searchText.set($event)">
     </div>
@@ -37,6 +37,19 @@
         <option [value]="i">{{ intentLabel(i) }}</option>
       }
     </select>
+
+    @if (salesPersons.length > 0) {
+      <select
+        class="filter-select"
+        [class.is-active]="filterSalesperson()"
+        [ngModel]="filterSalesperson()"
+        (ngModelChange)="filterSalesperson.set($event)">
+        <option value="">Todos los vendedores</option>
+        @for (sp of salesPersons; track sp.id) {
+          <option [value]="sp.id">{{ sp.email }}</option>
+        }
+      </select>
+    }
 
     <div class="filter-dates">
       <input
@@ -130,22 +143,18 @@
                  title="Seleccionar todos los filtrados">
         </th>
         <th>Contacto</th>
-        <th class="sortable" (click)="onSort('vehicle')">
-          Vehículo
-          <span class="sort-icon" [class.active]="sortColumn() === 'vehicle'">
-            {{ sortColumn() === 'vehicle' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
-          </span>
-        </th>
         <th class="sortable" (click)="onSort('intent')">
           Intención
           <span class="sort-icon" [class.active]="sortColumn() === 'intent'">
             {{ sortColumn() === 'intent' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
           </span>
         </th>
-        <th class="sortable" (click)="onSort('status')">
-          Estado
-          <span class="sort-icon" [class.active]="sortColumn() === 'status'">
-            {{ sortColumn() === 'status' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+        <th>Presupuesto</th>
+        <th>Método de Pago</th>
+        <th class="sortable" (click)="onSort('vehicle')">
+          Vehículo
+          <span class="sort-icon" [class.active]="sortColumn() === 'vehicle'">
+            {{ sortColumn() === 'vehicle' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
           </span>
         </th>
         <th class="sortable" (click)="onSort('received')">
@@ -160,13 +169,19 @@
             {{ sortColumn() === 'score' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
           </span>
         </th>
+        <th class="sortable" (click)="onSort('status')">
+          Estado
+          <span class="sort-icon" [class.active]="sortColumn() === 'status'">
+            {{ sortColumn() === 'status' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+          </span>
+        </th>
         @if (canAssign) {
           <th>Asignar A</th>
         }
       </tr>
     </thead>
     <tbody>
-      @for (lead of paginatedLeads; track lead.session_id) {
+      @for (lead of paginatedLeads; track lead.session_id; let i = $index) {
         <tr [class.row-selected]="isSelected(lead.session_id)">
           <td class="col-check">
             <input type="checkbox"
@@ -174,18 +189,18 @@
                    [checked]="isSelected(lead.session_id)"
                    (change)="toggleSelect(lead.session_id)">
           </td>
-          <td class="cell-name" (click)="onContactClick(lead)" style="cursor: pointer; color: var(--color-primary);">{{ lead.lead_profile_name || ('Cliente ' + (lead.lead_phone_hash | slice:0:6)) }}</td>
-          <td>{{ lead.vehicle_type || '—' }}</td>
+          <td class="cell-name" (click)="onContactClick(lead)" style="cursor: pointer; color: var(--color-primary);">
+            <span class="row-num">{{ (currentPage() - 1) * pageSize + i + 1 }}</span>
+            {{ lead.lead_profile_name || ('Cliente ' + (lead.lead_phone_hash | slice:0:6)) }}
+          </td>
           <td>
             <span class="intent-badge intent-{{ (lead.purchase_intent || '') | lowercase }}">
               {{ intentLabel(lead.purchase_intent || '') || '—' }}
             </span>
           </td>
-          <td>
-            <span class="status-badge status-{{ lead.status | lowercase }}">
-              {{ statusLabel(lead.status) }}
-            </span>
-          </td>
+          <td>{{ lead.budget_range || '—' }}</td>
+          <td>{{ lead.payment_method || '—' }}</td>
+          <td>{{ lead.vehicle_type || '—' }}</td>
           <td>
             <span class="waiting-time">{{ lead.created_at | date:'short':'America/Santiago' }}</span>
           </td>
@@ -197,12 +212,20 @@
               {{ lead.urgency_score }} PTS
             </span>
           </td>
+          <td>
+            <span class="status-badge status-{{ lead.status | lowercase }}"
+                  [title]="(lead.status === 'GANADO' || lead.status === 'PERDIDO' || lead.status === 'CON_VENDEDOR') && lead.salesperson_name
+                           ? 'Vendedor: ' + lead.salesperson_name
+                           : ''">
+              {{ statusLabel(lead.status) }}
+            </span>
+          </td>
           @if (canAssign) {
             <td>
               <select class="assign-select" (change)="onAssign(lead.session_id, $event)">
-                <option value="">Seleccionar Asesor…</option>
+                <option value="">Seleccionar…</option>
                 @for (sp of salesPersons; track sp.id) {
-                  <option [value]="sp.id">{{ sp.email }} (Activos: {{ sp.active_sessions_count }})</option>
+                  <option [value]="sp.id">{{ sp.email }}</option>
                 }
               </select>
             </td>
@@ -212,7 +235,7 @@
 
       @if (filteredLeads.length === 0) {
         <tr>
-          <td [attr.colspan]="canAssign ? 8 : 7" style="padding: 0; text-align: center">
+          <td [attr.colspan]="canAssign ? 10 : 9" style="padding: 0; text-align: center">
             <app-empty-state
               [icon]="hasActiveFilters ? '🔍' : '📭'"
               [title]="hasActiveFilters ? 'Sin resultados' : 'No hay leads pendientes'"

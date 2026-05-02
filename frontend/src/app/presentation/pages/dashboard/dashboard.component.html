@@ -20,7 +20,7 @@
 
   <div class="dash-header">
     <div class="dash-header-top">
-      <div class="dash-breadcrumb">Stelard › Dashboard</div>
+      <div class="dash-breadcrumb">{{ tenantSettings()?.nombre_legal || '—' }} › Dashboard</div>
       <div class="dash-header-actions">
         <span class="role-badge">{{ isManager() ? 'Gerente' : 'Vendedor' }}</span>
         @if (isManager() && tenantSettings()) {
@@ -45,7 +45,7 @@
       <div class="kpi-cards">
         @for (i of [1,2,3,4]; track i) {
           <div class="kpi-skeleton">
-            <app-skeleton width="56px" height="56px" radius="14px"></app-skeleton>
+            <app-skeleton width="40px" height="40px" radius="14px"></app-skeleton>
             <div class="kpi-skeleton-content">
               <app-skeleton width="80px" height="32px"></app-skeleton>
               <app-skeleton width="120px" height="16px"></app-skeleton>
@@ -75,7 +75,6 @@
         <app-kpi-card
           icon="clock"
           [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
-          trend="+0%"
           label="T. Respuesta Promedio">
         </app-kpi-card>
         <app-kpi-card
@@ -92,7 +91,6 @@
         <app-kpi-card
           icon="check-circle"
           [value]="metrics()!.funnel.win_rate + '%'"
-          trend="+0%"
           label="Tasa de Cierre">
         </app-kpi-card>
       </div>
@@ -107,7 +105,7 @@
     </div>
     <app-leads-grid
       [leads]="leads()"
-      [salesPersons]="salesPersons()"
+      [salesPersons]="assignableSalesPersons()"
       [canAssign]="isManager()"
       (assignLead)="handleAssignment($event)">
     </app-leads-grid>

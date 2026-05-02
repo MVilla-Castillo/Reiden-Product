@@ -181,6 +181,7 @@ class DjangoLeadRepository(LeadRepository):
         "last_name",
         "phone",
         "email",
+        "profile_name",
         "fsm_state",
         "fsm_substate",
     })

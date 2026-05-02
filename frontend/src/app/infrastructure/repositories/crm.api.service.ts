@@ -53,6 +53,10 @@ export class CrmApiService {
       .pipe(map(res => res.salespeople));
   }
 
+  getMe(): Observable<{ id: string; email: string; role: string }> {
+    return this.http.get<{ id: string; email: string; role: string }>(`${this.baseUrl}/dashboard/me/`);
+  }
+
   // ==========================================
   // PANEL VENDEDOR (CHAT)
   // ==========================================

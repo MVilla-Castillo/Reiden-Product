@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
 import { SseService } from '../../../infrastructure/services/sse.service';
@@ -20,7 +20,7 @@ import { Subscription } from 'rxjs';
       <div class="grid-wrapper">
         <app-leads-grid
           [leads]="leads()"
-          [salesPersons]="salesPersons()"
+          [salesPersons]="assignableSalesPersons()"
           [canAssign]="session.currentRole() === 'manager' && routingMode() === 'MANUAL'"
           (assignLead)="handleAssignment($event)"
           (batchAction)="handleBatchAction($event)">
@@ -41,7 +41,7 @@ import { Subscription } from 'rxjs';
   `,
   styles: [`
     .leads-page {
-      padding: 2rem;
+      padding: 1rem 1.5rem;
       max-width: 1400px;
       margin: 0 auto;
       position: relative;
@@ -52,7 +52,7 @@ import { Subscription } from 'rxjs';
       align-items: center;
       margin-bottom: 2rem;
       background: var(--color-surface);
-      padding: 1.5rem;
+      padding: 1rem;
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow-card);
 
@@ -71,7 +71,7 @@ import { Subscription } from 'rxjs';
     .grid-wrapper {
       background: var(--color-surface);
       border-radius: var(--radius-xl);
-      padding: 1.5rem;
+      padding: 1rem;
       box-shadow: var(--shadow-card);
     }
 
@@ -127,18 +127,40 @@ export class LeadsComponent implements OnInit, OnDestroy {
 
   leads = signal<SessionDto[]>([]);
   salesPersons = signal<SalespersonDto[]>([]);
+  managerProfile = signal<{ id: string; email: string } | null>(null);
   routingMode = signal<'AUTO' | 'MANUAL'>('MANUAL');
   toastMessage = signal<string | null>(null);
   toastType = signal<'success' | 'error'>('success');
   failedAutoLeads = signal<Array<{id: string; phone: string; reason: string}>>([]);
   showFailedModal = signal(false);
+
+  assignableSalesPersons = computed<SalespersonDto[]>(() => {
+    const base = this.salesPersons();
+    const routing = this.routingMode();
+    const mp = this.managerProfile();
+
+    if (routing === 'AUTO' || !mp) return base;
+
+    const managerEntry: SalespersonDto = {
+      id: mp.id,
+      email: mp.email + ' (Yo)',
+      role: 'manager',
+      active_sessions_count: 0,
+    };
+    return [managerEntry, ...base];
+  });
+
   private sseSub?: Subscription;
   private toastTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit() {
+    if (this.session.currentRole() === 'manager') {
+      this.crmApi.getMe().subscribe(me => this.managerProfile.set(me));
+    }
+
     this.sseSub = this.sseService.dashboardStream().subscribe(event => {
       if (event.type === 'snapshot') {
-        this.leads.set(event.data.leads ?? []);
+        this.crmApi.getMyChats().subscribe(leads => this.leads.set(leads));
         this.salesPersons.set(event.data.salespeople ?? []);
         if (event.data.settings?.routing_mode) {
           this.routingMode.set(event.data.settings.routing_mode);

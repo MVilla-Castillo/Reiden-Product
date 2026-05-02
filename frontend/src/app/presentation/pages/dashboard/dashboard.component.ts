@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal, effect } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { CrmApiService } from '../../../infrastructure/repositories/crm.api.service';
@@ -26,6 +26,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   leads = signal<SessionDto[]>([]);
   salesPersons = signal<SalespersonDto[]>([]);
+  managerProfile = signal<{ id: string; email: string } | null>(null);
   metrics = signal<MetricsResponse | null>(null);
   tenantSettings = signal<TenantSettings | null>(null);
 
@@ -33,6 +34,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isRefreshing = signal(false);
   metricsError = signal(false);
   sseReconnecting = signal(false);
+
+  assignableSalesPersons = computed<SalespersonDto[]>(() => {
+    const base = this.salesPersons();
+    const routing = this.tenantSettings()?.routing_mode;
+    const mp = this.managerProfile();
+
+    if (routing === 'AUTO' || !mp) return base;
+
+    const managerEntry: SalespersonDto = {
+      id: mp.id,
+      email: mp.email + ' (Yo)',
+      role: 'manager',
+      active_sessions_count: 0,
+    };
+    return [managerEntry, ...base];
+  });
 
   private sseSub?: Subscription;
   private metricsBackupInterval?: ReturnType<typeof setInterval>;
@@ -45,6 +62,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this._loadMetrics();
+
+    if (this.isManager()) {
+      this.crmApi.getMe().subscribe(me => this.managerProfile.set(me));
+    }
 
     // Backup automático cada hora: sincroniza con BD por si se perdieron eventos SSE
     this.metricsBackupInterval = setInterval(() => this._loadMetrics(), METRICS_BACKUP_MS);

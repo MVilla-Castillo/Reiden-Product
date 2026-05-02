@@ -188,6 +188,10 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
     if not tenant:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
+    user = getattr(request, "user", None)
+    if user and user.role not in (AppUser.Role.MANAGER, AppUser.Role.ADMIN):
+        return JsonResponse({"error": "Acceso restringido a gerentes."}, status=403)
+
     session_repo = DIContainer.instance().session_repo
     lead_repo = DIContainer.instance().lead_repo
 
@@ -297,6 +301,7 @@ def me_api(request):
     if not user or not user.is_authenticated:
         return JsonResponse({"error": "Unauthorized"}, status=401)
     return JsonResponse({
+        "id": str(user.id),
         "email": user.email,
         "role": user.role.lower(),  # 'manager', 'salesperson', 'admin'
     })

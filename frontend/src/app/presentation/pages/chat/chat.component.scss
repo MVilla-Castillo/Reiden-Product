@@ -6,7 +6,7 @@
 }
 
 .chat-sidebar {
-  width: 260px;
+  width: 210px;
   background: var(--color-surface);
   border-right: 1px solid #e0e4ed;
   display: flex;
@@ -189,13 +189,6 @@
   margin-right: 0.25rem;
 }
 
-.name-history-entry {
-  .drawer-meta {
-    font-size: var(--font-xs);
-    color: var(--color-muted);
-  }
-}
-
 .loading-more {
   display: flex;
   align-items: center;
@@ -315,6 +308,7 @@
   flex-direction: column;
   overflow: hidden;
   animation: slideInDrawer 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 100vh;
 }
 
 @keyframes slideInDrawer {
@@ -339,6 +333,7 @@
 
 .drawer-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.75rem 1rem;
   display: flex;
@@ -364,49 +359,6 @@
   font-size: var(--font-sm);
   color: #374151;
   font-weight: 500;
-  &.monospace { font-family: 'Courier New', monospace; font-size: var(--font-sm); }
-}
-
-.drawer-badge {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  font-size: var(--font-xs);
-  font-weight: 600;
-  width: fit-content;
-
-  &.status-con_vendedor       { background: var(--color-info-bg); color: var(--color-info); }
-  &.status-ganado             { background: var(--color-success-bg); color: var(--color-success-text); }
-  &.status-perdido            { background: var(--color-danger-bg); color: var(--color-danger-text); }
-  &.status-pending_assignment { background: var(--color-warning-bg); color: var(--color-warning-text); }
-  &.status-bot                { background: var(--color-muted-bg); color: #374151; }
-  &.status-abandoned          { background: #f5f3ff; color: #6d28d9; }
-}
-
-.urgency-bar-wrap {
-  height: 6px;
-  background: var(--color-bg);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-top: 0.15rem;
-}
-
-.urgency-bar {
-  height: 100%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #4ade80, #facc15, #f87171);
-  transition: width 0.3s ease;
-}
-
-.urgency-value {
-  font-size: var(--font-xs);
-  color: var(--color-muted);
-}
-
-.drawer-divider {
-  height: 1px;
-  background: #f0f2f5;
-  margin: 0.25rem 0;
 }
 
 .drawer-actions {
@@ -481,54 +433,6 @@
     cursor: pointer;
     &:hover { opacity: 0.75; }
   }
-}
-
-/* EC-1: Collapsible drawer sections */
-.drawer-group {
-  border: 1px solid #f0f2f5;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  & + .drawer-group { margin-top: 0.5rem; }
-}
-
-.drawer-group-title {
-  list-style: none;
-  padding: 0.5rem 0.75rem;
-  font-size: var(--font-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #6b7280;
-  background: #f9fafb;
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-
-  .drawer-chevron {
-    transition: transform 0.15s;
-  }
-}
-
-details[open] .drawer-group-title .drawer-chevron { transform: rotate(0deg); }
-details:not([open]) .drawer-group-title .drawer-chevron { transform: rotate(-90deg); }
-
-.drawer-group-content {
-  padding: 0.5rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.drawer-section.empty-field {
-  opacity: 0.6;
-}
-
-.drawer-value.muted {
-  color: #9ca3af;
-  font-style: italic;
-  font-weight: 400;
 }
 
 /* EC-2: File upload */

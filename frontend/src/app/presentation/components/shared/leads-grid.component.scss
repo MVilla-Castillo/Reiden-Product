@@ -2,22 +2,23 @@
   background: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .leads-filters {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 1rem 1.25rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   background: #fafafa;
 }
 
 .filter-search {
   position: relative;
-  flex: 1 1 220px;
+  flex: 0 0 160px;
   min-width: 0;
 
   .search-icon {
@@ -50,7 +51,7 @@
 }
 
 .filter-select {
-  padding: 0.48rem 0.75rem;
+  padding: 0.38rem 0.5rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-sm);
@@ -60,6 +61,8 @@
   outline: none;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
+  min-width: 115px;
+  flex-shrink: 0;
 
   &:focus { border-color: #93c5fd; }
 
@@ -73,11 +76,11 @@
 .filter-dates {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   flex-shrink: 0;
 
   .filter-date {
-    padding: 0.48rem 0.5rem;
+    padding: 0.38rem 0.4rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     font-size: var(--font-sm);
@@ -87,6 +90,7 @@
     outline: none;
     cursor: pointer;
     transition: border-color 0.15s;
+    width: 105px;
 
     &:focus  { border-color: #93c5fd; }
     &.is-active { border-color: var(--color-info); background: var(--color-info-bg); color: var(--color-info); }
@@ -100,7 +104,7 @@
 }
 
 .btn-clear-filters {
-  padding: 0.48rem 0.75rem;
+  padding: 0.38rem 0.6rem;
   background: var(--color-danger-bg);
   border: none;
   border-radius: var(--radius-md);
@@ -117,7 +121,7 @@
 }
 
 .filter-summary {
-  padding: 0.45rem 1.25rem;
+  padding: 0.375rem 1rem;
   font-size: var(--font-sm);
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-bg);
@@ -135,7 +139,7 @@
     background: #f9fafb;
 
     th {
-      padding: 1rem 1.25rem;
+      padding: 0.4rem 0.625rem;
       text-align: left;
       font-size: var(--font-xs);
       font-weight: 600;
@@ -143,6 +147,17 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       border-bottom: 1px solid var(--color-border);
+
+      &:nth-child(1) { width: 36px; }
+      &:nth-child(2) { width: 140px; }
+      &:nth-child(3) { width: 80px; }
+      &:nth-child(4) { width: 95px; }
+      &:nth-child(5) { width: 100px; }
+      &:nth-child(6) { width: 90px; }
+      &:nth-child(7) { width: 105px; }
+      &:nth-child(8) { width: 62px; }
+      &:nth-child(9) { width: 110px; }
+      &:nth-child(10) { width: 115px; }
 
       &.sortable {
         cursor: pointer;
@@ -162,7 +177,7 @@
     }
 
     td {
-      padding: 1rem 1.25rem;
+      padding: 0.4rem 0.625rem;
       font-size: var(--font-sm);
       color: #374151;
       vertical-align: middle;
@@ -198,6 +213,13 @@
 .cell-name {
   font-weight: 500;
   color: #111827;
+}
+
+.row-num {
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+  font-weight: 500;
+  margin-right: 0.375rem;
 }
 
 .intent-badge {
@@ -256,7 +278,7 @@
 }
 
 .col-check {
-  width: 40px;
+  width: 36px;
   padding-left: 1rem !important;
   padding-right: 0 !important;
 }
@@ -327,14 +349,15 @@
 .btn-batch-clear  { background: transparent; color: var(--color-muted); border: 1px solid #d1d5db; }
 
 .assign-select {
-  padding: 0.4rem 0.5rem;
+  padding: 0.3rem 0.35rem;
   border: 1px solid #d1d5db;
   border-radius: var(--radius-sm);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
   color: #374151;
   background: var(--color-surface);
   cursor: pointer;
-  min-width: 180px;
+  min-width: 0;
+  width: 100%;
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
@@ -347,7 +370,7 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  padding: 1rem;
+  padding: 0.625rem 1rem;
   border-top: 1px solid var(--color-bg);
   background: #f9fafb;
 }

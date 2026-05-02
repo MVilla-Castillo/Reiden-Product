@@ -104,10 +104,10 @@ class AssignLeadUseCase:
 
         if salesperson_id is not None and not isinstance(salesperson_id, str):
             sp = self._user_repo.find_by_id_and_tenant(
-                salesperson_id, tenant_id, role="SALESPERSON"
+                salesperson_id, tenant_id
             )
             if sp is None:
-                raise ValueError("Vendedor no encontrado en este tenant")
+                raise ValueError("Usuario no encontrado en este tenant")
 
             with transaction.atomic():
                 result = self._session_repo.assign_salesperson(

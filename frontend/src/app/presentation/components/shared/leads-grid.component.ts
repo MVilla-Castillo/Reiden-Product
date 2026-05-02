@@ -53,6 +53,7 @@ export class LeadsGridComponent {
   filterPurchaseIntent = signal('');
   filterDateFrom      = signal('');
   filterDateTo        = signal('');
+  filterSalesperson   = signal('');
 
   // ── Estado de ordenamiento ────────────────────────────────────────────
   sortColumn = signal('');
@@ -64,6 +65,7 @@ export class LeadsGridComponent {
 
   // ── Paginación ────────────────────────────────────────────────────
   private readonly PAGE_SIZE = 15;
+  get pageSize(): number { return this.PAGE_SIZE; }
   currentPage = signal(1);
 
   // ── Opciones estáticas predefinidas (no dependen de datos) ───────────────
@@ -82,6 +84,7 @@ export class LeadsGridComponent {
     const intent = this.filterPurchaseIntent();
     const from   = this.filterDateFrom();
     const to     = this.filterDateTo();
+    const sp     = this.filterSalesperson();
     const col    = this.sortColumn();
     const dir    = this.sortDirection();
 
@@ -93,6 +96,7 @@ export class LeadsGridComponent {
       }
       if (status && lead.status !== status) return false;
       if (intent && lead.purchase_intent !== intent) return false;
+      if (sp && lead.salesperson_id !== sp) return false;
       const datePart = lead.created_at?.substring(0, 10) ?? '';
       if (from && datePart < from) return false;
       if (to   && datePart > to)   return false;
@@ -157,7 +161,8 @@ export class LeadsGridComponent {
       this.filterStatus()         ||
       this.filterPurchaseIntent() ||
       this.filterDateFrom()       ||
-      this.filterDateTo()
+      this.filterDateTo()         ||
+      this.filterSalesperson()
     );
   }
 
@@ -167,6 +172,7 @@ export class LeadsGridComponent {
     this.filterPurchaseIntent.set('');
     this.filterDateFrom.set('');
     this.filterDateTo.set('');
+    this.filterSalesperson.set('');
     this.sortColumn.set('');
     this.sortDirection.set('asc');
     this.resetPage();

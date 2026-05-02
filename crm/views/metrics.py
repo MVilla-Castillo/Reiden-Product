@@ -13,6 +13,7 @@ from django.http import HttpRequest, JsonResponse
 from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
+from crm.models import AppUser
 
 
 def metrics_api(request: HttpRequest) -> JsonResponse:
@@ -23,6 +24,10 @@ def metrics_api(request: HttpRequest) -> JsonResponse:
     tenant = getattr(request, "tenant", None)
     if not tenant:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    user = getattr(request, "user", None)
+    if user and user.role not in (AppUser.Role.MANAGER, AppUser.Role.ADMIN):
+        return JsonResponse({"error": "Acceso restringido a gerentes."}, status=403)
 
     rate_key = f"metrics:{tenant.id}"
     if not check_rate_limit(rate_key, max_requests=30, window=60):

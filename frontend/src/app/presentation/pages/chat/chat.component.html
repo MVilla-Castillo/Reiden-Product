@@ -186,159 +186,34 @@
       </div>
 
       <div class="drawer-body">
-
-        <!-- Sección 1: Datos del Cliente -->
-        <details class="drawer-group" open>
-          <summary class="drawer-group-title">
-            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
-            Datos del Cliente
-          </summary>
-          <div class="drawer-group-content">
-            <div class="drawer-section">
-              <span class="drawer-label">Estado</span>
-              <span class="drawer-badge status-{{ selectedSession()!.status | lowercase }}">
-                {{ selectedSession()!.status }}
-              </span>
-            </div>
-            <div class="drawer-section">
-              <span class="drawer-label">Puntuación de urgencia</span>
-              <div class="urgency-bar-wrap">
-                <div class="urgency-bar" [style.width.%]="selectedSession()!.urgency_score"></div>
-              </div>
-              <span class="urgency-value">{{ selectedSession()!.urgency_score }} / 100</span>
-            </div>
-            @if (selectedSession()!.purchase_intent) {
-              <div class="drawer-section">
-                <span class="drawer-label">Intención de compra</span>
-                <span class="drawer-value">{{ selectedSession()!.purchase_intent }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Intención de compra</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-          </div>
-        </details>
-
-        <!-- Sección 2: Vehículo y Financiamiento -->
-        <details class="drawer-group" open>
-          <summary class="drawer-group-title">
-            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
-            Vehículo y Financiamiento
-          </summary>
-          <div class="drawer-group-content">
-            @if (selectedSession()!.vehicle_type) {
-              <div class="drawer-section">
-                <span class="drawer-label">Vehículo de interés</span>
-                <span class="drawer-value">{{ selectedSession()!.vehicle_type }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Vehículo de interés</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-            @if (selectedSession()!.payment_method) {
-              <div class="drawer-section">
-                <span class="drawer-label">Método de pago</span>
-                <span class="drawer-value">{{ selectedSession()!.payment_method }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Método de pago</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-            @if (selectedSession()!.budget_range) {
-              <div class="drawer-section">
-                <span class="drawer-label">Rango de presupuesto</span>
-                <span class="drawer-value">{{ selectedSession()!.budget_range }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Rango de presupuesto</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-          </div>
-        </details>
-
-        <!-- Sección 3: Información de Contacto -->
-        <details class="drawer-group" open>
-          <summary class="drawer-group-title">
-            <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
-            Información de Contacto
-          </summary>
-          <div class="drawer-group-content">
-            @if (selectedSession()!.acquisition_source) {
-              <div class="drawer-section">
-                <span class="drawer-label">Origen</span>
-                <span class="drawer-value">{{ selectedSession()!.acquisition_source }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Origen</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-            @if (selectedSession()!.fsm_step) {
-              <div class="drawer-section">
-                <span class="drawer-label">Paso en el bot</span>
-                <span class="drawer-value monospace">{{ selectedSession()!.fsm_step }}</span>
-              </div>
-            } @else {
-              <div class="drawer-section empty-field">
-                <span class="drawer-label">Paso en el bot</span>
-                <span class="drawer-value muted">Sin información</span>
-              </div>
-            }
-            @if (selectedSession()!.created_at) {
-              <div class="drawer-section">
-                <span class="drawer-label">Creado</span>
-                <span class="drawer-value">{{ selectedSession()!.created_at | date:'dd/MM/yy HH:mm' }}</span>
-              </div>
-            }
-            @if (selectedSession()!.salesperson_name) {
-              <div class="drawer-section">
-                <span class="drawer-label">Vendedor</span>
-                <span class="drawer-value">{{ selectedSession()!.salesperson_name }}</span>
-              </div>
-            } @else if (selectedSession()!.assigned_at) {
-              <div class="drawer-section">
-                <span class="drawer-label">Asignado</span>
-                <span class="drawer-value">{{ selectedSession()!.assigned_at | date:'dd/MM/yy HH:mm' }}</span>
-              </div>
-            }
-          </div>
-        </details>
-
-        @if (nameHistory().length > 0) {
-          <details class="drawer-group">
-            <summary class="drawer-group-title">
-              <app-icon name="chevron-down" [size]="14" [cssClass]="'drawer-chevron'"></app-icon>
-              Historial de nombres
-            </summary>
-            <div class="drawer-group-content">
-              @for (entry of nameHistory(); track entry.changed_at) {
-                <div class="drawer-section name-history-entry">
-                  <span class="drawer-value">{{ entry.old_name || '(sin nombre)' }} → {{ entry.new_name }}</span>
-                  <span class="drawer-meta">{{ entry.changed_by }} • {{ entry.changed_at | date:'dd/MM/yy HH:mm' }}</span>
-                </div>
-              }
-            </div>
-          </details>
-        }
-
-        <div class="drawer-divider"></div>
+        <div class="drawer-section">
+          <span class="drawer-label">Tipo de Vehículo</span>
+          <span class="drawer-value">{{ selectedSession()?.vehicle_type || '—' }}</span>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-label">Método de Pago</span>
+          <span class="drawer-value">{{ selectedSession()?.payment_method || '—' }}</span>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-label">Presupuesto</span>
+          <span class="drawer-value">{{ selectedSession()?.budget_range || '—' }}</span>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-label">Interés</span>
+          <span class="drawer-value">{{ selectedSession()?.purchase_intent || '—' }}</span>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-label">Creado en</span>
+          <span class="drawer-value">{{ selectedSession()?.created_at | date:'dd/MM/yy HH:mm' }}</span>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-label">Vendedor</span>
+          <span class="drawer-value">{{ selectedSession()?.salesperson_name || '—' }}</span>
+        </div>
 
         <div class="drawer-actions">
-          <button class="btn-drawer-action btn-ganado" (click)="updateStatus('GANADO')">
-            ✓ Marcar Ganado
-          </button>
-          <button class="btn-drawer-action btn-perdido" (click)="updateStatus('PERDIDO')">
-            ✕ Marcar Perdido
-          </button>
+          <button class="btn-drawer-action btn-ganado" (click)="updateStatus('GANADO')">Ganado</button>
+          <button class="btn-drawer-action btn-perdido" (click)="updateStatus('PERDIDO')">Perdido</button>
         </div>
       </div>
     </aside>
