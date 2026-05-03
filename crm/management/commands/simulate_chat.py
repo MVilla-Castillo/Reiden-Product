@@ -28,7 +28,7 @@ class Command(BaseCommand):
         # 2. Configuración de URLs y Secretos
         # Nota: Asegúrate de que 'runserver' esté en el puerto 8000
         worker_url = "http://127.0.0.1:8000/api/workers/process-message/"
-        secret = settings.CLOUD_TASKS_INTERNAL_SECRET
+        secret = settings.INTERNAL_SECRET
         phone_lead = "56999999999"
 
         # 3. Flujo de conversación (Cuerpo del mensaje)

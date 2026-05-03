@@ -12,6 +12,7 @@ Autenticación: X-Internal-Secret (mismo secreto que el worker).
 from __future__ import annotations
 
 import logging
+import secrets as _secrets
 
 from django.db import transaction
 from django.http import HttpRequest, JsonResponse
@@ -232,5 +233,7 @@ def _authenticate(request: HttpRequest) -> bool:
     internal_secret = request.headers.get("X-Internal-Secret", "")
     from django.conf import settings
 
-    expected = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
-    return bool(internal_secret and internal_secret == expected)
+    expected = getattr(settings, "INTERNAL_SECRET", "")
+    if not expected:
+        return False
+    return _secrets.compare_digest(internal_secret, expected)

@@ -1,5 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
-import { Observable, from, switchMap } from 'rxjs';
+import { Observable, from, switchMap, retry, timer } from 'rxjs';
 
 export interface SseEvent {
   type: string;
@@ -59,7 +59,8 @@ export class SseService {
         };
 
         es.onerror = () => {
-          this.ngZone.run(() => observer.next({ type: 'sse_reconnecting', data: null }));
+          es.close();
+          this.ngZone.run(() => observer.error(new Error('sse_error')));
         };
 
         return () => {
@@ -68,7 +69,11 @@ export class SseService {
           }
           es.close();
         };
-      }))
+      })),
+      retry({
+        count: 10,
+        delay: (_, attempt) => timer(Math.min(30_000, 1_000 * 2 ** attempt)),
+      })
     );
   }
 

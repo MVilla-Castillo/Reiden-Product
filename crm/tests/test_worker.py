@@ -44,7 +44,7 @@ def _make_payload(message_sid: str = "SMtest0000000000000000000000001") -> dict:
 
 
 def _post_to_worker(client: Client, payload: dict) -> object:
-    internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
+    internal_secret = settings.INTERNAL_SECRET
     return client.post(
         "/api/workers/process-message/",
         data=json.dumps(payload),
@@ -175,7 +175,7 @@ def test_invalid_json_body_returns_400() -> None:
     ASSERT: 400 Bad Request.
     """
     client = Client()
-    internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
+    internal_secret = settings.INTERNAL_SECRET
 
     response = client.post(
         "/api/workers/process-message/",

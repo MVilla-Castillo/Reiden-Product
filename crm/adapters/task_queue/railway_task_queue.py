@@ -123,7 +123,7 @@ class RailwayTaskQueue(TaskQueue):
 
     def enqueue(self, request: EnqueueRequest) -> EnqueueResult:
         worker_url: str = f"{settings.WORKER_BASE_URL}/api/workers/process-message/"
-        internal_secret: str = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
+        internal_secret: str = getattr(settings, "INTERNAL_SECRET", "")
 
         return _do_http_dispatch(
             worker_url=worker_url,
@@ -143,7 +143,7 @@ class HttpDispatchQueue(TaskQueue):
 
     def enqueue(self, request: EnqueueRequest) -> EnqueueResult:
         worker_url: str = f"{settings.WORKER_BASE_URL}/api/workers/process-message/"
-        internal_secret: str = getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
+        internal_secret: str = getattr(settings, "INTERNAL_SECRET", "")
 
         logger.info(
             "MODO LOCAL: Despachando payload al worker vía HTTP.",

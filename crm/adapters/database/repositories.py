@@ -158,13 +158,12 @@ class DjangoLeadRepository(LeadRepository):
             for m in Lead.objects.filter(tenant_id=tenant_id, is_deleted=False)
         ]
 
-    def find_wa_id(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID | None = None
-    ) -> str | None:
-        filters: dict[str, uuid.UUID | bool] = {"id": lead_id, "is_deleted": False}
-        if tenant_id is not None:
-            filters["tenant_id"] = tenant_id
-        result = Lead.objects.filter(**filters).values_list("wa_id", flat=True).first()
+    def find_wa_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> str | None:
+        result = (
+            Lead.objects.filter(id=lead_id, tenant_id=tenant_id, is_deleted=False)
+            .values_list("wa_id", flat=True)
+            .first()
+        )
         if result is None:
             return None
         return decrypt(result)
@@ -967,6 +966,44 @@ class DjangoUserRepository(UserRepository):
                 "name": sp["email"].split("@")[0],
                 "email": sp["email"],
                 "active_sessions_count": sp["active_sessions_count"],
+            }
+            for sp in salespeople
+        ]
+
+    def find_salespeople_by_tenant_locked(self, tenant_id: uuid.UUID) -> list[dict[str, Any]]:
+        from django.db.models import OuterRef, Subquery
+
+        session_counts = (
+            ChatSession.objects.filter(
+                salesperson_id=OuterRef("id"),
+                status__in=[
+                    ChatSession.Status.CON_VENDEDOR,
+                    ChatSession.Status.PENDING_ASSIGNMENT,
+                    ChatSession.Status.BOT,
+                ],
+                is_deleted=False,
+            )
+            .values("salesperson_id")
+            .annotate(count=models.Count("id"))
+            .values("count")
+        )
+
+        salespeople = (
+            AppUser.objects.select_for_update()
+            .filter(
+                tenant_id=tenant_id,
+                role=AppUser.Role.SALESPERSON,
+                is_active=True,
+            )
+            .annotate(active_sessions_count=Subquery(session_counts))
+            .values("id", "email", "active_sessions_count")
+        )
+        return [
+            {
+                "id": sp["id"],
+                "name": sp["email"].split("@")[0],
+                "email": sp["email"],
+                "active_sessions_count": sp["active_sessions_count"] or 0,
             }
             for sp in salespeople
         ]

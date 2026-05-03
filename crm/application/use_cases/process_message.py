@@ -45,6 +45,8 @@ from core.log_utils import mask_pii, stage_start, stage_end, tenant_id_var
 
 logger = logging.getLogger(__name__)
 
+_MAX_PROFILE_NAME_LENGTH = 100
+
 
 @dataclass(frozen=True)
 class ProcessMessageResult:
@@ -164,6 +166,8 @@ class ProcessMessageUseCase:
         # UC-A01: Guardar ProfileName si es primera sesión y viene en payload
         profile_name = payload.get("ProfileName")
         if profile_name and not lead.profile_name:
+            if len(profile_name) > _MAX_PROFILE_NAME_LENGTH:
+                profile_name = profile_name[:_MAX_PROFILE_NAME_LENGTH]
             self._lead_repo.update(lead.id, tenant_id, {"profile_name": profile_name})
 
         stage_end(

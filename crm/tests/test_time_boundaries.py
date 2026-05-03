@@ -48,7 +48,7 @@ def _post_to_worker(client: Client, payload: dict):
     from django.conf import settings
     import json
 
-    internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
+    internal_secret = settings.INTERNAL_SECRET
     return client.post(
         "/api/workers/process-message/",
         data=json.dumps(payload),

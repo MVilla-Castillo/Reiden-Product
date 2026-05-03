@@ -14,6 +14,7 @@ import pytest
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
+from django.conf import settings
 from django.test import Client
 from django.utils import timezone
 
@@ -110,7 +111,7 @@ class TestSchedulerCleanupBot:
         """Verifica que sesiones BOT > 4h se marcan como ABANDONO_BOT."""
         response = client.post(
             "/api/schedulers/cleanup-bot/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -127,7 +128,7 @@ class TestSchedulerCleanupBot:
         """Verifica que se crea AuditLog con acción SCHEDULER_CLEANUP_BOT."""
         response = client.post(
             "/api/schedulers/cleanup-bot/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -145,7 +146,7 @@ class TestSchedulerCleanupBot:
         """Sesiones BOT recientes (< 4h) no deben ser limpiadas."""
         response = client.post(
             "/api/schedulers/cleanup-bot/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -174,7 +175,7 @@ class TestSchedulerCleanupBot:
 
         response = client.post(
             "/api/schedulers/cleanup-bot/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -202,7 +203,7 @@ class TestSchedulerCleanupBot:
         """Método GET no debe ser permitido."""
         response = client.get(
             "/api/schedulers/cleanup-bot/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 405
@@ -217,7 +218,7 @@ class TestSchedulerCleanupSales:
         """Verifica que sesiones CON_VENDEDOR > 7d se marcan como PERDIDO."""
         response = client.post(
             "/api/schedulers/cleanup-sales/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -234,7 +235,7 @@ class TestSchedulerCleanupSales:
         """Verifica que se crea AuditLog con acción SCHEDULER_CLEANUP_SALES."""
         response = client.post(
             "/api/schedulers/cleanup-sales/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -262,7 +263,7 @@ class TestSchedulerTtlWarning:
         """Verifica que se envía notificación de TTL warning."""
         response = client.post(
             "/api/schedulers/ttl-warning/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -285,7 +286,7 @@ class TestSchedulerTtlWarning:
 
         response = client.post(
             "/api/schedulers/ttl-warning/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -303,7 +304,7 @@ class TestSchedulerTtlWarning:
 
         response = client.post(
             "/api/schedulers/ttl-warning/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200
@@ -327,7 +328,7 @@ class TestSchedulerCleanupRateLimits:
 
         response = client.post(
             "/api/schedulers/cleanup-rate-limits/",
-            HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+            HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
         )
 
         assert response.status_code == 200

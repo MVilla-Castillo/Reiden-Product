@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 from typing import Any
 
 from django.http import HttpRequest, JsonResponse
@@ -24,17 +25,26 @@ from crm.adapters.dependency_injection import get_use_case
 
 logger = logging.getLogger(__name__)
 
+_MAX_BODY_LENGTH = 4096
+
 
 @csrf_exempt
 @require_POST
 def process_message_worker_view(request: HttpRequest) -> JsonResponse:
     internal_secret = request.headers.get("X-Internal-Secret", "")
-    if not internal_secret or internal_secret != _get_internal_secret():
+    if not secrets.compare_digest(internal_secret, _get_internal_secret()):
         logger.warning(
             "Worker: secreto interno inválido.",
             extra={"component_name": "process_message_worker"},
         )
         return JsonResponse({"error": "Forbidden"}, status=403)
+
+    if len(request.body) > _MAX_BODY_LENGTH:
+        logger.warning(
+            "Worker: payload excede tamaño máximo.",
+            extra={"component_name": "process_message_worker", "size": len(request.body)},
+        )
+        return JsonResponse({"error": "Payload Too Large"}, status=413)
 
     try:
         payload: dict[str, Any] = json.loads(request.body)
@@ -101,4 +111,4 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
 def _get_internal_secret() -> str:
     from django.conf import settings
 
-    return getattr(settings, "CLOUD_TASKS_INTERNAL_SECRET", "")
+    return getattr(settings, "INTERNAL_SECRET", "")

@@ -73,43 +73,39 @@ class AssignLeadUseCase:
         old_status = session.status
         old_salesperson_id = session.salesperson_id
 
-        # Auto-assign: buscar vendedor con menor carga
-        if salesperson_id == "AUTO":
+        is_auto = salesperson_id == "AUTO"
+
+        if is_auto:
             tenant = self._tenant_repo.find_by_id(tenant_id)
             if tenant is None or tenant.get("routing_mode") != "AUTO":
                 raise ValueError("Routing AUTO no habilitado para este tenant")
 
-            salespeople = self._user_repo.find_salespeople_by_tenant(tenant_id)
-            if not salespeople:
-                raise ValueError("No hay vendedores disponibles en este tenant")
-
-            # Ordenar por menor carga de sesiones activas
-            salespeople_sorted = sorted(
-                salespeople, key=lambda x: x["active_sessions_count"]
-            )
-            selected = salespeople_sorted[0]
-            salesperson_id = selected["id"]
-
-            logger.info(
-                "Auto-assign Round-Robin",
-                extra={
-                    "component_name": "assign_lead_use_case",
-                    "tenant_id": str(tenant_id),
-                    "trace_id": trace_id_var.get() or "",
-                    "session_id": str(session_id),
-                    "selected_salesperson": selected["email"],
-                    "active_sessions": selected["active_sessions_count"],
-                },
-            )
-
-        if salesperson_id is not None and not isinstance(salesperson_id, str):
-            sp = self._user_repo.find_by_id_and_tenant(
-                salesperson_id, tenant_id
-            )
+        if not is_auto and salesperson_id is not None and not isinstance(salesperson_id, str):
+            sp = self._user_repo.find_by_id_and_tenant(salesperson_id, tenant_id)
             if sp is None:
                 raise ValueError("Usuario no encontrado en este tenant")
 
+        if is_auto or (salesperson_id is not None and not isinstance(salesperson_id, str)):
             with transaction.atomic():
+                if is_auto:
+                    salespeople = self._user_repo.find_salespeople_by_tenant_locked(tenant_id)
+                    if not salespeople:
+                        raise ValueError("No hay vendedores disponibles en este tenant")
+                    selected = min(salespeople, key=lambda x: x["active_sessions_count"])
+                    salesperson_id = selected["id"]
+                    sp = selected
+                    logger.info(
+                        "Auto-assign Round-Robin",
+                        extra={
+                            "component_name": "assign_lead_use_case",
+                            "tenant_id": str(tenant_id),
+                            "trace_id": trace_id_var.get() or "",
+                            "session_id": str(session_id),
+                            "selected_salesperson": selected["email"],
+                            "active_sessions": selected["active_sessions_count"],
+                        },
+                    )
+
                 result = self._session_repo.assign_salesperson(
                     session_id, tenant_id, salesperson_id
                 )

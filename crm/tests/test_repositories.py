@@ -140,14 +140,14 @@ def test_lead_find_wa_id(lead_repo: DjangoLeadRepository, tenant: Tenant) -> Non
         wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
     )
 
-    result = lead_repo.find_wa_id(lead.id)
+    result = lead_repo.find_wa_id(lead.id, tenant.id)
 
     assert result == wa_id
 
 
 @pytest.mark.django_db
-def test_lead_find_wa_id_not_found(lead_repo: DjangoLeadRepository) -> None:
-    result = lead_repo.find_wa_id(uuid.uuid4())
+def test_lead_find_wa_id_not_found(lead_repo: DjangoLeadRepository, tenant: Tenant) -> None:
+    result = lead_repo.find_wa_id(uuid.uuid4(), tenant.id)
     assert result is None
 
 

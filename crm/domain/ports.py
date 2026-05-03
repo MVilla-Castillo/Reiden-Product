@@ -158,8 +158,8 @@ class LeadRepository(Protocol):
         """Retorna todos los Leads activos de un tenant."""
         ...
 
-    def find_wa_id(self, lead_id: UUID, tenant_id: UUID | None = None) -> str | None:
-        """Retorna el wa_id decifrado de un Lead por su ID, opcionalmente filtrado por tenant."""
+    def find_wa_id(self, lead_id: UUID, tenant_id: UUID) -> str | None:
+        """Retorna el wa_id decifrado de un Lead por su ID, siempre filtrado por tenant."""
         ...
 
     def update(self, lead_id: UUID, tenant_id: UUID, data: dict[str, Any]) -> None:
@@ -341,6 +341,11 @@ class UserRepository(Protocol):
 
     def find_salespeople_by_tenant(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """Retorna vendedores del tenant con conteo de sesiones activas."""
+        ...
+
+    def find_salespeople_by_tenant_locked(self, tenant_id: UUID) -> list[dict[str, Any]]:
+        """Igual que find_salespeople_by_tenant pero con SELECT FOR UPDATE.
+        Debe llamarse dentro de transaction.atomic()."""
         ...
 
     def find_by_id_and_tenant(

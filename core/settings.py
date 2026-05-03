@@ -178,10 +178,8 @@ TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")
 TWILIO_CONTENT_SIDS = env.json("TWILIO_CONTENT_SIDS", default={})
 
 
-# Internal secret to authenticate Cloud Tasks → Django Worker callbacks (Sprint 3)
-CLOUD_TASKS_INTERNAL_SECRET = env(
-    "CLOUD_TASKS_INTERNAL_SECRET", default="dev-internal-secret-change-in-prod"
-)
+# Internal secret to authenticate RailwayTaskQueue → Django Worker callbacks + schedulers
+INTERNAL_SECRET = env("INTERNAL_SECRET")
 
 # WA ID Encryption (PII Compliance — AES-256 via Fernet)
 # Generate a key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

@@ -17,12 +17,15 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.application.use_cases.send_outbound_message import MessageDeliveryError
-from crm.models import Lead, LeadNameHistory
+from crm.models import AppUser, Lead, LeadNameHistory
 
 logger = logging.getLogger(__name__)
+
+_CLOSED_STATUSES = {"GANADO", "PERDIDO", "ABANDONO_BOT"}
 
 
 @require_http_methods(["GET"])
@@ -86,6 +89,23 @@ def send_message_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
+    rate_key = f"write:send:{request.user.id}"
+    if not check_rate_limit(rate_key, max_requests=20, window=60):
+        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+
+    _session = DIContainer.instance().session_repo.find_by_id(session_id, request.tenant.id)
+    if _session is None:
+        return JsonResponse({"error": "Sesión no encontrada"}, status=404)
+
+    if (
+        request.user.role != AppUser.Role.MANAGER
+        and _session.salesperson_id != request.user.id
+    ):
+        return JsonResponse(
+            {"error": "Solo el vendedor asignado o el manager puede enviar mensajes."},
+            status=403,
+        )
+
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -145,6 +165,16 @@ def send_message_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    rate_key = f"write:action:{request.user.id}"
+    if not check_rate_limit(rate_key, max_requests=30, window=60):
+        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+
+    if request.user.role != AppUser.Role.MANAGER:
+        return JsonResponse(
+            {"error": "Solo el manager puede asignar leads manualmente."},
+            status=403,
+        )
 
     try:
         body = json.loads(request.body)
@@ -213,6 +243,16 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
+    rate_key = f"write:action:{request.user.id}"
+    if not check_rate_limit(rate_key, max_requests=30, window=60):
+        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+
+    if request.user.role != AppUser.Role.MANAGER:
+        return JsonResponse(
+            {"error": "Solo el manager puede reasignar leads."},
+            status=403,
+        )
+
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -278,6 +318,23 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+
+    rate_key = f"write:action:{request.user.id}"
+    if not check_rate_limit(rate_key, max_requests=30, window=60):
+        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+
+    _session = DIContainer.instance().session_repo.find_by_id(session_id, request.tenant.id)
+    if _session is None:
+        return JsonResponse({"error": "Sesión no encontrada"}, status=404)
+
+    if (
+        _session.status in _CLOSED_STATUSES
+        and request.user.role != AppUser.Role.MANAGER
+    ):
+        return JsonResponse(
+            {"error": "Solo el manager puede modificar una sesión ya cerrada."},
+            status=403,
+        )
 
     try:
         body = json.loads(request.body)
@@ -362,6 +419,11 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
 
+    if request.method == "PATCH":
+        rate_key = f"write:action:{request.user.id}"
+        if not check_rate_limit(rate_key, max_requests=30, window=60):
+            return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+
     session_repo = DIContainer.instance().session_repo
     session = session_repo.find_by_id(session_id, request.tenant.id)
     if session is None:
@@ -402,7 +464,7 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
         LeadNameHistory.objects.filter(lead=lead)
         .select_related("changed_by")
         .order_by("-changed_at")
-        .values("old_name", "new_name", "changed_by__email", "changed_at")
+        .values("old_name", "new_name", "changed_by_id", "changed_at")
     )
 
     return JsonResponse(
@@ -412,7 +474,7 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
                 {
                     "old_name": h["old_name"],
                     "new_name": h["new_name"],
-                    "changed_by": h["changed_by__email"],
+                    "changed_by": str(h["changed_by_id"]) if h["changed_by_id"] else None,
                     "changed_at": h["changed_at"].isoformat()
                     if h["changed_at"]
                     else None,

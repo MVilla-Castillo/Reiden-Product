@@ -12,6 +12,7 @@ import json
 import uuid
 
 import pytest
+from django.conf import settings
 from django.test import Client, override_settings
 
 from crm.adapters.dependency_injection import DIContainer
@@ -207,7 +208,7 @@ def test_scoring_handles_corrupt_fsm_answers_gracefully(
         "/api/workers/process-message/",
         data=json.dumps(payload),
         content_type="application/json",
-        HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+        HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
     )
 
     assert response.status_code == 200
@@ -268,7 +269,7 @@ def test_scoring_handles_empty_fsm_answers(
         "/api/workers/process-message/",
         data=json.dumps(payload),
         content_type="application/json",
-        HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+        HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
     )
 
     assert response.status_code == 200
@@ -331,7 +332,7 @@ def test_worker_rejects_missing_message_sid() -> None:
         "/api/workers/process-message/",
         data=json.dumps(payload),
         content_type="application/json",
-        HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+        HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
     )
 
     assert response.status_code == 400
@@ -353,7 +354,7 @@ def test_worker_rejects_invalid_json() -> None:
         "/api/workers/process-message/",
         data="esto no es json {{{",
         content_type="application/json",
-        HTTP_X_INTERNAL_SECRET="dev-internal-secret-change-in-prod",
+        HTTP_X_INTERNAL_SECRET=settings.INTERNAL_SECRET,
     )
 
     assert response.status_code == 400

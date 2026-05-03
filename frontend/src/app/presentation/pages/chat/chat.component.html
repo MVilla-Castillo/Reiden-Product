@@ -77,7 +77,7 @@
               <input
                 type="text"
                 class="name-edit-input"
-                [(ngModel)]="editingNameValue"
+                [ngModel]="editingNameValue()" (ngModelChange)="editingNameValue.set($event)"
                 (keyup.enter)="saveName()"
                 (keyup.escape)="cancelEditName()"
                 #nameInput>

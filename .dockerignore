@@ -1,0 +1,39 @@
+# Secretos — nunca en la imagen
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Cobertura y reportes
+.coverage
+htmlcov
+coverage.xml
+
+# Virtualenvs locales
+.venv
+venv
+
+# Frontend Angular (servido por separado)
+frontend
+
+# Documentación
+docs
+
+# Logs
+*.log
+
+# IDEs
+.vscode
+.idea

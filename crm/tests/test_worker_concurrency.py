@@ -45,7 +45,7 @@ def _make_payload(message_sid: str = "SMconcurrent000000000000001") -> dict:
 
 
 def _post_to_worker(client, payload: dict):
-    internal_secret = settings.CLOUD_TASKS_INTERNAL_SECRET
+    internal_secret = settings.INTERNAL_SECRET
     return client.post(
         "/api/workers/process-message/",
         data=json.dumps(payload),
