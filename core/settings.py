@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import environ
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -99,6 +101,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "corsheaders",
     # Local Apps
@@ -113,6 +116,7 @@ MIDDLEWARE = [
     "core.metrics.REDMetricsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -154,16 +158,22 @@ DATABASES = {
 # SRE Grade: Connection Management & Cloud SQL SSL
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
-# Si estamos en producción, forzamos SSL para la base de datos si no es un Unix Socket
+# Railway SSL: si no es local y tenemos CA, verificamos; si no, requerimos cifrado
 if (
     not DEBUG
     and "127.0.0.1" not in DATABASES["default"]["HOST"]
     and "localhost" not in DATABASES["default"]["HOST"]
 ):
-    DATABASES["default"]["OPTIONS"] = {
-        "sslmode": "verify-ca",
-        "sslrootcert": env("DATABASE_SSL_CA", default=""),
-    }
+    ssl_ca = env("DATABASE_SSL_CA", default="")
+    if ssl_ca:
+        DATABASES["default"]["OPTIONS"] = {
+            "sslmode": "verify-ca",
+            "sslrootcert": ssl_ca,
+        }
+    else:
+        DATABASES["default"]["OPTIONS"] = {
+            "sslmode": "require",
+        }
 
 # Railway Worker Configuration
 # The base URL where the worker process will receive HTTP requests
@@ -232,15 +242,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# OIDC Configuration (Google Workspace — OAuth 2.0 / OIDC)
-OIDC_GOOGLE_ISSUER = env("OIDC_GOOGLE_ISSUER", default="https://accounts.google.com")
-OIDC_GOOGLE_JWKS_URL = env(
-    "OIDC_GOOGLE_JWKS_URL", default="https://www.googleapis.com/oauth2/v3/certs"
-)
-OIDC_GOOGLE_AUDIENCE = env(
-    "OIDC_GOOGLE_AUDIENCE", default="GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-)
+# Supabase Auth (JWT validation via HS256)
+SUPABASE_URL = env("SUPABASE_URL")
+SUPABASE_JWT_SECRET = env("SUPABASE_JWT_SECRET")
 
 # Observability (SRE): JSON Structured Logging
 LOGGING = {
@@ -283,9 +290,6 @@ LOGGING = {
 }
 
 # Sentry Integration (Observability & Error Tracking)
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-
 SENTRY_DSN = env("SENTRY_DSN", default="")
 
 

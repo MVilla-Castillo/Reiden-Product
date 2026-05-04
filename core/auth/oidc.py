@@ -1,12 +1,10 @@
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import jwt
-import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from core.log_utils import tenant_id_var
 
@@ -16,16 +14,16 @@ User = get_user_model()
 
 class OIDCStatelessMiddleware:
     """
-    Middleware SRE-grade para validación JWT con Google Workspace (OIDC).
+    Middleware SRE-grade para validación JWT con Supabase Auth.
     - Stateless: No toca DB para validar sesión activa, solo firma criptográfica.
-    - Resiliente: Maneja fallos de JWKS con re-fetch dinámico.
+    - HS256: Validación con secreto simétrico de Supabase.
     - Multi-Tenant: Inyecta request.tenant asumiendo que el JWT lo provee (o la DB).
     """
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest) -> HttpResponse:
         # 1. Ignorar rutas públicas (healthchecks, webhooks de Twilio y workers internos)
         # SRE Grade: Bypass robusto para endpoints operativos
         PUBLIC_PATH_PREFIXES = (
@@ -44,28 +42,25 @@ class OIDCStatelessMiddleware:
             request.path.startswith("/api/dashboard/")
             or request.path.startswith("/api/sse/")
         ):
-            from crm.models import Tenant
-
-            # Extraer el JWT desde Authorization header o query param ?token= (SSE no soporta headers)
-            resolved_email = None
+            resolved_sub = None
+            resolved_issuer = None
             raw_token = None
 
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 raw_token = auth_header.split(" ", 1)[1]
             elif request.path.startswith("/api/sse/"):
-                # EventSource no puede enviar headers; el frontend pasa el token como ?token=
                 raw_token = request.GET.get("token")
 
-            # Para SSE: aceptar ?ticket=<uuid> (token de un solo uso, TTL 30s)
             if not raw_token and request.path.startswith("/api/sse/"):
                 ticket = request.GET.get("ticket")
                 if ticket:
                     from django.core.cache import cache
                     ticket_data = cache.get(f"sse_ticket_{ticket}")
                     if ticket_data:
-                        cache.delete(f"sse_ticket_{ticket}")  # un solo uso
-                        resolved_email = ticket_data.get("email")
+                        cache.delete(f"sse_ticket_{ticket}")
+                        resolved_sub = ticket_data.get("sub")
+                        resolved_issuer = ticket_data.get("issuer")
                     else:
                         logger.warning("OIDC DEBUG: ticket SSE inválido o expirado para %s", request.path)
                         return JsonResponse({"error": "Unauthorized", "detail": "Ticket SSE inválido o expirado"}, status=401)
@@ -73,35 +68,37 @@ class OIDCStatelessMiddleware:
             if raw_token:
                 try:
                     payload = jwt.decode(raw_token, options={"verify_signature": False})
-                    resolved_email = payload.get("email") or payload.get("sub")
+                    resolved_sub = payload.get("sub")
+                    resolved_issuer = payload.get("iss")
                 except Exception:
                     pass
 
-            if not resolved_email:
-                logger.warning("OIDC DEBUG: token ausente o sin email — acceso denegado a %s", request.path)
+            if not resolved_sub:
+                logger.warning("OIDC DEBUG: token ausente o sin sub — acceso denegado a %s", request.path)
                 return JsonResponse({"error": "Unauthorized", "detail": "Token inválido o sin identidad"}, status=401)
 
-            # Resolver usuario primero — su tenant viene de la DB, no de un orden arbitrario
             try:
                 user = User.objects.select_related("tenant").get(
-                    email=resolved_email, is_active=True
+                    oidc_sub=resolved_sub,
+                    oidc_issuer=resolved_issuer,
+                    is_active=True
                 )
             except User.DoesNotExist:
-                logger.warning("OIDC DEBUG: email '%s' no registrado en el sistema", resolved_email)
+                logger.warning("OIDC DEBUG: sub '%s' no registrado en el sistema", resolved_sub)
                 return JsonResponse(
-                    {"error": "Forbidden", "detail": f"El correo '{resolved_email}' no tiene acceso a este sistema."},
+                    {"error": "Forbidden", "detail": f"Usuario con sub '{resolved_sub}' no tiene acceso a este sistema."},
                     status=403,
                 )
 
             if not user.tenant:
-                logger.warning("OIDC DEBUG: usuario '%s' sin tenant asignado", resolved_email)
+                logger.warning("OIDC DEBUG: usuario '%s' sin tenant asignado", resolved_sub)
                 return JsonResponse({"error": "Forbidden", "detail": "Usuario sin tenant asignado."}, status=403)
 
             request.tenant = user.tenant
             request.user = user
             request.oidc_bypass = True
             tenant_id_var.set(str(user.tenant.id))
-            logger.debug("OIDC DEBUG bypass: %s → %s (%s)", resolved_email, request.path, user.role)
+            logger.debug("OIDC DEBUG bypass: %s → %s (%s)", resolved_sub, request.path, user.role)
             return self.get_response(request)
 
         auth_header = request.headers.get("Authorization")
@@ -118,39 +115,20 @@ class OIDCStatelessMiddleware:
         token = token_parts[1]
 
         try:
-            # 2. Extraer Header y Payload sin validar firma todavía
-            unverified_header = jwt.get_unverified_header(token)
             unverified_payload = jwt.decode(token, options={"verify_signature": False})
-
             issuer = unverified_payload.get("iss")
-            kid = unverified_header.get("kid")
 
-            if not issuer or not kid:
-                return self._unauthorized("Token malformado: iss o kid faltante")
+            if not issuer:
+                return self._unauthorized("Token malformado: iss faltante")
 
-            # 3. Validar que el issuer sea Google
-            if not self._is_google_issuer(issuer):
+            if not self._is_valid_issuer(issuer):
                 return self._unauthorized(f"Issuer no soportado: {issuer}")
 
-            # 4. Obtener clave pública (JWKS) con mecanismo de re-fetch
-            public_key = self._get_public_key(kid)
-            if not public_key:
-                # Edge Case 1: Rotación silenciosa de llaves. Forzamos re-fetch.
-                logger.warning(f"KID {kid} no encontrado en caché. Forzando re-fetch.")
-                public_key = self._get_public_key(kid, force_refresh=True)
-
-            if not public_key:
-                return self._unauthorized(
-                    "Fallo firma: Llave pública no encontrada tras re-fetch"
-                )
-
-            # 5. Validación Criptográfica Fuerte (PyJWT)
             decoded_token = jwt.decode(
                 token,
-                public_key,
-                algorithms=["RS256"],
-                audience=settings.OIDC_GOOGLE_AUDIENCE,
-                issuer=settings.OIDC_GOOGLE_ISSUER,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                audience="authenticated",
                 leeway=30,
                 options={
                     "verify_exp": True,
@@ -162,13 +140,15 @@ class OIDCStatelessMiddleware:
             # 6. Inyección de Identidad al Request
             request.oidc_payload = decoded_token
             # Buscar o inyectar usuario (Idealmente cacheado o mediante lazy loading)
-            user, tenant = self._resolve_user_and_tenant(decoded_token)
+            user, tenant = self._resolve_user_and_tenant(decoded_token, issuer)
             if not user:
                 return self._unauthorized(
                     "Usuario asociado al Token denegado o inactivo"
                 )
 
             request.user = user
+            if not tenant:
+                return self._unauthorized("Usuario sin tenant asignado")
             request.tenant = tenant
             tenant_id_var.set(str(tenant.id))
 
@@ -177,9 +157,6 @@ class OIDCStatelessMiddleware:
         except jwt.InvalidTokenError as e:
             logger.error(f"JWT Inválido: {str(e)}")
             return self._unauthorized("Token inválido")
-        except requests.RequestException as e:
-            logger.error(f"OIDC: Fallo de red al obtener JWKS: {str(e)}")
-            return JsonResponse({"error": "Internal Server Error", "detail": "External service unavailable"}, status=500)
         except Exception:
             logger.exception("OIDC: Error inesperado en Middleware (revisar stacktrace)")
             if settings.DEBUG:
@@ -191,42 +168,15 @@ class OIDCStatelessMiddleware:
     def _unauthorized(self, message: str) -> JsonResponse:
         return JsonResponse({"error": "Unauthorized", "detail": message}, status=401)
 
-    def _is_google_issuer(self, issuer: str) -> bool:
-        return issuer in [
-            settings.OIDC_GOOGLE_ISSUER,
-            "accounts.google.com",
-            "https://accounts.google.com",
-        ]
-
-    def _get_public_key(self, kid: str, force_refresh: bool = False) -> str | None:
-        """Obtiene la llave RSA del sistema de caché o hace fetch a la red."""
-        cache_key = "jwks_google"
-        jwks = cache.get(cache_key)
-
-        if not jwks or force_refresh:
-            try:
-                response = requests.get(settings.OIDC_GOOGLE_JWKS_URL, timeout=5)
-                response.raise_for_status()
-                jwks = response.json()
-                cache.set(cache_key, jwks, timeout=86400)
-            except requests.RequestException as e:
-                logger.error(f"Fallo red al obtener JWKS de Google: {e}")
-                return None
-
-        for key in jwks.get("keys", []):
-            if key.get("kid") == kid:
-                try:
-                    return jwt.algorithms.RSAAlgorithm.from_jwk(key)
-                except Exception as e:
-                    logger.error(f"Error parseando JWK a llave RSA: {e}")
-                    return None
-        return None
+    def _is_valid_issuer(self, issuer: str) -> bool:
+        expected_issuer = f"{settings.SUPABASE_URL}/auth/v1"
+        return issuer == expected_issuer
 
     def _resolve_user_and_tenant(
-        self, payload: dict[str, Any]
+        self, payload: dict[str, Any], issuer: str
     ) -> tuple[Any | None, Any | None]:
         """
-        Mapea el oidc_sub (Subject) al AppUser de la base de datos local.
+        Mapea el oidc_sub (Subject) + issuer al AppUser de la base de datos local.
         """
         sub = payload.get("sub")
         if not sub:
@@ -234,7 +184,7 @@ class OIDCStatelessMiddleware:
 
         try:
             user = User.objects.select_related("tenant").get(
-                oidc_sub=sub, is_active=True
+                oidc_sub=sub, oidc_issuer=issuer, is_active=True
             )
             return user, user.tenant
         except User.DoesNotExist:

@@ -1,4 +1,6 @@
-const supabaseUrl = 'https://nviceqkfcntxejybnpzd.supabase.co';
+import { environment } from '../../environments/environment';
+
+const supabaseUrl = environment.supabaseUrl;
 
 interface SupabaseAuth {
   getSession(): Promise<{ data: { session: { access_token: string; user: { id: string; email: string } } | null } }>;
@@ -27,7 +29,7 @@ export const supabase: SupabaseClient = {
     },
     signInWithOAuth: async (options: { provider: string; options: { redirectTo: string } }) => {
       const redirectUrl = options.options.redirectTo;
-      const googleAuthUrl = `https://nviceqkfcntxejybnpzd.supabase.co/auth/v1/authorize?provider=${options.provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+      const googleAuthUrl = `${supabaseUrl}/auth/v1/authorize?provider=${options.provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
       window.location.href = googleAuthUrl;
       return { error: null };
     },

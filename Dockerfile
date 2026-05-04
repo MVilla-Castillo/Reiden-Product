@@ -34,8 +34,17 @@ RUN addgroup --system appuser && adduser --system --group appuser
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appuser /app /app
 
+# Healthcheck para orquestadores (Railway, Cloud Run)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/liveness')"
+
+# Copiamos el entrypoint
+COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Mover al usuario seguro
 USER appuser
 
 # Usamos el path absoluto para máxima resiliencia
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/app/.venv/bin/uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

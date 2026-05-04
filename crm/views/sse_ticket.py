@@ -4,7 +4,7 @@ crm/views/sse_ticket.py — Endpoint de ticket de un solo uso para autenticar SS
 Flujo:
   1. Frontend hace POST /api/sse/ticket/ con Authorization: Bearer <jwt>
   2. Este endpoint valida la identidad (via middleware OIDC normal) y genera un UUID
-  3. Guarda en caché: ticket_<uuid> → user_email  (TTL 30s)
+  3. Guarda en caché: ticket_<uuid> → {sub, issuer, tenant_id} (TTL 30s)
   4. Devuelve { "ticket": "<uuid>" }
   5. Frontend usa /api/sse/dashboard/?ticket=<uuid> — el JWT nunca va en la URL
 """
@@ -33,7 +33,15 @@ def sse_ticket_view(request: HttpRequest) -> JsonResponse:
 
     ticket = str(uuid.uuid4())
     cache_key = f"sse_ticket_{ticket}"
-    cache.set(cache_key, {"email": user.email, "tenant_id": str(tenant.id)}, timeout=TICKET_TTL)
+    cache.set(
+        cache_key,
+        {
+            "sub": user.oidc_sub,
+            "issuer": user.oidc_issuer,
+            "tenant_id": str(tenant.id),
+        },
+        timeout=TICKET_TTL,
+    )
 
     logger.debug("SSE ticket generado para %s (TTL=%ds)", user.email, TICKET_TTL)
     return JsonResponse({"ticket": ticket})

@@ -18,6 +18,7 @@ dependencies = [
     "sentry-sdk>=2.54.0",
     "twilio>=9.10.3",
     "uvicorn[standard]>=0.41.0",
+    "whitenoise>=6.8.0",
 ]
 
 [dependency-groups]
@@ -29,16 +30,14 @@ dev = [
     "freezegun>=1.5.5",
     "factory-boy>=3.3.3",
     "ruff>=0.15.10",
+    "pre-commit>=4.0.0",
 ]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-plugins = ["mypy_django_plugin.main"]
 exclude = ["migrations/", "tests/"]
-
-[tool.django-stubs]
-django_settings_module = "core.settings"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--cov=crm --cov=core --cov-report=term-missing --cov-fail-under=80"
