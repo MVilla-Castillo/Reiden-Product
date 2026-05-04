@@ -2,6 +2,7 @@ import logging
 from typing import Any, Callable
 
 import jwt
+from jwt import PyJWKClient
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -11,12 +12,22 @@ from core.log_utils import tenant_id_var
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+_jwks_client: PyJWKClient | None = None
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        jwks_url = f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+        _jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+    return _jwks_client
+
 
 class OIDCStatelessMiddleware:
     """
     Middleware SRE-grade para validación JWT con Supabase Auth.
     - Stateless: No toca DB para validar sesión activa, solo firma criptográfica.
-    - HS256: Validación con secreto simétrico de Supabase.
+    - ES256: Validación con clave pública del JWKS de Supabase.
     - Multi-Tenant: Inyecta request.tenant asumiendo que el JWT lo provee (o la DB).
     """
 
@@ -84,7 +95,12 @@ class OIDCStatelessMiddleware:
         token = token_parts[1]
 
         try:
-            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            header = jwt.get_unverified_header(token)
+            alg = header.get("alg", "ES256")
+
+            unverified_payload = jwt.decode(
+                token, options={"verify_signature": False}, algorithms=[alg]
+            )
             issuer = unverified_payload.get("iss")
 
             if not issuer:
@@ -93,17 +109,14 @@ class OIDCStatelessMiddleware:
             if not self._is_valid_issuer(issuer):
                 return self._unauthorized(f"Issuer no soportado: {issuer}")
 
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
             decoded_token = jwt.decode(
                 token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
+                signing_key.key,
+                algorithms=["ES256"],
                 audience="authenticated",
                 leeway=10,
-                options={
-                    "verify_exp": True,
-                    "verify_aud": True,
-                    "verify_iss": True,
-                },
+                options={"verify_exp": True, "verify_aud": True, "verify_iss": True},
             )
 
             # 6. Inyección de Identidad al Request

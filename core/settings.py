@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 import environ
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -316,3 +318,10 @@ if SENTRY_DSN:
         send_default_pii=False,
         before_send=_sentry_before_send,
     )
+
+# SRE Grade: Fail-fast en producción
+if not DEBUG:
+    if not env("WA_ID_ENCRYPTION_KEY", default=""):
+        raise ImproperlyConfigured("WA_ID_ENCRYPTION_KEY requerida en producción")
+    if not env("ALLOWED_HOSTS", default=""):
+        raise ImproperlyConfigured("ALLOWED_HOSTS requerida en producción")
