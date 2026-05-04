@@ -36,70 +36,39 @@ class OIDCStatelessMiddleware:
         if any(request.path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return self.get_response(request)
 
-        # DEBUG bypass: resuelve tenant+user desde el JWT de Supabase (sin verificar firma).
-        # IMPORTANTE: settings.DEBUG DEBE estar False en producción — el OIDC completo toma el control.
-        if settings.DEBUG and (
-            request.path.startswith("/api/dashboard/")
-            or request.path.startswith("/api/sse/")
-        ):
-            resolved_sub = None
-            resolved_issuer = None
-            raw_token = None
-
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                raw_token = auth_header.split(" ", 1)[1]
-            elif request.path.startswith("/api/sse/"):
-                raw_token = request.GET.get("token")
-
-            if not raw_token and request.path.startswith("/api/sse/"):
-                ticket = request.GET.get("ticket")
-                if ticket:
-                    from django.core.cache import cache
-                    ticket_data = cache.get(f"sse_ticket_{ticket}")
-                    if ticket_data:
-                        cache.delete(f"sse_ticket_{ticket}")
-                        resolved_sub = ticket_data.get("sub")
-                        resolved_issuer = ticket_data.get("issuer")
-                    else:
-                        logger.warning("OIDC DEBUG: ticket SSE inválido o expirado para %s", request.path)
-                        return JsonResponse({"error": "Unauthorized", "detail": "Ticket SSE inválido o expirado"}, status=401)
-
-            if raw_token:
-                try:
-                    payload = jwt.decode(raw_token, options={"verify_signature": False})
-                    resolved_sub = payload.get("sub")
-                    resolved_issuer = payload.get("iss")
-                except Exception:
-                    pass
-
-            if not resolved_sub:
-                logger.warning("OIDC DEBUG: token ausente o sin sub — acceso denegado a %s", request.path)
-                return JsonResponse({"error": "Unauthorized", "detail": "Token inválido o sin identidad"}, status=401)
-
-            try:
-                user = User.objects.select_related("tenant").get(
-                    oidc_sub=resolved_sub,
-                    oidc_issuer=resolved_issuer,
-                    is_active=True
-                )
-            except User.DoesNotExist:
-                logger.warning("OIDC DEBUG: sub '%s' no registrado en el sistema", resolved_sub)
+        # SSE ticket validation: Endpoints SSE no pueden enviar Authorization header.
+        # El ticket es un UUID de un solo uso emitido por sse_ticket_view tras validar JWT completo.
+        if request.path.startswith("/api/sse/"):
+            ticket = request.GET.get("ticket")
+            if ticket:
+                from django.core.cache import cache
+                ticket_data = cache.get(f"sse_ticket_{ticket}")
+                if ticket_data:
+                    cache.delete(f"sse_ticket_{ticket}")
+                    try:
+                        user = User.objects.select_related("tenant").get(
+                            oidc_sub=ticket_data["sub"],
+                            oidc_issuer=ticket_data["issuer"],
+                            is_active=True,
+                        )
+                    except User.DoesNotExist:
+                        return JsonResponse(
+                            {"error": "Unauthorized", "detail": "Usuario del ticket no encontrado"},
+                            status=401,
+                        )
+                    if not user.tenant:
+                        return JsonResponse(
+                            {"error": "Unauthorized", "detail": "Usuario sin tenant asignado"},
+                            status=401,
+                        )
+                    request.user = user
+                    request.tenant = user.tenant
+                    tenant_id_var.set(str(user.tenant.id))
+                    return self.get_response(request)
                 return JsonResponse(
-                    {"error": "Forbidden", "detail": f"Usuario con sub '{resolved_sub}' no tiene acceso a este sistema."},
-                    status=403,
+                    {"error": "Unauthorized", "detail": "Ticket SSE inválido o expirado"},
+                    status=401,
                 )
-
-            if not user.tenant:
-                logger.warning("OIDC DEBUG: usuario '%s' sin tenant asignado", resolved_sub)
-                return JsonResponse({"error": "Forbidden", "detail": "Usuario sin tenant asignado."}, status=403)
-
-            request.tenant = user.tenant
-            request.user = user
-            request.oidc_bypass = True
-            tenant_id_var.set(str(user.tenant.id))
-            logger.debug("OIDC DEBUG bypass: %s → %s (%s)", resolved_sub, request.path, user.role)
-            return self.get_response(request)
 
         auth_header = request.headers.get("Authorization")
 
@@ -129,7 +98,7 @@ class OIDCStatelessMiddleware:
                 settings.SUPABASE_JWT_SECRET,
                 algorithms=["HS256"],
                 audience="authenticated",
-                leeway=30,
+                leeway=10,
                 options={
                     "verify_exp": True,
                     "verify_aud": True,

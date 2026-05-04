@@ -50,6 +50,10 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Strict"
+    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = "Strict"
 
 
 # CORS Configuration (Angular Frontend — SRE Hardening)
@@ -150,10 +154,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    "default": env.db(
-        "DATABASE_URL",
-        default="postgres://ccrm_user:ccrm_password@localhost:5432/ccrm_db",
-    )
+    "default": env.db("DATABASE_URL")
 }
 # SRE Grade: Connection Management & Cloud SQL SSL
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)

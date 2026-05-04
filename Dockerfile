@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58 AS builder
 
 # Determinismo total para el path
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # ─────────────────────────────────────────────────────────
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:46cb7cc2877e60fbd5e21a9ae6115c30ace7a077b9f8772da879e4590c18c2e3
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -27,8 +27,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Crear usuario sin privilegios
-RUN addgroup --system appuser && adduser --system --group appuser
+# Crear usuario sin privilegios (UID/GID fijo para consistencia)
+RUN addgroup --system --gid 1001 appuser \
+    && adduser --system --uid 1001 --gid 1001 --no-create-home appuser
 
 # Copiamos el venv y el código con los permisos correctos
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv

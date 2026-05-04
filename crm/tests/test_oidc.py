@@ -48,18 +48,11 @@ def oidc_user(db, tenant: Tenant) -> AppUser:
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
     SUPABASE_JWT_SECRET=TEST_SUPABASE_SECRET,
-    DEBUG=True,
+    DEBUG=False,
 )
-def test_oidc_bypass_dev_mode(client: Client, tenant: Tenant) -> None:
-    AppUser.objects.create(
-        email="dev@example.com",
-        oidc_sub="550e8400-e29b-41d4-a716-446655440000",
-        oidc_issuer=TEST_SUPABASE_ISSUER,
-        tenant=tenant,
-        role=AppUser.Role.SALESPERSON,
-        is_active=True,
-    )
-    token = _make_supabase_token()
+def test_oidc_valid_user_gets_200(client: Client, oidc_user: AppUser) -> None:
+    """El flujo OIDC completo devuelve 200 para usuario válido."""
+    token = _make_supabase_token(sub=oidc_user.oidc_sub)
     response = client.get(
         "/api/dashboard/leads/",
         HTTP_AUTHORIZATION=f"Bearer {token}",
@@ -243,3 +236,32 @@ def _make_sub(sub: str) -> str:
         TEST_SUPABASE_SECRET,
         algorithm="HS256",
     )
+
+
+@pytest.mark.django_db
+@override_settings(
+    SUPABASE_URL=TEST_SUPABASE_URL,
+    SUPABASE_JWT_SECRET=TEST_SUPABASE_SECRET,
+    DEBUG=False,
+)
+def test_sse_ticket_valid(client: Client, oidc_user: AppUser) -> None:
+    """Ticket SSE válido de un solo uso da acceso al endpoint SSE."""
+    from django.core.cache import cache
+
+    ticket = "test-ticket-uuid-1234"
+    cache.set(
+        f"sse_ticket_{ticket}",
+        {"sub": oidc_user.oidc_sub, "issuer": oidc_user.oidc_issuer},
+        timeout=30,
+    )
+    response = client.get(f"/api/sse/dashboard/?ticket={ticket}")
+    assert response.status_code in (200, 204)
+    assert cache.get(f"sse_ticket_{ticket}") is None
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=False)
+def test_sse_ticket_invalid_returns_401(client: Client) -> None:
+    """Ticket SSE inexistente devuelve 401."""
+    response = client.get("/api/sse/dashboard/?ticket=fake-ticket")
+    assert response.status_code == 401
