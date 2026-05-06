@@ -65,7 +65,6 @@ def oidc_user(db, tenant: Tenant) -> AppUser:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_valid_user_gets_200(client: Client, oidc_user: AppUser) -> None:
@@ -81,7 +80,6 @@ def test_oidc_valid_user_gets_200(client: Client, oidc_user: AppUser) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_no_token_returns_401(client: Client) -> None:
@@ -94,7 +92,6 @@ def test_oidc_no_token_returns_401(client: Client) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_unsupported_issuer_returns_401(client: Client) -> None:
@@ -121,10 +118,11 @@ def test_oidc_unsupported_issuer_returns_401(client: Client) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
-def test_oidc_expired_token_returns_401(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_oidc_expired_token_returns_401(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import jwt as pyjwt
 
     def fake_decode(*args, **kwargs):
@@ -146,7 +144,6 @@ def test_oidc_expired_token_returns_401(client: Client, monkeypatch: pytest.Monk
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_public_paths_bypass(client: Client) -> None:
@@ -160,7 +157,6 @@ def test_oidc_public_paths_bypass(client: Client) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_malformed_token_missing_iss(client: Client) -> None:
@@ -186,7 +182,6 @@ def test_oidc_malformed_token_missing_iss(client: Client) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_valid_token_returns_200(client: Client, oidc_user: AppUser) -> None:
@@ -202,7 +197,6 @@ def test_oidc_valid_token_returns_200(client: Client, oidc_user: AppUser) -> Non
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_invalid_signature_returns_401(client: Client) -> None:
@@ -230,7 +224,6 @@ def test_oidc_invalid_signature_returns_401(client: Client) -> None:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_oidc_user_not_found_returns_401(client: Client) -> None:
@@ -260,7 +253,6 @@ def _make_sub(sub: str) -> str:
 @pytest.mark.django_db
 @override_settings(
     SUPABASE_URL=TEST_SUPABASE_URL,
-    
     DEBUG=False,
 )
 def test_sse_ticket_valid(client: Client, oidc_user: AppUser) -> None:
@@ -283,4 +275,33 @@ def test_sse_ticket_valid(client: Client, oidc_user: AppUser) -> None:
 def test_sse_ticket_invalid_returns_401(client: Client) -> None:
     """Ticket SSE inexistente devuelve 401."""
     response = client.get("/api/sse/dashboard/?ticket=fake-ticket")
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=True, SUPABASE_URL=TEST_SUPABASE_URL)
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/dashboard/leads/",
+        "/api/dashboard/leads/pending/",
+        "/api/sse/dashboard/",
+    ],
+)
+def test_no_jwt_bypass_when_debug_true(client: Client, path: str) -> None:
+    """Regresión: con DEBUG=True las rutas protegidas siguen exigiendo JWT."""
+    response = client.get(path)
+    assert response.status_code == 401, (
+        f"REGRESIÓN CRÍTICA: {path} aceptó request sin JWT con DEBUG=True"
+    )
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=True, SUPABASE_URL=TEST_SUPABASE_URL)
+def test_invalid_token_rejected_when_debug_true(client: Client) -> None:
+    """Regresión: con DEBUG=True un Bearer mal formado sigue siendo 401."""
+    response = client.get(
+        "/api/dashboard/leads/",
+        HTTP_AUTHORIZATION="Bearer not-a-real-token",
+    )
     assert response.status_code == 401

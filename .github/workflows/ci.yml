@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "preproduccion/**"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.5.x"
+
+jobs:
+  lint-typecheck:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Ruff
+        run: uv run ruff check .
+      - name: Mypy
+        run: uv run mypy crm core
+
+  test:
+    name: Tests with coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15.5-alpine
+        env:
+          POSTGRES_DB: ccrm
+          POSTGRES_USER: ccrm_user
+          POSTGRES_PASSWORD: ccrm_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ccrm_user -d ccrm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://ccrm_user:ccrm_password@localhost:5432/ccrm
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      DEBUG: "true"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      INTERNAL_SECRET: "ci-internal-secret-not-for-production"
+      WA_ID_ENCRYPTION_KEY: ${{ secrets.WA_ID_ENCRYPTION_KEY }}
+      SUPABASE_URL: "https://example.supabase.co"
+      SUPABASE_JWT_SECRET: "ci-jwt-secret"
+      TWILIO_ACCOUNT_SID: "ACtestci0000000000000000000000000000"
+      TWILIO_AUTH_TOKEN: "ci-twilio-token"
+      WORKER_BASE_URL: "http://localhost:8000"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run pytest
+        run: uv run pytest --cov=crm --cov=core --cov-report=term-missing --cov-fail-under=80
+
+  security:
+    name: Secret & dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: pip-audit
+        run: |
+          uv tool install pip-audit
+          uv export --frozen --no-dev --format requirements-txt --output-file requirements.audit.txt
+          uv tool run pip-audit --strict --requirement requirements.audit.txt

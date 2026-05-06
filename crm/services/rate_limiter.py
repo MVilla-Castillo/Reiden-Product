@@ -91,14 +91,15 @@ def check_rate_limit(
 
         current_window = now.replace(microsecond=0)
 
+        table = _RATE_LIMIT_TABLE
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
-                INSERT INTO {_RATE_LIMIT_TABLE}
+                INSERT INTO {table}
                     (tenant_id, wa_id_hash, window_start, request_count)
                 VALUES (%s, %s, %s, 1)
                 ON CONFLICT (tenant_id, wa_id_hash, window_start)
-                DO UPDATE SET request_count = {_RATE_LIMIT_TABLE}.request_count + 1
+                DO UPDATE SET request_count = {table}.request_count + 1
                 """,
                 [str(tenant_id), wa_id_hash, current_window],
             )

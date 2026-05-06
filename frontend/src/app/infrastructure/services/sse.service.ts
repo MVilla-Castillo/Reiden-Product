@@ -1,5 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
-import { Observable, from, switchMap, retry, timer } from 'rxjs';
+import { Observable, defer, from, switchMap, retry, timer } from 'rxjs';
 
 export interface SseEvent {
   type: string;
@@ -30,7 +30,7 @@ export class SseService {
   }
 
   connect(path: string, eventNames: string[]): Observable<SseEvent> {
-    return from(this.fetchTicket()).pipe(
+    return defer(() => from(this.fetchTicket())).pipe(
       switchMap(ticket => new Observable<SseEvent>(observer => {
         const url = `${this.baseUrl}${path}?ticket=${encodeURIComponent(ticket)}`;
         const es = new EventSource(url);

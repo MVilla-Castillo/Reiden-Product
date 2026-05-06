@@ -13,10 +13,10 @@ from cryptography.fernet import Fernet
 _TEST_ENCRYPTION_KEY = Fernet.generate_key().decode()
 os.environ["WA_ID_ENCRYPTION_KEY"] = _TEST_ENCRYPTION_KEY
 
-import pytest
-from crm.models import Tenant, Lead, ChatSession, AppUser
-import hashlib
-from core.crypto import encrypt, reset_fernet
+import pytest  # noqa: E402
+from crm.models import Tenant, Lead, ChatSession, AppUser  # noqa: E402
+import hashlib  # noqa: E402
+from core.crypto import encrypt, reset_fernet  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

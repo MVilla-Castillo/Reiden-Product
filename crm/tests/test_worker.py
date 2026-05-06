@@ -265,7 +265,7 @@ def test_auditlog_fsm_transition_written(tenant) -> None:
         wa_id=encrypt(wa_id),
         wa_id_hash=hashlib.sha256(wa_id.encode()).hexdigest(),
     )
-    session = ChatSession.objects.create(
+    ChatSession.objects.create(
         tenant=tenant,
         lead=lead,
         status=ChatSession.Status.BOT,

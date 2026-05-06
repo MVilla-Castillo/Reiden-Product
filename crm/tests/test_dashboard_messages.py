@@ -22,13 +22,25 @@ from crm.models import AppUser, ChatSession, Lead, Message, Tenant
 
 
 class MockMiddleware:
-    """Middleware para inyectar el tenant en tests bypassando OIDC."""
+    """Middleware para inyectar tenant + usuario MANAGER en tests bypassando OIDC."""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         request.tenant = Tenant.objects.order_by("created_at").first()
+        if request.tenant:
+            user, _ = AppUser.objects.get_or_create(
+                tenant=request.tenant,
+                oidc_sub=f"mock-manager-{request.tenant.id}",
+                defaults={
+                    "email": f"mock-manager-{request.tenant.id}@test.cl",
+                    "role": AppUser.Role.MANAGER,
+                    "is_active": True,
+                    "oidc_issuer": "https://test.supabase.co/auth/v1",
+                },
+            )
+            request.user = user
         return self.get_response(request)
 
 
@@ -243,7 +255,7 @@ def test_assign_lead_salesperson_not_found(
         )
 
     assert response.status_code == 404
-    assert "Vendedor no encontrado" in response.json()["error"]
+    assert "no encontrado" in response.json()["error"]
 
 
 @pytest.mark.django_db

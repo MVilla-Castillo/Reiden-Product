@@ -7,39 +7,72 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0017_add_pending_assignment_timestamp'),
+        ("crm", "0017_add_pending_assignment_timestamp"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='lead',
-            name='profile_name',
-            field=models.CharField(blank=True, help_text='Nombre del perfil de WhatsApp del lead', max_length=255, null=True),
+            model_name="lead",
+            name="profile_name",
+            field=models.CharField(
+                blank=True,
+                help_text="Nombre del perfil de WhatsApp del lead",
+                max_length=255,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='message',
-            name='is_forwarded',
-            field=models.BooleanField(default=False, help_text='true si el mensaje fue reenviado una vez'),
+            model_name="message",
+            name="is_forwarded",
+            field=models.BooleanField(
+                default=False, help_text="true si el mensaje fue reenviado una vez"
+            ),
         ),
         migrations.AddField(
-            model_name='message',
-            name='is_frequently_forwarded',
-            field=models.BooleanField(default=False, help_text='true si el mensaje fue reenviado múltiples veces (spam/bot)'),
+            model_name="message",
+            name="is_frequently_forwarded",
+            field=models.BooleanField(
+                default=False,
+                help_text="true si el mensaje fue reenviado múltiples veces (spam/bot)",
+            ),
         ),
         migrations.CreateModel(
-            name='LeadNameHistory',
+            name="LeadNameHistory",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('old_name', models.CharField(blank=True, max_length=255, null=True)),
-                ('new_name', models.CharField(blank=True, max_length=255, null=True)),
-                ('changed_at', models.DateTimeField(auto_now_add=True)),
-                ('changed_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='name_changes', to=settings.AUTH_USER_MODEL)),
-                ('lead', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='name_history', to='crm.lead')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("old_name", models.CharField(blank=True, max_length=255, null=True)),
+                ("new_name", models.CharField(blank=True, max_length=255, null=True)),
+                ("changed_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "changed_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="name_changes",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "lead",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="name_history",
+                        to="crm.lead",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-changed_at'],
+                "ordering": ["-changed_at"],
             },
         ),
     ]

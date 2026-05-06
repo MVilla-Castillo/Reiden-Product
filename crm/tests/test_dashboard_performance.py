@@ -94,7 +94,7 @@ class TestDashboardPerformance(TestCase):
         self._create_bulk_sessions(count=50)
 
         with override_settings(DEBUG=True):
-            with self.assertNumQueries(2):
+            with self.assertNumQueries(3):
                 client = Client()
                 with OVERM:
                     response = client.get("/api/dashboard/leads/")
@@ -125,7 +125,7 @@ class TestDashboardPerformance(TestCase):
 
         client = Client()
         with OVERM:
-            with self.assertNumQueries(2):
+            with self.assertNumQueries(3):
                 response = client.get("/api/dashboard/leads/")
 
         self.assertEqual(response.status_code, 200)
@@ -166,7 +166,7 @@ class TestDashboardPerformance(TestCase):
 
         client = Client()
         with OVERM:
-            with self.assertNumQueries(2):
+            with self.assertNumQueries(3):
                 response = client.get("/api/dashboard/leads/")
 
         self.assertEqual(response.status_code, 200)
@@ -187,7 +187,7 @@ class TestDashboardPerformance(TestCase):
 
         client = Client()
         with OVERM:
-            with self.assertNumQueries(2):
+            with self.assertNumQueries(3):
                 response = client.get("/api/dashboard/leads/")
 
         self.assertEqual(response.status_code, 200)

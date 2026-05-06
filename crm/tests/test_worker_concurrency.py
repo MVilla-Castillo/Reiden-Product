@@ -91,7 +91,7 @@ class TestWorkerConcurrency(TransactionTestCase):
             - Message.objects.count() == 1
             - Ningún hilo lanzó IntegrityError no manejado.
         """
-        tenant = Tenant.objects.create(
+        Tenant.objects.create(
             nombre_legal="Automotora Test S.A.",
             rut_empresa="76.000.000-0",
             phone_number_id="56912345678",
@@ -161,7 +161,7 @@ class TestWorkerConcurrency(TransactionTestCase):
               fallar por race condition en session creation, lo cual es aceptable)
             - Ningún IntegrityError no manejado se propaga al cliente.
         """
-        tenant = Tenant.objects.create(
+        Tenant.objects.create(
             nombre_legal="Automotora Test S.A.",
             rut_empresa="76.000.001-1",
             phone_number_id="56912345678",

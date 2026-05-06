@@ -4,7 +4,7 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 django.setup()
 
-from crm.adapters.dependency_injection import get_use_case
+from crm.adapters.dependency_injection import get_use_case  # noqa: E402
 
 payload = {
     "MessageSid": "SM_TEST_500",

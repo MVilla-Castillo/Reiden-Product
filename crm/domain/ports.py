@@ -166,6 +166,12 @@ class LeadRepository(Protocol):
         """Actualiza campos de un Lead."""
         ...
 
+    def get_profile_names_batch(
+        self, lead_ids: set[UUID], tenant_id: UUID
+    ) -> dict[UUID, str]:
+        """Retorna mapa de lead_id → nombre de perfil para un conjunto de IDs."""
+        ...
+
 
 class SessionRepository(Protocol):
     """Puerto para persistencia de ChatSessions."""
@@ -301,6 +307,14 @@ class SessionRepository(Protocol):
         """
         ...
 
+    def get_users_email_batch(self, user_ids: set[UUID]) -> dict[UUID, str]:
+        """Retorna mapa de user_id → email para un conjunto de IDs."""
+        ...
+
+    def check_session_expired(self, session_id: UUID, hours: int = 24) -> bool:
+        """Verifica si una sesión lleva inactiva más de `hours` horas."""
+        ...
+
 
 class MessageRepository(Protocol):
     """Puerto para persistencia de Messages."""
@@ -343,7 +357,9 @@ class UserRepository(Protocol):
         """Retorna vendedores del tenant con conteo de sesiones activas."""
         ...
 
-    def find_salespeople_by_tenant_locked(self, tenant_id: UUID) -> list[dict[str, Any]]:
+    def find_salespeople_by_tenant_locked(
+        self, tenant_id: UUID
+    ) -> list[dict[str, Any]]:
         """Igual que find_salespeople_by_tenant pero con SELECT FOR UPDATE.
         Debe llamarse dentro de transaction.atomic()."""
         ...

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.core.cache import cache
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -29,8 +30,21 @@ from crm.domain.ports import (
 )
 from crm.services.rate_limiter import RateLimitExceeded, check_rate_limit
 from core.log_utils import trace_id_var
+from core.rate_limit import check_rate_limit as check_ip_rate_limit
 
 logger = logging.getLogger(__name__)
+
+WEBHOOK_REPLAY_TTL_SECONDS = 24 * 60 * 60  # 24h: ventana de detección de replay
+WEBHOOK_IP_RATE_LIMIT = 50  # peticiones por minuto por IP, antes de validar firma
+
+
+def _get_client_ip(request: HttpRequest) -> str:
+    """Extrae IP respetando X-Forwarded-For (proxy/Cloud Run con USE_X_FORWARDED_HOST)."""
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
 
 ALLOWED_MESSAGE_TYPES = {
     "text",
@@ -87,6 +101,22 @@ def _send_rejection(provider, from_raw: str, to_raw: str, message_sid: str) -> N
 @csrf_exempt
 @require_POST
 def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
+    client_ip = _get_client_ip(request)
+    if not check_ip_rate_limit(
+        f"webhook:ip:{client_ip}",
+        max_requests=WEBHOOK_IP_RATE_LIMIT,
+        window=60,
+    ):
+        logger.warning(
+            "Webhook: rate limit por IP excedido.",
+            extra={"component_name": "twilio_webhook_view", "client_ip": client_ip},
+        )
+        return JsonResponse(
+            {"error": "Too Many Requests"},
+            status=429,
+            headers={"Retry-After": "60"},
+        )
+
     provider = DIContainer.instance().message_provider
     post_data = request.POST.dict()
     validation_request = SignatureValidationRequest(
@@ -116,6 +146,17 @@ def twilio_webhook_view(request: HttpRequest) -> JsonResponse:
             extra={"component_name": "twilio_webhook_view"},
         )
         return JsonResponse({"error": "Bad Request: MessageSid requerido"}, status=400)
+
+    # Anti-replay: la firma de Twilio es válida indefinidamente (no incluye timestamp).
+    # Cacheamos cada MessageSid 24h para rechazar replays sin tocar la cola.
+    replay_key = f"webhook:msg:{message_sid}"
+    if cache.get(replay_key):
+        logger.info(
+            "Webhook: MessageSid duplicado, descartado por anti-replay.",
+            extra={"component_name": "twilio_webhook_view", "message_sid": message_sid},
+        )
+        return JsonResponse({"status": "duplicate"}, status=200)
+    cache.set(replay_key, "1", timeout=WEBHOOK_REPLAY_TTL_SECONDS)
 
     # Rate limiting DB-based por tenant + wa_id_hash
     _to_raw = request.POST.get("To", "").replace("whatsapp:", "").lstrip("+")

@@ -1,17 +1,18 @@
 services:
   db:
-    image: postgres:15
+    image: postgres:15.5-alpine
     container_name: ccrm_db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ccrm
-      POSTGRES_USER: ccrm_user
-      POSTGRES_PASSWORD: ccrm_password
+      POSTGRES_DB: ${POSTGRES_DB:-ccrm}
+      POSTGRES_USER: ${POSTGRES_USER:-ccrm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerido}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ccrm_user -d ccrm" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ccrm_user} -d ${POSTGRES_DB:-ccrm}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,7 +20,8 @@ services:
   web:
     build: .
     container_name: ccrm_web
-    command: uvicorn core.asgi:application --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    command: uvicorn core.asgi:application --host 0.0.0.0 --port 8000
     volumes:
       - .:/app
       - /app/.venv
@@ -31,5 +33,25 @@ services:
       db:
         condition: service_healthy
 
+  backup:
+    image: postgres:15.5-alpine
+    container_name: ccrm_backup
+    profiles: ["backup"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL requerido}
+      BACKUP_DIR: /var/backups/ccrm
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      GCS_BACKUP_BUCKET: ${GCS_BACKUP_BUCKET:-}
+    volumes:
+      - ./scripts:/scripts:ro
+      - backups_data:/var/backups/ccrm
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/scripts/backup_db.sh"]
+
 volumes:
   postgres_data:
+  backups_data:

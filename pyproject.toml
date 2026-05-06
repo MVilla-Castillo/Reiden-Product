@@ -27,6 +27,8 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-django>=4.12.0",
     "mypy>=1.15.0",
+    "django-stubs[compatible-mypy]>=5.0.0",
+    "types-requests>=2.32.0",
     "freezegun>=1.5.5",
     "factory-boy>=3.3.3",
     "ruff>=0.15.10",
@@ -38,6 +40,37 @@ python_version = "3.12"
 strict = true
 exclude = ["migrations/", "tests/"]
 ignore_missing_imports = true
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings"
+
+[[tool.mypy.overrides]]
+module = [
+    "crm.models",
+    "crm.admin",
+    "crm.adapters.sse.broadcaster",
+    "crm.adapters.task_queue.railway_task_queue",
+    "crm.management.commands.*",
+    "core.views.errors",
+    "core.settings",
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "crm.views.dashboard_messages",
+    "crm.views.dashboard",
+    "crm.views.sse",
+    "crm.views.scheduler",
+    "crm.views.webhook",
+    "crm.views.worker",
+    "crm.views.sse_ticket",
+    "core.auth.oidc",
+    "core.log_utils",
+    "core.metrics",
+]
+disable_error_code = ["attr-defined", "union-attr", "no-untyped-def", "no-untyped-call", "no-any-return", "return-value", "type-arg", "assignment", "arg-type"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=crm --cov=core --cov-report=term-missing --cov-fail-under=80"

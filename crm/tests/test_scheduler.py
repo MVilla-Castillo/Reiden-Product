@@ -276,7 +276,7 @@ class TestSchedulerTtlWarning:
         mock_push = MagicMock()
         mock_di.return_value.push_adapter = mock_push
 
-        session_without_salesperson = ChatSession.objects.create(
+        ChatSession.objects.create(
             tenant=lead.tenant,
             lead=lead,
             status=ChatSession.Status.CON_VENDEDOR,
@@ -324,7 +324,7 @@ class TestSchedulerCleanupRateLimits:
         """Verifica que se limpian rate limits antiguos."""
         from crm.services.rate_limiter import cleanup_old_rate_limits
 
-        deleted = cleanup_old_rate_limits(hours=1)
+        cleanup_old_rate_limits(hours=1)
 
         response = client.post(
             "/api/schedulers/cleanup-rate-limits/",

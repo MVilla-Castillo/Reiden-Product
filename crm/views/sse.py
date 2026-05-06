@@ -79,9 +79,7 @@ def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     return response
 
 
-def messages_sse_view(
-    request: HttpRequest, session_id: UUID
-) -> StreamingHttpResponse:
+def messages_sse_view(request: HttpRequest, session_id: UUID) -> StreamingHttpResponse:
     """
     SSE stream para mensajes de una sesión.
     Emite eventos 'message' y 'status_change' en tiempo real.
@@ -145,17 +143,29 @@ def _build_dashboard_snapshot(tenant) -> str:
 
     all_sessions = list(pending) + list(all_leads)
     salesperson_ids = {s.salesperson_id for s in all_sessions if s.salesperson_id}
-    users_cache = container.session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
+    users_cache = (
+        container.session_repo.get_users_email_batch(salesperson_ids)
+        if salesperson_ids
+        else {}
+    )
 
     lead_ids = {s.lead_id for s in all_sessions}
-    leads_cache = container.lead_repo.get_profile_names_batch(lead_ids, tenant_id) if lead_ids else {}
+    leads_cache = (
+        container.lead_repo.get_profile_names_batch(lead_ids, tenant_id)
+        if lead_ids
+        else {}
+    )
 
     payload = {
-        "pending_leads": [_serialize_session(s, users_cache, leads_cache) for s in pending],
+        "pending_leads": [
+            _serialize_session(s, users_cache, leads_cache) for s in pending
+        ],
         "leads": [_serialize_session(s, users_cache, leads_cache) for s in all_leads],
         "salespeople": salespeople,
         "settings": {
-            "routing_mode": settings_data.get("routing_mode") if settings_data else None,
+            "routing_mode": settings_data.get("routing_mode")
+            if settings_data
+            else None,
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

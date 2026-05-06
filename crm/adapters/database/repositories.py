@@ -117,18 +117,19 @@ class DjangoLeadRepository(LeadRepository):
         wa_id_plain = defaults.get("wa_id", "")
         wa_id_encrypted = encrypt(wa_id_plain) if wa_id_plain else ""
 
+        lead_table = Lead._meta.db_table
         with transaction.atomic():
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    INSERT INTO {Lead._meta.db_table} (id, tenant_id, wa_id_hash, wa_id, first_name, profile_name, is_deleted, last_interaction)
+                    INSERT INTO {lead_table} (id, tenant_id, wa_id_hash, wa_id, first_name, profile_name, is_deleted, last_interaction)
                     VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, False, NOW())
                     ON CONFLICT (wa_id_hash)
                     DO UPDATE SET
                         tenant_id = EXCLUDED.tenant_id,
                         wa_id = EXCLUDED.wa_id,
-                        first_name = COALESCE(EXCLUDED.first_name, {Lead._meta.db_table}.first_name),
-                        profile_name = COALESCE(EXCLUDED.profile_name, {Lead._meta.db_table}.profile_name),
+                        first_name = COALESCE(EXCLUDED.first_name, {lead_table}.first_name),
+                        profile_name = COALESCE(EXCLUDED.profile_name, {lead_table}.profile_name),
                         last_interaction = NOW()
                     RETURNING id, tenant_id, wa_id_hash, first_name, profile_name, is_deleted, last_interaction
                     """,
@@ -168,22 +169,28 @@ class DjangoLeadRepository(LeadRepository):
             return None
         return decrypt(result)
 
-    def get_profile_names_batch(self, lead_ids: set[uuid.UUID], tenant_id: uuid.UUID) -> dict[uuid.UUID, str]:
+    def get_profile_names_batch(
+        self, lead_ids: set[uuid.UUID], tenant_id: uuid.UUID
+    ) -> dict[uuid.UUID, str]:
         """Batch fetch de profile_names para múltiples lead_ids."""
         if not lead_ids:
             return {}
-        leads = Lead.objects.filter(id__in=lead_ids, tenant_id=tenant_id, is_deleted=False).values("id", "profile_name")
+        leads = Lead.objects.filter(
+            id__in=lead_ids, tenant_id=tenant_id, is_deleted=False
+        ).values("id", "profile_name")
         return {row["id"]: row["profile_name"] for row in leads}
 
-    ALLOWED_UPDATE_FIELDS = frozenset({
-        "first_name",
-        "last_name",
-        "phone",
-        "email",
-        "profile_name",
-        "fsm_state",
-        "fsm_substate",
-    })
+    ALLOWED_UPDATE_FIELDS = frozenset(
+        {
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "profile_name",
+            "fsm_state",
+            "fsm_substate",
+        }
+    )
 
     def update(
         self, lead_id: uuid.UUID, tenant_id: uuid.UUID, data: dict[str, Any]
@@ -364,12 +371,12 @@ class DjangoSessionRepository(SessionRepository):
     ) -> SessionEntity | None:
         now = timezone.now()
         terminal_statuses = {
-            ChatSession.Status.GANADO,
-            ChatSession.Status.PERDIDO,
-            ChatSession.Status.ABANDONO_BOT,
+            ChatSession.Status.GANADO.value,
+            ChatSession.Status.PERDIDO.value,
+            ChatSession.Status.ABANDONO_BOT.value,
         }
         with transaction.atomic():
-            update_fields = {"status": new_status}
+            update_fields: dict[str, Any] = {"status": new_status}
             if new_status in terminal_statuses:
                 update_fields["closed_at"] = now
             if lost_reason is not None:
@@ -447,9 +454,7 @@ class DjangoSessionRepository(SessionRepository):
         )
         return [_session_to_entity(m) for m in models]
 
-    def get_users_email_batch(
-        self, user_ids: set[uuid.UUID]
-    ) -> dict[uuid.UUID, str]:
+    def get_users_email_batch(self, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         """Batch fetch de emails para múltiples user_ids."""
         if not user_ids:
             return {}
@@ -508,8 +513,8 @@ class DjangoSessionRepository(SessionRepository):
                 return SessionExpirationInfo(
                     session_id=model.id,
                     tenant_id=tenant_id,
-                    old_status=old_status,
-                    new_status=new_status,
+                    old_status=str(old_status),
+                    new_status=str(new_status),
                     lost_reason=lost_reason,
                 )
 
@@ -550,7 +555,7 @@ class DjangoSessionRepository(SessionRepository):
             session_id=session_id,
             tenant_id=tenant_id,
             old_status="UNKNOWN",
-            new_status=ChatSession.Status.ABANDONO_BOT,
+            new_status=str(ChatSession.Status.ABANDONO_BOT),
             lost_reason="Sesión abandonada durante procesamiento",
         )
 
@@ -804,9 +809,9 @@ class DjangoSessionRepository(SessionRepository):
             statuses = [status_filter]
         else:
             statuses = [
-                ChatSession.Status.BOT,
-                ChatSession.Status.PENDING_ASSIGNMENT,
-                ChatSession.Status.CON_VENDEDOR,
+                ChatSession.Status.BOT.value,
+                ChatSession.Status.PENDING_ASSIGNMENT.value,
+                ChatSession.Status.CON_VENDEDOR.value,
             ]
 
         qs = (
@@ -842,14 +847,14 @@ class DjangoSessionRepository(SessionRepository):
             last_client_message_at__lte=to_cutoff,
             is_deleted=False,
         ).values("id", "salesperson_id", "tenant_id", "lead_id")
-        return list(models)
+        return list(dict(m) for m in models)
 
 
 class DjangoMessageRepository(MessageRepository):
     def exists_by_provider_id(
         self, provider_message_id: str, tenant_id: uuid.UUID | None = None
     ) -> bool:
-        filters: dict[str, str | bool] = {
+        filters: dict[str, Any] = {
             "provider_message_id": provider_message_id,
             "is_deleted": False,
         }
@@ -926,9 +931,11 @@ class DjangoTenantRepository(TenantRepository):
             .values("id", "nombre_legal", "routing_mode", "is_verified")
             .first()
         )
-        if tenant:
-            tenant["routing_mode"] = str(tenant["routing_mode"])
-        return tenant
+        if tenant is None:
+            return None
+        result: dict[str, Any] = dict(tenant)
+        result["routing_mode"] = str(result["routing_mode"])
+        return result
 
     def update_routing_mode(self, tenant_id: uuid.UUID, routing_mode: str) -> bool:
         if routing_mode not in ("MANUAL", "AUTO"):
@@ -970,7 +977,9 @@ class DjangoUserRepository(UserRepository):
             for sp in salespeople
         ]
 
-    def find_salespeople_by_tenant_locked(self, tenant_id: uuid.UUID) -> list[dict[str, Any]]:
+    def find_salespeople_by_tenant_locked(
+        self, tenant_id: uuid.UUID
+    ) -> list[dict[str, Any]]:
         from django.db.models import OuterRef, Subquery
 
         session_counts = (

@@ -91,9 +91,13 @@ def send_message_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     rate_key = f"write:send:{request.user.id}"
     if not check_rate_limit(rate_key, max_requests=20, window=60):
-        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+        return JsonResponse(
+            {"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429
+        )
 
-    _session = DIContainer.instance().session_repo.find_by_id(session_id, request.tenant.id)
+    _session = DIContainer.instance().session_repo.find_by_id(
+        session_id, request.tenant.id
+    )
     if _session is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
 
@@ -168,7 +172,9 @@ def assign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     rate_key = f"write:action:{request.user.id}"
     if not check_rate_limit(rate_key, max_requests=30, window=60):
-        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+        return JsonResponse(
+            {"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429
+        )
 
     if request.user.role != AppUser.Role.MANAGER:
         return JsonResponse(
@@ -245,7 +251,9 @@ def reassign_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
 
     rate_key = f"write:action:{request.user.id}"
     if not check_rate_limit(rate_key, max_requests=30, window=60):
-        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+        return JsonResponse(
+            {"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429
+        )
 
     if request.user.role != AppUser.Role.MANAGER:
         return JsonResponse(
@@ -321,9 +329,13 @@ def change_session_status_api(request: HttpRequest, session_id: UUID) -> JsonRes
 
     rate_key = f"write:action:{request.user.id}"
     if not check_rate_limit(rate_key, max_requests=30, window=60):
-        return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+        return JsonResponse(
+            {"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429
+        )
 
-    _session = DIContainer.instance().session_repo.find_by_id(session_id, request.tenant.id)
+    _session = DIContainer.instance().session_repo.find_by_id(
+        session_id, request.tenant.id
+    )
     if _session is None:
         return JsonResponse({"error": "Sesión no encontrada"}, status=404)
 
@@ -422,7 +434,9 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.method == "PATCH":
         rate_key = f"write:action:{request.user.id}"
         if not check_rate_limit(rate_key, max_requests=30, window=60):
-            return JsonResponse({"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429)
+            return JsonResponse(
+                {"error": "Demasiadas peticiones. Intenta en 1 minuto."}, status=429
+            )
 
     session_repo = DIContainer.instance().session_repo
     session = session_repo.find_by_id(session_id, request.tenant.id)
@@ -474,7 +488,9 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
                 {
                     "old_name": h["old_name"],
                     "new_name": h["new_name"],
-                    "changed_by": str(h["changed_by_id"]) if h["changed_by_id"] else None,
+                    "changed_by": str(h["changed_by_id"])
+                    if h["changed_by_id"]
+                    else None,
                     "changed_at": h["changed_at"].isoformat()
                     if h["changed_at"]
                     else None,

@@ -8,6 +8,7 @@ Flujo:
   4. Devuelve { "ticket": "<uuid>" }
   5. Frontend usa /api/sse/dashboard/?ticket=<uuid> — el JWT nunca va en la URL
 """
+
 import uuid
 import logging
 from django.core.cache import cache

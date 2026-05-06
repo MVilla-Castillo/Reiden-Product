@@ -37,7 +37,7 @@ COPY --from=builder --chown=appuser:appuser /app /app
 
 # Healthcheck para orquestadores (Railway, Cloud Run)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/liveness')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/readiness')"
 
 # Copiamos el entrypoint
 COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh

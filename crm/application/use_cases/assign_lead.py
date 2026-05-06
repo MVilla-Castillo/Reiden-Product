@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID
 
 from django.db import transaction
@@ -80,18 +80,28 @@ class AssignLeadUseCase:
             if tenant is None or tenant.get("routing_mode") != "AUTO":
                 raise ValueError("Routing AUTO no habilitado para este tenant")
 
-        if not is_auto and salesperson_id is not None and not isinstance(salesperson_id, str):
+        if (
+            not is_auto
+            and salesperson_id is not None
+            and not isinstance(salesperson_id, str)
+        ):
             sp = self._user_repo.find_by_id_and_tenant(salesperson_id, tenant_id)
             if sp is None:
                 raise ValueError("Usuario no encontrado en este tenant")
 
-        if is_auto or (salesperson_id is not None and not isinstance(salesperson_id, str)):
+        if is_auto or (
+            salesperson_id is not None and not isinstance(salesperson_id, str)
+        ):
             with transaction.atomic():
                 if is_auto:
-                    salespeople = self._user_repo.find_salespeople_by_tenant_locked(tenant_id)
+                    salespeople = self._user_repo.find_salespeople_by_tenant_locked(
+                        tenant_id
+                    )
                     if not salespeople:
                         raise ValueError("No hay vendedores disponibles en este tenant")
-                    selected = min(salespeople, key=lambda x: x["active_sessions_count"])
+                    selected = min(
+                        salespeople, key=lambda x: x["active_sessions_count"]
+                    )
                     salesperson_id = selected["id"]
                     sp = selected
                     logger.info(
@@ -106,12 +116,14 @@ class AssignLeadUseCase:
                         },
                     )
 
+                resolved_id = cast(UUID | None, salesperson_id)
                 result = self._session_repo.assign_salesperson(
-                    session_id, tenant_id, salesperson_id
+                    session_id, tenant_id, resolved_id
                 )
                 if result is None:
                     return None
 
+                assert sp is not None
                 self._audit_logger.record(
                     AuditEntry(
                         session_id=session_id,
@@ -125,7 +137,7 @@ class AssignLeadUseCase:
                         },
                         new_value={
                             "status": result.status,
-                            "salesperson_id": str(salesperson_id),
+                            "salesperson_id": str(resolved_id),
                             "salesperson_email": sp["email"],
                         },
                     )
@@ -134,7 +146,7 @@ class AssignLeadUseCase:
             return AssignLeadResult(
                 session_id=result.id,
                 status=result.status,
-                salesperson_id=salesperson_id,
+                salesperson_id=resolved_id,
                 salesperson_name=sp["email"].split("@")[0],
                 assigned_at=result.assigned_at.isoformat()
                 if result.assigned_at

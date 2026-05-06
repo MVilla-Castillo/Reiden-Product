@@ -19,7 +19,13 @@ from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.adapters.sse.broadcaster import broadcaster
 from crm.domain.entities import SessionEntity
-from crm.models import AppUser
+from crm.models import AppUser, ChatSession
+from crm.services.fsm_types import (
+    BudgetRange,
+    PaymentMethod,
+    PurchaseIntent,
+    VehicleType,
+)
 
 
 _CHILE_TZ = zoneinfo.ZoneInfo("America/Santiago")
@@ -34,9 +40,7 @@ def _to_chile(dt) -> str | None:
     return dt.astimezone(_CHILE_TZ).isoformat()
 
 
-def _serialize_session(
-    s: SessionEntity, users_cache: dict, leads_cache: dict
-) -> dict:
+def _serialize_session(s: SessionEntity, users_cache: dict, leads_cache: dict) -> dict:
     if users_cache is None or leads_cache is None:
         raise TypeError("users_cache y leads_cache son requeridos")
 
@@ -52,7 +56,9 @@ def _serialize_session(
         if s.salesperson_id in users_cache:
             salesperson_name = users_cache[s.salesperson_id]
         else:
-            raise KeyError(f"salesperson_id {s.salesperson_id} no encontrado en users_cache")
+            raise KeyError(
+                f"salesperson_id {s.salesperson_id} no encontrado en users_cache"
+            )
 
     return {
         "session_id": str(s.id),
@@ -94,23 +100,23 @@ def _build_filters(request: HttpRequest) -> dict:
         filters["date_to"] = parse_date_param(date_to_param, date.today())
 
     status = request.GET.get("status")
-    if status:
+    if status and status in ChatSession.Status.values:
         filters["status"] = status
 
     vehicle_type = request.GET.get("vehicle_type")
-    if vehicle_type:
+    if vehicle_type and vehicle_type in VehicleType.__members__.values():
         filters["vehicle_type"] = vehicle_type
 
     payment_method = request.GET.get("payment_method")
-    if payment_method:
+    if payment_method and payment_method in PaymentMethod.__members__.values():
         filters["payment_method"] = payment_method
 
     budget_range = request.GET.get("budget_range")
-    if budget_range:
+    if budget_range and budget_range in BudgetRange.__members__.values():
         filters["budget_range"] = budget_range
 
     purchase_intent = request.GET.get("purchase_intent")
-    if purchase_intent:
+    if purchase_intent and purchase_intent in PurchaseIntent.__members__.values():
         filters["purchase_intent"] = purchase_intent
 
     salesperson_id = request.GET.get("salesperson_id")
@@ -169,10 +175,14 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
     )
 
     salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
-    users_cache = session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
+    users_cache = (
+        session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
+    )
 
     lead_ids = {s.lead_id for s in sessions}
-    leads_cache = lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
+    leads_cache = (
+        lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
+    )
 
     data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 
@@ -198,10 +208,14 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
     sessions = session_repo.get_pending_sessions(tenant.id, limit=50)
 
     salesperson_ids = {s.salesperson_id for s in sessions if s.salesperson_id}
-    users_cache = session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
+    users_cache = (
+        session_repo.get_users_email_batch(salesperson_ids) if salesperson_ids else {}
+    )
 
     lead_ids = {s.lead_id for s in sessions}
-    leads_cache = lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
+    leads_cache = (
+        lead_repo.get_profile_names_batch(lead_ids, tenant.id) if lead_ids else {}
+    )
 
     data = [_serialize_session(s, users_cache, leads_cache) for s in sessions]
 
@@ -215,6 +229,10 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
     GET: Retorna configuración actual (incluyendo routing_mode).
     PATCH: Actualiza el modo de asignación (MANUAL/AUTO).
     """
+    user = getattr(request, "user", None)
+    if not user or not getattr(user, "is_authenticated", False):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
     tenant = getattr(request, "tenant", None)
     if not tenant:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
@@ -237,10 +255,6 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
         )
 
     if request.method == "PATCH":
-        user = getattr(request, "user", None)
-        if not user:
-            return JsonResponse({"error": "Usuario no autenticado."}, status=401)
-
         if user.role != AppUser.Role.MANAGER:
             return JsonResponse(
                 {"error": "Solo administradores pueden cambiar la configuración."},
@@ -295,13 +309,16 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
 def me_api(request):
     """Devuelve el perfil del usuario autenticado (rol, email)."""
     from django.http import JsonResponse
+
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return JsonResponse({"error": "Unauthorized"}, status=401)
-    return JsonResponse({
-        "id": str(user.id),
-        "email": user.email,
-        "role": user.role.lower(),  # 'manager', 'salesperson', 'admin'
-    })
+    return JsonResponse(
+        {
+            "id": str(user.id),
+            "email": user.email,
+            "role": user.role.lower(),  # 'manager', 'salesperson', 'admin'
+        }
+    )

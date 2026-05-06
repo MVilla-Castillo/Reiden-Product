@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('crm', '0016_alter_chatsession_salesperson_and_more'),
+        ("crm", "0016_alter_chatsession_salesperson_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='chatsession',
-            name='pending_assignment_at',
-            field=models.DateTimeField(blank=True, help_text='Timestamp cuando el lead completó el FSM y quedó en PENDING_ASSIGNMENT', null=True),
+            model_name="chatsession",
+            name="pending_assignment_at",
+            field=models.DateTimeField(
+                blank=True,
+                help_text="Timestamp cuando el lead completó el FSM y quedó en PENDING_ASSIGNMENT",
+                null=True,
+            ),
         ),
     ]

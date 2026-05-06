@@ -79,7 +79,7 @@ class ProcessMessageUseCase:
         audit_logger: AuditLogger,
         tenant_repo: TenantRepository,
         content_sids: dict[str, str] | None = None,
-        assign_lead_use_case=None,
+        assign_lead_use_case: Any = None,
     ) -> None:
         self._lead_repo = lead_repo
         self._session_repo = session_repo
@@ -268,6 +268,7 @@ class ProcessMessageUseCase:
                                 )
                             )
                 else:
+                    assert isinstance(expiration_result, SessionEntity)
                     session = expiration_result
             else:
                 is_expired = self._session_repo.check_session_expired(
@@ -517,10 +518,11 @@ class ProcessMessageUseCase:
         if reply_result and reply_result.text:
             stage_start("twilio_send")
             lead_phone = payload.get("From", "").replace("whatsapp:", "").lstrip("+")
-            lead_phone_masked = mask_pii(lead_phone)
 
             current_step = reply_result.updated_fsm_answers.get("current_step")
-            content_sid = self._content_sids.get(current_step)
+            content_sid = (
+                self._content_sids.get(str(current_step)) if current_step else None
+            )
 
             send_request = SendMessageRequest(
                 to_number=lead_phone,

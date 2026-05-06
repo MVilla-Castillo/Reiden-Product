@@ -146,7 +146,9 @@ def test_lead_find_wa_id(lead_repo: DjangoLeadRepository, tenant: Tenant) -> Non
 
 
 @pytest.mark.django_db
-def test_lead_find_wa_id_not_found(lead_repo: DjangoLeadRepository, tenant: Tenant) -> None:
+def test_lead_find_wa_id_not_found(
+    lead_repo: DjangoLeadRepository, tenant: Tenant
+) -> None:
     result = lead_repo.find_wa_id(uuid.uuid4(), tenant.id)
     assert result is None
 

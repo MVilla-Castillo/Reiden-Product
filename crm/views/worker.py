@@ -42,7 +42,10 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
     if len(request.body) > _MAX_BODY_LENGTH:
         logger.warning(
             "Worker: payload excede tamaño máximo.",
-            extra={"component_name": "process_message_worker", "size": len(request.body)},
+            extra={
+                "component_name": "process_message_worker",
+                "size": len(request.body),
+            },
         )
         return JsonResponse({"error": "Payload Too Large"}, status=413)
 

@@ -15,11 +15,13 @@ from uuid import uuid4
 
 from django.test import Client, override_settings
 
-from crm.models import Tenant, Lead, ChatSession, AppUser, Message
+from crm.models import AppUser, ChatSession, Lead, Message, Tenant
+
+_MIDDLEWARE = ["crm.tests.test_get_session_messages.MockMiddleware"]
 
 
 class MockMiddleware:
-    """Middleware para inyectar el tenant en tests."""
+    """Middleware para inyectar tenant en tests (session_messages_api no requiere user)."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -29,14 +31,14 @@ class MockMiddleware:
         return self.get_response(request)
 
 
-OVERM = override_settings(
-    MIDDLEWARE=["crm.tests.test_get_session_messages.MockMiddleware"]
-)
-
-
 @pytest.mark.django_db
 class TestSessionMessagesApi:
     """Tests para session_messages_api endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def _apply_middleware(self):
+        with override_settings(MIDDLEWARE=_MIDDLEWARE):
+            yield
 
     def test_get_messages_returns_200(
         self, client: Client, tenant: Tenant, lead: Lead, salesperson: AppUser
@@ -135,6 +137,11 @@ class TestSessionMessagesApi:
 @pytest.mark.django_db
 class TestSessionMessagesFilters:
     """Tests para filtrado de mensajes por tenant."""
+
+    @pytest.fixture(autouse=True)
+    def _apply_middleware(self):
+        with override_settings(MIDDLEWARE=_MIDDLEWARE):
+            yield
 
     def test_get_messages_filters_by_tenant(
         self, client: Client, tenant: Tenant, lead: Lead, salesperson: AppUser

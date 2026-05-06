@@ -83,8 +83,8 @@ def mask_pii(wa_id: str) -> str:
     return "****" + wa_id[-4:]
 
 
-_stage_timings: contextvars.ContextVar[dict[str, float]] = contextvars.ContextVar(
-    "_stage_timings", default=None
+_stage_timings: contextvars.ContextVar[dict[str, float] | None] = (
+    contextvars.ContextVar("_stage_timings", default=None)
 )
 
 

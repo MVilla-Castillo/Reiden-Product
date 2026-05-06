@@ -10,8 +10,7 @@ Coverage:
 """
 
 import pytest
-from django.test import Client, RequestFactory, override_settings
-from django.conf import settings
+from django.test import Client, override_settings
 
 from core.log_utils import trace_id_var, tenant_id_var
 from core.settings import _sentry_before_send
@@ -20,6 +19,7 @@ from core.settings import _sentry_before_send
 # ==============================================================================
 # Fixtures
 # ==============================================================================
+
 
 class _PassthroughMiddleware:
     """Middleware mínimo que no requiere tenant — para tests de infraestructura."""
@@ -48,6 +48,7 @@ INFRA = override_settings(MIDDLEWARE=_INFRA_MIDDLEWARE)
 # ==============================================================================
 # TraceIDMiddleware — X-Trace-ID en respuestas
 # ==============================================================================
+
 
 @pytest.mark.django_db
 @INFRA
@@ -80,6 +81,7 @@ def test_trace_id_propagated_from_request_header(client: Client) -> None:
 # CORS_EXPOSE_HEADERS — X-Trace-ID accesible por el browser Angular
 # ==============================================================================
 
+
 @pytest.mark.django_db
 @INFRA
 def test_cors_exposes_trace_id_header(client: Client) -> None:
@@ -101,6 +103,7 @@ def test_cors_exposes_trace_id_header(client: Client) -> None:
 # ==============================================================================
 # handler404 — JSON con trace_id (no HTML de Django)
 # ==============================================================================
+
 
 @pytest.mark.django_db
 @override_settings(
@@ -147,6 +150,7 @@ def test_handler404_trace_id_matches_request(client: Client) -> None:
 # handler500 — JSON con trace_id
 # ==============================================================================
 
+
 @pytest.mark.django_db
 @override_settings(
     MIDDLEWARE=_INFRA_MIDDLEWARE,
@@ -172,6 +176,7 @@ def test_handler500_returns_json_with_trace_id() -> None:
 # ==============================================================================
 # _sentry_before_send — inyecta trace_id y tenant_id como tags
 # ==============================================================================
+
 
 def test_sentry_before_send_injects_trace_id() -> None:
     """
@@ -239,6 +244,7 @@ def test_sentry_before_send_returns_event() -> None:
 # ==============================================================================
 # CSRF_TRUSTED_ORIGINS — PATCH desde localhost:4200 no produce 403
 # ==============================================================================
+
 
 @pytest.mark.django_db
 @override_settings(

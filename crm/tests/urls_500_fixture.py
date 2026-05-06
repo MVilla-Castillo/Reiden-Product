@@ -1,6 +1,6 @@
 """URL fixture para tests de handler500 — solo usado en tests."""
+
 from django.urls import path
-from django.http import HttpResponse
 
 from core.views.errors import handler404 as handler404  # noqa: F401
 from core.views.errors import handler500 as handler500  # noqa: F401
