@@ -1,5 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Observable, defer, from, switchMap, retry, timer } from 'rxjs';
+import { SessionService } from '../../core/services/session.service';
 
 export interface SseEvent {
   type: string;
@@ -10,13 +11,20 @@ export interface SseEvent {
 export class SseService {
   private readonly baseUrl = 'http://localhost:8000/api';
 
-  constructor(private ngZone: NgZone) {}
+  constructor(
+    private ngZone: NgZone,
+    private session: SessionService,
+  ) {}
 
   // Pide al backend un ticket de un solo uso (TTL 30s) para autenticar el SSE
   // sin exponer el JWT real en la URL ni en los logs del servidor.
   private async fetchTicket(): Promise<string> {
-    const token = localStorage.getItem('supabase_token');
-    const userId = localStorage.getItem('user_id') ?? '';
+    const token = this.session.token();
+    if (!token) {
+      // Sin sesión activa no tiene sentido reintentar — la sesión ya fue invalidada.
+      throw Object.assign(new Error('SSE: sesión no disponible'), { noRetry: true });
+    }
+    const userId = this.session.userId() ?? '';
     const res = await fetch(`${this.baseUrl}/sse/ticket/`, {
       method: 'POST',
       headers: {
@@ -24,6 +32,10 @@ export class SseService {
         'X-User-ID': userId,
       },
     });
+    if (res.status === 401) {
+      // Error de autenticación — reintentar no lo resolverá.
+      throw Object.assign(new Error(`SSE ticket: sesión inválida (401)`), { noRetry: true });
+    }
     if (!res.ok) throw new Error(`SSE ticket error: ${res.status}`);
     const { ticket } = await res.json();
     return ticket;
@@ -72,7 +84,10 @@ export class SseService {
       })),
       retry({
         count: 10,
-        delay: (_, attempt) => timer(Math.min(30_000, 1_000 * 2 ** attempt)),
+        delay: (err, attempt) => {
+          if ((err as any)?.noRetry) throw err;
+          return timer(Math.min(30_000, 1_000 * 2 ** attempt));
+        },
       })
     );
   }

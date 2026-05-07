@@ -17,6 +17,16 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+# collectstatic en build-time. DEBUG=true bypassa el fail-fast de settings.py.
+# Las vars dummy nunca llegan al runtime: el ENTRYPOINT recibe las reales.
+RUN SECRET_KEY=build-time-dummy-not-used-at-runtime \
+    DEBUG=true \
+    DATABASE_URL=postgres://dummy:dummy@localhost/dummy \
+    INTERNAL_SECRET=dummy \
+    SUPABASE_URL=https://dummy.supabase.co \
+    SUPABASE_JWT_SECRET=dummy \
+    /app/.venv/bin/python manage.py collectstatic --noinput --clear
+
 # ─────────────────────────────────────────────────────────
 FROM python:3.12-slim@sha256:46cb7cc2877e60fbd5e21a9ae6115c30ace7a077b9f8772da879e4590c18c2e3
 

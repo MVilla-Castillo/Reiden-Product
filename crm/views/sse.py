@@ -41,18 +41,32 @@ def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     SSE stream para el dashboard.
     Emite snapshot al conectar, luego deltas a medida que el broadcaster
     publica eventos (pending_leads, settings).
+
+    Autorización por rol:
+    - MANAGER/ADMIN: reciben snapshot completo y todos los eventos delta.
+    - SALESPERSON: snapshot filtrado a sus propias sesiones; solo reciben
+      eventos delta de pending_leads donde salesperson_id == su propio id.
     """
+    from crm.models import AppUser
+
     tenant = getattr(request, "tenant", None)
+    user = getattr(request, "user", None)
     if tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+    if user is None:
+        return JsonResponse({"error": "Usuario no definido."}, status=403)
 
+    is_manager = user.role in (AppUser.Role.MANAGER, AppUser.Role.ADMIN)
+    user_id_str = str(user.id)
     tenant_id = str(tenant.id)
     q = broadcaster.subscribe_dashboard(tenant_id)
-    logger.debug("SSE dashboard: nueva conexión (tenant=%s)", tenant_id)
+    logger.debug(
+        "SSE dashboard: nueva conexión (tenant=%s, user=%s)", tenant_id, user_id_str
+    )
 
     def event_stream():
         try:
-            yield _build_dashboard_snapshot(tenant)
+            yield _build_dashboard_snapshot(tenant, user)
 
             while True:
                 try:
@@ -60,7 +74,8 @@ def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
                     # threading.Queue.get() es thread-safe: cualquier thread WSGI puede
                     # publicar con put_nowait() y este get() lo recibe inmediatamente.
                     msg = q.get(block=True, timeout=HEARTBEAT_INTERVAL)
-                    yield msg
+                    if is_manager or _should_forward_to_salesperson(msg, user_id_str):
+                        yield msg
                 except _queue.Empty:
                     # Timeout sin mensajes → envía comentario SSE para mantener la conexión
                     yield heartbeat_frame()
@@ -83,10 +98,33 @@ def messages_sse_view(request: HttpRequest, session_id: UUID) -> StreamingHttpRe
     """
     SSE stream para mensajes de una sesión.
     Emite eventos 'message' y 'status_change' en tiempo real.
+
+    Autorización: MANAGER/ADMIN acceden a cualquier sesión del tenant.
+    SALESPERSON solo puede suscribirse a la sesión que tiene asignada.
     """
+    from crm.adapters.dependency_injection import DIContainer
+    from crm.models import AppUser
+
     tenant = getattr(request, "tenant", None)
+    user = getattr(request, "user", None)
     if tenant is None:
         return JsonResponse({"error": "Tenant no definido."}, status=403)
+    if user is None:
+        return JsonResponse({"error": "Usuario no definido."}, status=403)
+
+    is_manager = user.role in (AppUser.Role.MANAGER, AppUser.Role.ADMIN)
+    if not is_manager:
+        container = DIContainer.instance()
+        session = container.session_repo.find_by_id(session_id, tenant.id)
+        if session is None:
+            return JsonResponse({"error": "Sesión no encontrada."}, status=404)
+        if session.salesperson_id != user.id:
+            return JsonResponse(
+                {
+                    "error": "Solo el vendedor asignado o un manager puede ver estos mensajes."
+                },
+                status=403,
+            )
 
     tenant_id = str(tenant.id)
     session_id_str = str(session_id)
@@ -124,22 +162,64 @@ def messages_sse_view(request: HttpRequest, session_id: UUID) -> StreamingHttpRe
     return response
 
 
-def _build_dashboard_snapshot(tenant) -> str:
+def _should_forward_to_salesperson(msg: str, user_id: str) -> bool:
+    """
+    Decide si un evento delta del broadcaster debe enviarse a un SALESPERSON.
+
+    - pending_leads: solo si el payload contiene salesperson_id == user_id.
+    - settings: nunca (los vendedores no gestionan configuración del tenant).
+    - Cualquier otro evento no reconocido: no se reenvía.
+    """
+    try:
+        event_name = ""
+        data_json = ""
+        for line in msg.split("\n"):
+            if line.startswith("event: "):
+                event_name = line[7:]
+            elif line.startswith("data: "):
+                data_json = line[6:]
+        if event_name == "pending_leads" and data_json:
+            return json.loads(data_json).get("salesperson_id") == user_id
+        return False
+    except Exception:
+        return False
+
+
+def _build_dashboard_snapshot(tenant, user=None) -> str:
     """
     Consulta DB de forma síncrona y construye el frame SSE 'snapshot'
     con pending_leads, salespeople y settings en una sola respuesta.
     Se llama desde el generador síncrono — no necesita sync_to_async.
+
+    El contenido se filtra según el rol del usuario:
+    - MANAGER/ADMIN: snapshot completo (todos los leads, pending, vendedores, settings).
+    - SALESPERSON: solo sus propias sesiones asignadas; sin pending, sin lista de vendedores,
+      sin settings (consistente con lo que retorna el REST API leads_dashboard_api).
     """
     from crm.adapters.dependency_injection import DIContainer
+    from crm.models import AppUser
     from crm.views.dashboard import _serialize_session
 
     container = DIContainer.instance()
     tenant_id = tenant.id
 
-    pending = container.session_repo.get_pending_sessions(tenant_id, limit=50)
-    all_leads = container.session_repo.get_dashboard_sessions(tenant_id, limit=100)
-    salespeople = container.user_repo.find_salespeople_by_tenant(tenant_id)
-    settings_data = container.tenant_repo.find_by_id(tenant_id)
+    is_manager = user is None or user.role in (AppUser.Role.MANAGER, AppUser.Role.ADMIN)
+
+    pending = (
+        list(container.session_repo.get_pending_sessions(tenant_id, limit=50))
+        if is_manager
+        else []
+    )
+
+    session_filters = None if is_manager else {"salesperson_id": str(user.id)}
+    all_leads = container.session_repo.get_dashboard_sessions(
+        tenant_id, limit=100, filters=session_filters
+    )
+
+    salespeople = (
+        container.user_repo.find_salespeople_by_tenant(tenant_id) if is_manager else []
+    )
+    settings_data = container.tenant_repo.find_by_id(tenant_id) if is_manager else None
 
     all_sessions = list(pending) + list(all_leads)
     salesperson_ids = {s.salesperson_id for s in all_sessions if s.salesperson_id}

@@ -9,12 +9,17 @@ if [ "${ENVIRONMENT:-}" = "production" ]; then
     fi
 fi
 
-echo "[entrypoint] Iniciando migraciones..."
-python manage.py migrate --no-input
-echo "[entrypoint] Migraciones completadas."
+# Migraciones opt-in. En prod (Railway) se setea RUN_MIGRATIONS_ON_BOOT=false
+# y las migraciones corren en un release-job aparte para evitar que N réplicas
+# intenten migrar simultáneamente. En dev queda true por default.
+if [ "${RUN_MIGRATIONS_ON_BOOT:-true}" = "true" ]; then
+    echo "[entrypoint] Iniciando migraciones..."
+    /app/.venv/bin/python manage.py migrate --no-input
+    echo "[entrypoint] Migraciones completadas."
+else
+    echo "[entrypoint] Migraciones omitidas (RUN_MIGRATIONS_ON_BOOT=false)."
+fi
 
-echo "[entrypoint] Recopilando archivos estáticos..."
-python manage.py collectstatic --no-input --quiet
-echo "[entrypoint] Estáticos listos."
+# collectstatic se ejecuta en build-time (ver Dockerfile). No correr en boot.
 
 exec "$@"
