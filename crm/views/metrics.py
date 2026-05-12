@@ -14,16 +14,16 @@ from core.date_utils import get_date_range_from_filter, parse_date_param
 from core.rate_limit import check_rate_limit
 from crm.adapters.dependency_injection import DIContainer
 from crm.models import AppUser
+from crm.views._decorators import require_tenant
 
 
+@require_tenant
 def metrics_api(request: HttpRequest) -> JsonResponse:
     """Retorna métricas agregadas para el dashboard gerencial."""
     if request.method != "GET":
         return JsonResponse({"error": "Method Not Allowed"}, status=405)
 
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
+    tenant = request.tenant
 
     user = getattr(request, "user", None)
     if user and user.role not in (AppUser.Role.MANAGER, AppUser.Role.ADMIN):

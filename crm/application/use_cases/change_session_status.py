@@ -14,6 +14,7 @@ from uuid import UUID
 
 from django.db import transaction
 
+from crm.domain.exceptions import DomainValidationError
 from crm.domain.ports import AuditEntry, AuditLogger, SessionRepository
 
 logger = logging.getLogger(__name__)
@@ -46,15 +47,17 @@ class ChangeSessionStatusUseCase:
         lost_reason: str | None = None,
     ) -> ChangeSessionStatusResult | None:
         if new_status not in VALID_CLOSE_STATUSES:
-            raise ValueError(
+            raise DomainValidationError(
                 f"Estado no válido: '{new_status}'. Solo se permiten: {VALID_CLOSE_STATUSES}"
             )
 
         if new_status == "PERDIDO" and not lost_reason:
-            raise ValueError("lost_reason es obligatorio para estado PERDIDO")
+            raise DomainValidationError(
+                "lost_reason es obligatorio para estado PERDIDO"
+            )
 
         if lost_reason and len(lost_reason) > _MAX_LOST_REASON_LENGTH:
-            raise ValueError(
+            raise DomainValidationError(
                 f"lost_reason no puede superar {_MAX_LOST_REASON_LENGTH} caracteres"
             )
 

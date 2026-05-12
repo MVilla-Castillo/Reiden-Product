@@ -153,7 +153,11 @@ class TestUpdateLeadApi:
         assert body["name_history"][0]["new_name"] == "Actual"
 
     def test_patch_publishes_lead_updated_event(
-        self, client: Client, tenant: Tenant, lead: Lead
+        self,
+        client: Client,
+        tenant: Tenant,
+        lead: Lead,
+        django_capture_on_commit_callbacks,
     ) -> None:
         """Tras un cambio real de nombre se publica un evento SSE para sincronizar otras vistas."""
         lead.profile_name = "Antes"
@@ -163,11 +167,12 @@ class TestUpdateLeadApi:
         with mock_patch(
             "crm.views.dashboard_messages.broadcaster.publish_dashboard"
         ) as mock_publish:
-            response = client.patch(
-                f"/api/dashboard/leads/{session.id}/lead/",
-                data=json.dumps({"lead_profile_name": "Despues"}),
-                content_type="application/json",
-            )
+            with django_capture_on_commit_callbacks(execute=True):
+                response = client.patch(
+                    f"/api/dashboard/leads/{session.id}/lead/",
+                    data=json.dumps({"lead_profile_name": "Despues"}),
+                    content_type="application/json",
+                )
 
         assert response.status_code == 200
         assert mock_publish.called
@@ -180,7 +185,11 @@ class TestUpdateLeadApi:
         assert payload["lead_profile_name"] == "Despues"
 
     def test_patch_same_name_does_not_publish_event(
-        self, client: Client, tenant: Tenant, lead: Lead
+        self,
+        client: Client,
+        tenant: Tenant,
+        lead: Lead,
+        django_capture_on_commit_callbacks,
     ) -> None:
         lead.profile_name = "Igual"
         lead.save(update_fields=["profile_name"])
@@ -189,11 +198,12 @@ class TestUpdateLeadApi:
         with mock_patch(
             "crm.views.dashboard_messages.broadcaster.publish_dashboard"
         ) as mock_publish:
-            client.patch(
-                f"/api/dashboard/leads/{session.id}/lead/",
-                data=json.dumps({"lead_profile_name": "Igual"}),
-                content_type="application/json",
-            )
+            with django_capture_on_commit_callbacks(execute=True):
+                client.patch(
+                    f"/api/dashboard/leads/{session.id}/lead/",
+                    data=json.dumps({"lead_profile_name": "Igual"}),
+                    content_type="application/json",
+                )
 
         assert not mock_publish.called
 

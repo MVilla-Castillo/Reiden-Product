@@ -16,6 +16,7 @@ import logging
 import secrets
 from typing import Any
 
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -50,48 +51,57 @@ def process_message_worker_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Payload Too Large"}, status=413)
 
     try:
-        payload: dict[str, Any] = json.loads(request.body)
+        payload_raw = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({"error": "Bad Request: JSON inválido"}, status=400)
 
-    message_sid = payload.get("MessageSid", "")
-    if not message_sid:
+    if not isinstance(payload_raw, dict):
+        return JsonResponse(
+            {"error": "Bad Request: el cuerpo debe ser un objeto JSON"}, status=400
+        )
+    payload: dict[str, Any] = payload_raw
+
+    message_sid_raw = payload.get("MessageSid", "")
+    if not isinstance(message_sid_raw, str) or not message_sid_raw:
         return JsonResponse({"error": "Bad Request: MessageSid requerido"}, status=400)
+    message_sid = message_sid_raw
 
     # Restaurar trace_id y tenant_id desde payload para logging estructurado
     trace_id_token = trace_id_var.set(payload.get("trace_id", "-"))
     tenant_token = tenant_id_var.set("-")
     try:
-        result = get_use_case().execute(payload)
+        with transaction.atomic():
+            result = get_use_case().execute(payload)
 
-        if result.message_created and result.session_id and result.tenant_id:
-            from datetime import datetime, timezone
-            from crm.adapters.sse.broadcaster import broadcaster
+            if result.message_created and result.session_id and result.tenant_id:
+                from datetime import datetime, timezone
+                from crm.adapters.sse.broadcaster import broadcaster
 
-            ts = datetime.now(timezone.utc).isoformat()
-            tenant_id_str = str(result.tenant_id)
-            session_id_str = str(result.session_id)
-            broadcaster.publish_message(
-                tenant_id_str,
-                session_id_str,
-                "message",
-                {
+                ts = datetime.now(timezone.utc).isoformat()
+                tenant_id_str = str(result.tenant_id)
+                session_id_str = str(result.session_id)
+                message_payload = {
                     "direction": "INBOUND",
                     "body": result.inbound_message_body or "",
                     "session_id": session_id_str,
                     "timestamp": ts,
-                },
-            )
-            broadcaster.publish_dashboard(
-                tenant_id_str,
-                "pending_leads",
-                {
+                }
+                dashboard_payload = {
                     "session_id": session_id_str,
                     "action": "new_inbound_message",
                     "pending_delta": 1,
                     "timestamp": ts,
-                },
-            )
+                }
+                transaction.on_commit(
+                    lambda: broadcaster.publish_message(
+                        tenant_id_str, session_id_str, "message", message_payload
+                    )
+                )
+                transaction.on_commit(
+                    lambda: broadcaster.publish_dashboard(
+                        tenant_id_str, "pending_leads", dashboard_payload
+                    )
+                )
 
         return JsonResponse(
             {"status": result.status, "created": result.message_created},

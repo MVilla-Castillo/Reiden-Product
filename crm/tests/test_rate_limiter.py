@@ -136,9 +136,68 @@ class TestRateLimitConcurrency(TransactionTestCase):
         assert allowed == 10
         assert len(errors) == 0
 
+        from django.db.models import Sum
+
         total_count = WebhookRateLimit.objects.filter(
             tenant_id=tenant.id,
-        ).aggregate(
-            total=__import__("django.db.models", fromlist=["Sum"]).Sum("request_count")
-        )["total"]
+        ).aggregate(total=Sum("request_count"))["total"]
         assert total_count == 10
+
+    def test_concurrent_requests_exceeding_max_block_exactly_the_excess(self) -> None:
+        """
+        50 hilos simultáneos con max_requests=30 deben permitir EXACTAMENTE 30 y
+        bloquear EXACTAMENTE 20. Antes del fix A3, la race condition permitía
+        que algunos requests sobrantes pasaran (overcount).
+        """
+        tenant = Tenant.objects.create(
+            nombre_legal="Overflow Tenant",
+            rut_empresa="55.555.555-5",
+            phone_number_id="56955555555",
+            waba_id="WABA_OVERFLOW_RATE",
+            is_verified=True,
+        )
+
+        n_threads = 50
+        max_req = 30
+        barrier = threading.Barrier(n_threads)
+        results: list[str] = []
+        errors: list[str] = []
+        lock = threading.Lock()
+
+        def worker() -> None:
+            barrier.wait()
+            try:
+                check_rate_limit(tenant.id, "56912345678", max_requests=max_req)
+                outcome = "allowed"
+            except RateLimitExceeded:
+                outcome = "blocked"
+            except Exception as e:
+                with lock:
+                    errors.append(str(e))
+                outcome = "error"
+            with lock:
+                results.append(outcome)
+
+        with ThreadPoolExecutor(max_workers=n_threads) as executor:
+            futures = [executor.submit(worker) for _ in range(n_threads)]
+            for future in as_completed(futures):
+                future.result()
+
+        allowed = sum(1 for r in results if r == "allowed")
+        blocked = sum(1 for r in results if r == "blocked")
+
+        # Crítico: el contador de la DB no puede superar el límite tras los rollbacks.
+        from django.db.models import Sum
+
+        total_count = (
+            WebhookRateLimit.objects.filter(tenant_id=tenant.id).aggregate(
+                total=Sum("request_count")
+            )["total"]
+            or 0
+        )
+
+        assert errors == []
+        assert allowed + blocked == n_threads
+        assert allowed == max_req, f"esperaba {max_req} allowed, obtuvo {allowed}"
+        assert blocked == n_threads - max_req
+        assert total_count == max_req

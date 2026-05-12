@@ -899,7 +899,7 @@ class DjangoMessageRepository(MessageRepository):
                 is_deleted=False,
             )
             .order_by("created_at")
-            .select_related("session")[offset : offset + limit]
+            .select_related("session__lead")[offset : offset + limit]
         )
         return [_message_to_entity(m) for m in models]
 

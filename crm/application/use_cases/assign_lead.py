@@ -20,6 +20,11 @@ from uuid import UUID
 from django.db import transaction
 
 from core.log_utils import trace_id_var
+from crm.domain.exceptions import (
+    RoutingNotEnabledError,
+    SalespersonNotFoundError,
+    SalespersonUnavailableError,
+)
 from crm.domain.ports import (
     AuditEntry,
     AuditLogger,
@@ -78,7 +83,9 @@ class AssignLeadUseCase:
         if is_auto:
             tenant = self._tenant_repo.find_by_id(tenant_id)
             if tenant is None or tenant.get("routing_mode") != "AUTO":
-                raise ValueError("Routing AUTO no habilitado para este tenant")
+                raise RoutingNotEnabledError(
+                    "Routing AUTO no habilitado para este tenant"
+                )
 
         if (
             not is_auto
@@ -87,7 +94,7 @@ class AssignLeadUseCase:
         ):
             sp = self._user_repo.find_by_id_and_tenant(salesperson_id, tenant_id)
             if sp is None:
-                raise ValueError("Usuario no encontrado en este tenant")
+                raise SalespersonNotFoundError("Usuario no encontrado en este tenant")
 
         if is_auto or (
             salesperson_id is not None and not isinstance(salesperson_id, str)
@@ -98,7 +105,9 @@ class AssignLeadUseCase:
                         tenant_id
                     )
                     if not salespeople:
-                        raise ValueError("No hay vendedores disponibles en este tenant")
+                        raise SalespersonUnavailableError(
+                            "No hay vendedores disponibles en este tenant"
+                        )
                     selected = min(
                         salespeople, key=lambda x: x["active_sessions_count"]
                     )

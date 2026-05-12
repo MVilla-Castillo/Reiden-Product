@@ -196,6 +196,12 @@ class LeadNameHistory(models.Model):
 
     class Meta:
         ordering = ["-changed_at"]
+        indexes = [
+            models.Index(
+                fields=["lead", "-changed_at"],
+                name="idx_leadhist_lead_changed",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.old_name} → {self.new_name}"

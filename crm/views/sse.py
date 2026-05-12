@@ -30,12 +30,14 @@ from uuid import UUID
 from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 
 from crm.adapters.sse.broadcaster import broadcaster, heartbeat_frame
+from crm.views._decorators import require_tenant
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 25  # segundos — tiempo máximo entre heartbeats
 
 
+@require_tenant
 def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     """
     SSE stream para el dashboard.
@@ -49,10 +51,8 @@ def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     """
     from crm.models import AppUser
 
-    tenant = getattr(request, "tenant", None)
+    tenant = request.tenant
     user = getattr(request, "user", None)
-    if tenant is None:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
     if user is None:
         return JsonResponse({"error": "Usuario no definido."}, status=403)
 
@@ -94,6 +94,7 @@ def dashboard_sse_view(request: HttpRequest) -> StreamingHttpResponse:
     return response
 
 
+@require_tenant
 def messages_sse_view(request: HttpRequest, session_id: UUID) -> StreamingHttpResponse:
     """
     SSE stream para mensajes de una sesión.
@@ -105,10 +106,8 @@ def messages_sse_view(request: HttpRequest, session_id: UUID) -> StreamingHttpRe
     from crm.adapters.dependency_injection import DIContainer
     from crm.models import AppUser
 
-    tenant = getattr(request, "tenant", None)
+    tenant = request.tenant
     user = getattr(request, "user", None)
-    if tenant is None:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
     if user is None:
         return JsonResponse({"error": "Usuario no definido."}, status=403)
 

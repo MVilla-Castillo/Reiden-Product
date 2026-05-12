@@ -61,6 +61,7 @@ ignore_errors = true
 module = [
     "crm.views.dashboard_messages",
     "crm.views.dashboard",
+    "crm.views.metrics",
     "crm.views.sse",
     "crm.views.scheduler",
     "crm.views.webhook",

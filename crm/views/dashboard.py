@@ -7,10 +7,10 @@ Incluye rate limiting para proteger contra abuso (60 req/min por tenant).
 
 from __future__ import annotations
 
-import json
 import zoneinfo
 from datetime import datetime, timezone
 
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -26,6 +26,8 @@ from crm.services.fsm_types import (
     PurchaseIntent,
     VehicleType,
 )
+from crm.views._decorators import require_tenant
+from crm.views._validation import parse_json_body
 
 
 _CHILE_TZ = zoneinfo.ZoneInfo("America/Santiago")
@@ -140,14 +142,12 @@ def _build_filters(request: HttpRequest) -> dict:
     return filters
 
 
+@require_tenant
 def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
     if request.method != "GET":
         return JsonResponse({"error": "Method Not Allowed"}, status=405)
 
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
-
+    tenant = request.tenant
     rate_key = f"dashboard:{tenant.id}"
     if not check_rate_limit(rate_key, max_requests=60, window=60):
         return JsonResponse(
@@ -189,15 +189,13 @@ def leads_dashboard_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"leads": data, "count": len(data)}, status=200)
 
 
+@require_tenant
 def pending_leads_api(request: HttpRequest) -> JsonResponse:
     """API para obtener la cola de leads pendientes de asignación."""
     if request.method != "GET":
         return JsonResponse({"error": "Method Not Allowed"}, status=405)
 
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
-
+    tenant = request.tenant
     user = getattr(request, "user", None)
     if user and user.role not in (AppUser.Role.MANAGER, AppUser.Role.ADMIN):
         return JsonResponse({"error": "Acceso restringido a gerentes."}, status=403)
@@ -223,6 +221,7 @@ def pending_leads_api(request: HttpRequest) -> JsonResponse:
 
 
 @csrf_exempt
+@require_tenant
 def tenant_settings_api(request: HttpRequest) -> JsonResponse:
     """
     API para obtener y actualizar configuración del tenant.
@@ -233,10 +232,7 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
     if not user or not getattr(user, "is_authenticated", False):
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        return JsonResponse({"error": "Tenant no definido."}, status=403)
-
+    tenant = request.tenant
     tenant_repo = DIContainer.instance().tenant_repo
 
     if request.method == "GET":
@@ -261,10 +257,9 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
                 status=403,
             )
 
-        try:
-            body = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "JSON inválido."}, status=400)
+        body, err = parse_json_body(request)
+        if err is not None:
+            return err
 
         new_routing_mode = body.get("routing_mode")
         if new_routing_mode is None:
@@ -279,21 +274,24 @@ def tenant_settings_api(request: HttpRequest) -> JsonResponse:
                 status=400,
             )
 
-        success = tenant_repo.update_routing_mode(tenant.id, new_routing_mode)
-        if not success:
-            return JsonResponse(
-                {"error": "Error al actualizar routing_mode."},
-                status=500,
-            )
+        with transaction.atomic():
+            success = tenant_repo.update_routing_mode(tenant.id, new_routing_mode)
+            if not success:
+                return JsonResponse(
+                    {"error": "Error al actualizar routing_mode."},
+                    status=500,
+                )
 
-        broadcaster.publish_dashboard(
-            str(tenant.id),
-            "settings",
-            {
+            tenant_id_str = str(tenant.id)
+            payload = {
                 "routing_mode": new_routing_mode,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
+            }
+            transaction.on_commit(
+                lambda: broadcaster.publish_dashboard(
+                    tenant_id_str, "settings", payload
+                )
+            )
 
         return JsonResponse(
             {
