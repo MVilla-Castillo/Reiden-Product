@@ -2,9 +2,12 @@
 
   <!-- Header -->
   <div class="reports-header">
-    <div class="reports-breadcrumb">Stelard › Reportes</div>
+    <div class="reports-breadcrumb-row">
+      <div class="reports-breadcrumb">Stelard › Reportes</div>
+      <app-guide-button tab="reports"></app-guide-button>
+    </div>
     <div class="reports-controls">
-      <div class="date-filter">
+      <div class="date-filter" data-guide="reports-date-filter">
         @for (opt of dateOptions; track opt.value) {
           <button
             class="filter-btn"
@@ -40,7 +43,7 @@
   }
 
   <!-- Sección 1: KPIs gerenciales -->
-  <section class="reports-section">
+  <section class="reports-section" data-guide="reports-kpis">
     <div class="section-label">Métricas del período</div>
     @if (loading()) {
       <div class="kpi-grid">
@@ -83,7 +86,7 @@
   </section>
 
   <!-- Sección 2: Leaderboard -->
-  <section class="reports-section">
+  <section class="reports-section" data-guide="reports-leaderboard">
     <div class="section-label">Leaderboard de vendedores</div>
     @if (loading()) {
       <app-skeleton width="100%" height="200px" radius="12px"></app-skeleton>
@@ -127,7 +130,7 @@
 
   <!-- Sección 3: KPIs por vendedor -->
   @if (!loading() && leaderboard.length > 0) {
-    <section class="reports-section">
+    <section class="reports-section" data-guide="reports-detail-cards">
       <div class="section-label">Detalle por vendedor</div>
       <div class="vendor-cards">
         @for (sp of leaderboard; track sp.salesperson_id) {

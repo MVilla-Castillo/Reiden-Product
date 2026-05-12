@@ -26,6 +26,7 @@
         @if (isManager() && tenantSettings()) {
           <button
             class="routing-badge"
+            data-guide="dashboard-routing-toggle"
             [class.auto]="tenantSettings()!.routing_mode === 'AUTO'"
             [class.manual]="tenantSettings()!.routing_mode === 'MANUAL'"
             (click)="toggleRoutingMode()">
@@ -33,15 +34,13 @@
             <span class="routing-mode">{{ tenantSettings()!.routing_mode }}</span>
           </button>
         }
+        <app-guide-button tab="dashboard"></app-guide-button>
       </div>
     </div>
   </div>
 
   @if (isManager() && !metrics()) {
     <section class="kpi-section">
-      <div class="kpi-section-header">
-        <app-skeleton width="180px" height="24px"></app-skeleton>
-      </div>
       <div class="kpi-cards">
         @for (i of [1,2,3,4]; track i) {
           <div class="kpi-skeleton">
@@ -60,18 +59,17 @@
     <section class="kpi-section">
       <div class="kpi-section-header">
         <span class="kpi-section-title">KPIs en tiempo real</span>
-        @if (isManager()) {
-          <button
-            class="btn-refresh-metrics"
-            (click)="refreshMetrics()"
-            [disabled]="isRefreshing()"
-            title="Sincronizar métricas con base de datos">
-            <app-icon name="arrow-path" [size]="18" [class.cssClass]="isRefreshing() ? 'spinning' : ''"></app-icon>
-          </button>
-        }
+        <button
+          class="btn-refresh-metrics"
+          data-guide="dashboard-refresh"
+          (click)="refreshMetrics()"
+          [disabled]="isRefreshing()"
+          title="Sincronizar métricas con base de datos">
+          <app-icon name="arrow-path" [size]="18" [class.cssClass]="isRefreshing() ? 'spinning' : ''"></app-icon>
+        </button>
       </div>
 
-      <div class="kpi-cards">
+      <div class="kpi-cards" data-guide="dashboard-kpis">
         <app-kpi-card
           icon="clock"
           [value]="formatMinutes(metrics()!.time_metrics.avg_time_to_first_response)"
@@ -98,7 +96,7 @@
 
   }
 
-  <section class="leads-section">
+  <section class="leads-section" data-guide="dashboard-pending-grid">
     <div class="section-header">
       <h2>{{ isManager() ? 'Leads Pendientes' : 'Mis Leads' }}</h2>
       <span class="lead-count">{{ leads().length }} registros</span>

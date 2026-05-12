@@ -1,0 +1,226 @@
+:host {
+  display: block;
+}
+
+.guide-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  color: var(--color-text, #111827);
+}
+
+.guide-svg {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+}
+
+.highlight-ring {
+  position: fixed;
+  border: 2px solid var(--color-primary, #3b82f6);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 4px rgba(59, 130, 246, 0.25),
+    0 8px 32px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+}
+
+.guide-tooltip {
+  position: fixed;
+  background: var(--color-surface, #ffffff);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+  padding: 1.1rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  transition: top 0.18s ease, bottom 0.18s ease, left 0.18s ease;
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+
+  h3 {
+    margin: 0;
+    font-size: var(--font-md, 1rem);
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.3;
+    font-family: 'Montserrat', var(--font-sans, 'Inter', system-ui, sans-serif);
+  }
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--color-muted, #6b7280);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: rgba(15, 23, 42, 0.05);
+    color: #111827;
+  }
+}
+
+.tooltip-body {
+  .desc {
+    margin: 0;
+    font-size: var(--font-sm, 0.875rem);
+    color: var(--color-text, #1f2937);
+    line-height: 1.5;
+
+    &.clamped {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  .expand-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-primary, #3b82f6);
+    font-size: var(--font-xs, 0.75rem);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 0.25rem;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+
+  .step-counter {
+    font-size: var(--font-xs, 0.75rem);
+    color: var(--color-muted, #6b7280);
+    font-weight: 600;
+  }
+
+  .tooltip-actions {
+    display: flex;
+    gap: 0.45rem;
+  }
+}
+
+.btn-primary,
+.btn-secondary {
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text, #1f2937);
+  border: 1px solid var(--color-border, #e5e7eb);
+
+  &:hover:not(:disabled) {
+    background: rgba(15, 23, 42, 0.04);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.guide-loading,
+.guide-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-surface, #ffffff);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+  padding: 1.5rem 1.75rem;
+  max-width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  h3 {
+    margin: 0;
+    font-size: var(--font-md, 1rem);
+    font-weight: 700;
+    color: #111827;
+  }
+
+  p {
+    margin: 0;
+    font-size: var(--font-sm, 0.875rem);
+    color: var(--color-text, #1f2937);
+    line-height: 1.5;
+  }
+}
+
+.guide-message-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #3b82f6);
+  border-radius: 50%;
+  animation: guide-spin 0.8s linear infinite;
+}
+
+@keyframes guide-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Backdrop sin foco visual cuando hay loading/error/missing (no hay rect target) */
+.guide-root:has(.guide-loading),
+.guide-root:has(.guide-message) {
+  background: rgba(15, 23, 42, 0.45);
+}

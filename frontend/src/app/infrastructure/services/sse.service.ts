@@ -93,7 +93,7 @@ export class SseService {
   }
 
   dashboardStream(): Observable<SseEvent> {
-    return this.connect('/sse/dashboard/', ['snapshot', 'pending_leads', 'settings']);
+    return this.connect('/sse/dashboard/', ['snapshot', 'pending_leads', 'settings', 'lead_updated']);
   }
 
   messagesStream(sessionId: string): Observable<SseEvent> {

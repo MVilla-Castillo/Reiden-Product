@@ -1,0 +1,110 @@
+@if (tour.isActive()) {
+  <div
+    class="guide-root"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="guide-tooltip-title"
+    (click)="onBackdropClick($event)"
+  >
+    @if (tour.isLoading()) {
+      <div class="guide-loading">
+        <div class="spinner"></div>
+        <span>Cargando guía…</span>
+      </div>
+    } @else if (tour.error()) {
+      <div class="guide-message">
+        <h3>No se pudo abrir la guía</h3>
+        <p>{{ tour.error() }}</p>
+        <button class="btn-secondary" (click)="tour.close()">Cerrar</button>
+      </div>
+    } @else if (missingTarget()) {
+      <div class="guide-message">
+        <h3>{{ tour.currentStep()?.title }}</h3>
+        <p>
+          No encontramos este elemento en la pantalla actual. Es posible que se
+          muestre solo bajo ciertas condiciones (por ejemplo, al seleccionar leads).
+        </p>
+        <div class="guide-message-actions">
+          <button class="btn-secondary" (click)="tour.close()">Salir</button>
+          <button class="btn-primary" (click)="onSkipMissing()">
+            @if (tour.index() < tour.total() - 1) { Saltar paso } @else { Finalizar }
+          </button>
+        </div>
+      </div>
+    } @else if (rect()) {
+      <svg class="guide-svg" [attr.width]="viewportWidth()" [attr.height]="viewportHeight()" aria-hidden="true">
+        <defs>
+          <mask id="guideHole">
+            <rect width="100%" height="100%" fill="white" />
+            @if (holeStyle(); as h) {
+              <rect
+                [attr.x]="h.x"
+                [attr.y]="h.y"
+                [attr.width]="h.width"
+                [attr.height]="h.height"
+                rx="10"
+                ry="10"
+                fill="black"
+              />
+            }
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(15, 23, 42, 0.62)" mask="url(#guideHole)" />
+      </svg>
+
+      @if (holeStyle(); as h) {
+        <div
+          class="highlight-ring"
+          [style.top.px]="h.y"
+          [style.left.px]="h.x"
+          [style.width.px]="h.width"
+          [style.height.px]="h.height"
+          aria-hidden="true"
+        ></div>
+      }
+
+      @if (tooltipPos(); as p) {
+        <div
+          class="guide-tooltip"
+          [class]="'placement-' + p.placement"
+          [style.top.px]="p.top"
+          [style.bottom.px]="p.bottom"
+          [style.left.px]="p.left"
+          [style.width.px]="340"
+        >
+          <header class="tooltip-header">
+            <h3 id="guide-tooltip-title">{{ tour.currentStep()?.title }}</h3>
+            <button class="btn-icon" aria-label="Cerrar guía" (click)="tour.close()">×</button>
+          </header>
+
+          <div class="tooltip-body" [class.expanded]="expanded()">
+            <p class="desc" [class.clamped]="!expanded()">
+              {{ tour.currentStep()?.desc }}
+            </p>
+            <button class="expand-btn" (click)="toggleExpand()" type="button">
+              {{ expanded() ? 'Ver menos' : 'Ver más' }}
+            </button>
+          </div>
+
+          <footer class="tooltip-footer">
+            <span class="step-counter">
+              Paso {{ tour.index() + 1 }} de {{ tour.total() }}
+            </span>
+            <div class="tooltip-actions">
+              <button
+                class="btn-secondary"
+                (click)="tour.prev()"
+                [disabled]="tour.index() === 0"
+              >
+                Anterior
+              </button>
+              <button class="btn-primary" (click)="tour.next()">
+                @if (tour.index() < tour.total() - 1) { Siguiente } @else { Finalizar }
+              </button>
+            </div>
+          </footer>
+        </div>
+      }
+    }
+  </div>
+}

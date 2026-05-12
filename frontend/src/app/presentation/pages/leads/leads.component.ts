@@ -5,6 +5,7 @@ import { SseService } from '../../../infrastructure/services/sse.service';
 import { SessionService } from '../../../core/services/session.service';
 import { LeadsGridComponent, BatchActionEvent } from '../../components/shared/leads-grid.component';
 import { TopBarComponent } from '../../components/shared/top-bar.component';
+import { GuideButtonComponent } from '../../components/shared/guide-button.component';
 import { SessionDto, SalespersonDto } from '../../../core/models/crm.models';
 import { Subscription } from 'rxjs';
 
@@ -12,10 +13,12 @@ import { Subscription } from 'rxjs';
 // ... (Keeping decorator matching)
   selector: 'app-leads',
   standalone: true,
-  imports: [CommonModule, LeadsGridComponent, TopBarComponent],
+  imports: [CommonModule, LeadsGridComponent, TopBarComponent, GuideButtonComponent],
   template: `
     <div class="leads-page">
-      <app-top-bar [title]="session.currentRole() === 'manager' ? 'Gestor de Leads' : 'Mis Leads'" breadcrumb="Leads"></app-top-bar>
+      <app-top-bar [title]="session.currentRole() === 'manager' ? 'Gestor de Leads' : 'Mis Leads'" breadcrumb="Leads">
+        <app-guide-button tab="leads"></app-guide-button>
+      </app-top-bar>
 
       <div class="grid-wrapper">
         <app-leads-grid
@@ -173,6 +176,15 @@ export class LeadsComponent implements OnInit, OnDestroy {
 
       if (event.type === 'settings') {
         this.routingMode.set(event.data.routing_mode);
+      }
+
+      if (event.type === 'lead_updated') {
+        const { session_id, lead_profile_name } = event.data ?? {};
+        if (session_id) {
+          this.leads.update(list => list.map(l =>
+            l.session_id === session_id ? { ...l, lead_profile_name } : l
+          ));
+        }
       }
     });
 

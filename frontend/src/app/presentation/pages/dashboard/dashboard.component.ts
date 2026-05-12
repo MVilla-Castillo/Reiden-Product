@@ -8,6 +8,7 @@ import { KpiCardComponent } from '../../components/shared/kpi-card.component';
 import { LeadsGridComponent } from '../../components/shared/leads-grid.component';
 import { IconComponent } from '../../components/shared/icons.component';
 import { SkeletonComponent } from '../../components/shared/skeleton.component';
+import { GuideButtonComponent } from '../../components/shared/guide-button.component';
 import { SessionDto, SalespersonDto, MetricsResponse, TenantSettings } from '../../../core/models/crm.models';
 
 const METRICS_BACKUP_MS = 3_600_000;
@@ -15,7 +16,7 @@ const METRICS_BACKUP_MS = 3_600_000;
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, KpiCardComponent, LeadsGridComponent, IconComponent, SkeletonComponent],
+  imports: [CommonModule, KpiCardComponent, LeadsGridComponent, IconComponent, SkeletonComponent, GuideButtonComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
@@ -103,6 +104,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
           ...(ts ?? { tenant_id: '', nombre_legal: '', is_verified: false }),
           routing_mode: event.data.routing_mode,
         }));
+      }
+
+      if (event.type === 'lead_updated') {
+        const { session_id, lead_profile_name } = event.data ?? {};
+        if (session_id) {
+          this.leads.update(list => list.map(l =>
+            l.session_id === session_id ? { ...l, lead_profile_name } : l
+          ));
+        }
       }
     }, error: () => {
       this.sseReconnecting.set(true);

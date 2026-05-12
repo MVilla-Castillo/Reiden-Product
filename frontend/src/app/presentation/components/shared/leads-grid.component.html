@@ -1,7 +1,7 @@
 <div class="leads-table-container">
 
   <!-- ── Barra de filtros ─────────────────────────────────────────────── -->
-  <div class="leads-filters">
+  <div class="leads-filters" data-guide="leads-filters">
 
     <div class="filter-search">
       <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
@@ -86,7 +86,7 @@
 
   <!-- ── Batch action toolbar ─────────────────────────────────────────── -->
   @if (selectionCount > 0) {
-    <div class="batch-toolbar" role="toolbar" aria-label="Acciones masivas">
+    <div class="batch-toolbar" data-guide="leads-batch-toolbar" role="toolbar" aria-label="Acciones masivas">
       <span class="batch-count">
         <strong>{{ selectionCount }}</strong> lead{{ selectionCount === 1 ? '' : 's' }} seleccionado{{ selectionCount === 1 ? '' : 's' }}
       </span>
@@ -123,7 +123,7 @@
 
   <!-- ── Paginación ─────────────────────────────────────────────────────── -->
   @if (totalPages >= 1) {
-    <div class="pagination">
+    <div class="pagination" data-guide="leads-pagination">
       <button class="btn-page" [disabled]="!hasPrevPage" (click)="prevPage()">← Anterior</button>
       <span class="page-info">Página {{ currentPage() }} de {{ totalPages }}</span>
       <button class="btn-page" [disabled]="!hasNextPage" (click)="nextPage()">Siguiente →</button>
@@ -131,10 +131,10 @@
   }
 
   <!-- ── Tabla ────────────────────────────────────────────────────────── -->
-  <table class="leads-table">
+  <table class="leads-table" data-guide="leads-table">
     <thead>
       <tr>
-        <th class="col-check">
+        <th class="col-check" data-guide="leads-batch-select">
           <input type="checkbox"
                  class="row-checkbox"
                  [checked]="allSelected"
@@ -176,7 +176,7 @@
           </span>
         </th>
         @if (canAssign) {
-          <th>Asignar A</th>
+          <th data-guide="leads-assign-col">Asignar A</th>
         }
       </tr>
     </thead>
@@ -206,6 +206,7 @@
           </td>
           <td>
             <span class="urgency-badge"
+                  [attr.data-guide]="i === 0 ? 'leads-urgency-badge' : null"
                   [class.urgency-high]="lead.urgency_score > 60"
                   [class.urgency-medium]="lead.urgency_score > 30 && lead.urgency_score <= 60"
                   [class.urgency-normal]="lead.urgency_score <= 30">
@@ -214,6 +215,7 @@
           </td>
           <td>
             <span class="status-badge status-{{ lead.status | lowercase }}"
+                  [attr.data-guide]="i === 0 ? 'leads-status-badge' : null"
                   [title]="(lead.status === 'GANADO' || lead.status === 'PERDIDO' || lead.status === 'CON_VENDEDOR') && lead.salesperson_name
                            ? 'Vendedor: ' + lead.salesperson_name
                            : ''">

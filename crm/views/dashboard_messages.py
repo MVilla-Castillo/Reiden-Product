@@ -426,6 +426,7 @@ def salespeople_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"salespeople": salespeople}, status=200)
 
 
+@csrf_exempt
 @require_http_methods(["GET", "PATCH"])
 def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
     if request.tenant is None:
@@ -473,6 +474,17 @@ def update_lead_api(request: HttpRequest, session_id: UUID) -> JsonResponse:
             )
             lead.profile_name = new_name
             lead.save(update_fields=["profile_name"])
+
+            broadcaster.publish_dashboard(
+                str(request.tenant.id),
+                "lead_updated",
+                {
+                    "session_id": str(session_id),
+                    "lead_id": str(lead.id),
+                    "lead_profile_name": lead.profile_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
     name_history = list(
         LeadNameHistory.objects.filter(lead=lead)

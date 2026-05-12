@@ -7,6 +7,7 @@ import { MetricsResponse, SalespersonDto } from '../../../core/models/crm.models
 import { KpiCardComponent } from '../../components/shared/kpi-card.component';
 import { SkeletonComponent } from '../../components/shared/skeleton.component';
 import { IconComponent } from '../../components/shared/icons.component';
+import { GuideButtonComponent } from '../../components/shared/guide-button.component';
 
 interface LeaderboardRow {
   salesperson_id: string;
@@ -23,7 +24,7 @@ interface LeaderboardRow {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, KpiCardComponent, SkeletonComponent, IconComponent],
+  imports: [CommonModule, FormsModule, KpiCardComponent, SkeletonComponent, IconComponent, GuideButtonComponent],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.scss'
 })

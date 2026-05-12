@@ -33,6 +33,7 @@ from crm.views.dashboard_messages import (
     update_lead_api,
 )
 from crm.views.metrics import metrics_api
+from crm.views.guides import guides_api
 from crm.views.sse import dashboard_sse_view, messages_sse_view
 from crm.views.sse_ticket import sse_ticket_view
 from crm.views.scheduler import (
@@ -138,6 +139,12 @@ urlpatterns = [
         name="metrics",
     ),
     path("api/dashboard/me/", me_api, name="me"),
+    # Guías interactivas (tour onboarding) por pestaña: dashboard, leads, chat, reports
+    path(
+        "api/dashboard/guides/<str:tab>/",
+        guides_api,
+        name="guides",
+    ),
     # SSE: ticket de un solo uso para autenticar la conexión SSE sin exponer el JWT en la URL
     path("api/sse/ticket/", sse_ticket_view, name="sse_ticket"),
     # SSE: stream en tiempo real para el dashboard

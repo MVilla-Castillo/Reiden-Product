@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { SidebarComponent } from './presentation/components/layout/sidebar.component';
+import { GuideOverlayComponent } from './presentation/components/shared/guide-overlay.component';
 import { filter, Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { SessionService } from './core/services/session.service';
@@ -9,7 +10,7 @@ import { supabase } from './core/supabase';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent, CommonModule],
+  imports: [RouterOutlet, SidebarComponent, GuideOverlayComponent, CommonModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

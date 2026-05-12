@@ -10,11 +10,12 @@ import { SessionDto, BackendMessage, LeadNameHistory } from '../../../core/model
 import { EmptyStateComponent } from '../../components/shared/empty-state.component';
 import { TopBarComponent } from '../../components/shared/top-bar.component';
 import { IconComponent } from '../../components/shared/icons.component';
+import { GuideButtonComponent } from '../../components/shared/guide-button.component';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollingModule, EmptyStateComponent, TopBarComponent, IconComponent],
+  imports: [CommonModule, FormsModule, ScrollingModule, EmptyStateComponent, TopBarComponent, IconComponent, GuideButtonComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
@@ -71,6 +72,17 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.dashboardSseSub = this.sseService.dashboardStream().subscribe(event => {
       if (event.type === 'snapshot' || event.type === 'pending_leads') {
         this.loadMyChats();
+      }
+
+      if (event.type === 'lead_updated') {
+        const { session_id, lead_profile_name } = event.data ?? {};
+        if (!session_id) return;
+        this.chats.update(chats => chats.map(c =>
+          c.session_id === session_id ? { ...c, lead_profile_name } : c
+        ));
+        this.selectedSession.update(s =>
+          s && s.session_id === session_id ? { ...s, lead_profile_name } : s
+        );
       }
     });
     this.queryParamsSub = this.route.queryParams.subscribe(params => {
@@ -187,6 +199,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     const file = this.failedUploadFile();
     if (file) this.startUpload(file);
   }
+
+  openFirstChatForGuide = (): void => {
+    const first = this.filteredChats()[0];
+    if (!this.selectedSession() && first) {
+      this.selectLead(first);
+    }
+  };
 
   selectLead(chat: SessionDto) {
     this.selectedSession.set(chat);
@@ -390,6 +409,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   isEditingName = signal(false);
   editingNameValue = signal('');
   nameHistory = signal<LeadNameHistory[]>([]);
+  nameSaveError = signal<string | null>(null);
 
   startEditName() {
     const session = this.selectedSession();
@@ -419,8 +439,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.nameHistory.set(res.name_history || []);
         this.isEditingName.set(false);
       },
-      error: () => {
-        this.isEditingName.set(false);
+      error: (err) => {
+        console.error('Error al actualizar nombre del lead', err);
+        this.nameSaveError.set(
+          'No se pudo guardar el nuevo nombre. Verifica tu conexión e intenta de nuevo.'
+        );
+        setTimeout(() => this.nameSaveError.set(null), 5000);
       }
     });
   }

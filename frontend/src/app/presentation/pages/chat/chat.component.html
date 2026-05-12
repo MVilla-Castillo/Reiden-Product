@@ -1,8 +1,11 @@
 <div class="chat-container">
   <aside class="chat-sidebar">
     <div class="sidebar-header">
-      <h2>Mis Chats</h2>
-      <div class="chat-filter">
+      <div class="sidebar-header-row">
+        <h2>Mis Chats</h2>
+        <app-guide-button tab="chat" [beforeStart]="openFirstChatForGuide"></app-guide-button>
+      </div>
+      <div class="chat-filter" data-guide="chat-filters">
         <button [class.active]="chatFilter() === 'all'" (click)="setFilter('all')">Todos</button>
         <button [class.active]="chatFilter() === 'active'" (click)="setFilter('active')">Activos</button>
         <button [class.active]="chatFilter() === 'won'" (click)="setFilter('won')">Ganados</button>
@@ -10,7 +13,7 @@
         <button [class.active]="chatFilter() === 'abandoned'" (click)="setFilter('abandoned')">Abandonados</button>
       </div>
     </div>
-    <div class="chat-list">
+    <div class="chat-list" data-guide="chat-list">
       @if (useVirtualScroll()) {
         <cdk-virtual-scroll-viewport itemSize="80" class="chat-virtual-viewport">
           <div
@@ -72,6 +75,12 @@
     @if (selectedSession()) {
       <div class="chat-header">
         <div class="header-details">
+          @if (nameSaveError(); as nameErr) {
+            <div class="name-save-error" role="alert">
+              <span>{{ nameErr }}</span>
+              <button (click)="nameSaveError.set(null)" aria-label="Cerrar aviso">✕</button>
+            </div>
+          }
           @if (isEditingName()) {
             <div class="name-edit-wrap">
               <input
@@ -101,7 +110,7 @@
           <span>Cargando mensajes...</span>
         </div>
       }
-      <div class="messages-area" #messagesContainer (scroll)="onMessagesScroll($event)">
+      <div class="messages-area" data-guide="chat-messages" #messagesContainer (scroll)="onMessagesScroll($event)">
         @for (msg of messages(); track msg.message_id) {
           <div class="message" [ngClass]="msg.direction === 'OUTBOUND' ? 'sent' : 'received'">
             <div class="bubble">
@@ -146,7 +155,7 @@
           <button class="btn-cancel-upload" (click)="cancelUpload()" title="Cancelar">✕</button>
         </div>
       }
-      <div class="input-area">
+      <div class="input-area" data-guide="chat-input">
         <input
           type="file"
           #fileInput
@@ -180,7 +189,7 @@
     }
   </main>
 
-  @if (selectedSession()) { <aside class="lead-drawer">
+  @if (selectedSession()) { <aside class="lead-drawer" data-guide="chat-lead-drawer">
       <div class="drawer-header">
         <h4>Ficha del Lead</h4>
       </div>
@@ -211,7 +220,7 @@
           <span class="drawer-value">{{ selectedSession()?.salesperson_name || '—' }}</span>
         </div>
 
-        <div class="drawer-actions">
+        <div class="drawer-actions" data-guide="chat-status-actions">
           <button class="btn-drawer-action btn-ganado" (click)="updateStatus('GANADO')">Ganado</button>
           <button class="btn-drawer-action btn-perdido" (click)="updateStatus('PERDIDO')">Perdido</button>
         </div>
